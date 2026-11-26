@@ -61,6 +61,28 @@ export type CatalogRelation = {
   readonly definition: string | null;
 };
 
+/** A trigger on a relation the migrations made (T-486). */
+export type CatalogTrigger = {
+  /** The relation, `schema.name`, each part quoted as PostgreSQL would need. */
+  readonly table: string;
+  /** Its name, quoted as PostgreSQL would need. */
+  readonly name: string;
+  /** pg_get_triggerdef, read with an empty search path: function, timing, events. */
+  readonly definition: string;
+  /** pg_trigger.tgenabled: O (as made), D (disabled), R (replica only) or A (always). */
+  readonly enabled: string;
+};
+
+/** A rewrite rule on a relation the migrations made, other than a view's own (T-486). */
+export type CatalogRule = {
+  readonly table: string;
+  readonly name: string;
+  /** sha256 of pg_get_ruledef, read with an empty search path. */
+  readonly definition: string;
+  /** pg_rewrite.ev_enabled, as a trigger's. */
+  readonly enabled: string;
+};
+
 /** What the migrations made: their schemas, every relation and function in them, the fence. */
 export type MigrationCatalog = {
   readonly schemas: readonly string[];
@@ -70,7 +92,31 @@ export type MigrationCatalog = {
   readonly policies: readonly FencePolicy[];
   /** Every function in those schemas that no extension brought. */
   readonly functions: readonly FunctionShape[];
+  /** Every trigger (not PostgreSQL's own for a foreign key) on a relation in those schemas. */
+  readonly triggers: readonly CatalogTrigger[];
+  /** Every rewrite rule on a relation in those schemas, but a view's own `_RETURN`. */
+  readonly rules: readonly CatalogRule[];
 };
+
+/**
+ * Runs `read` in a read-only transaction whose search path is empty (T-485), so PostgreSQL
+ * prints every function, type and table in a policy, view, trigger or rule with its schema:
+ * a policy calling a `current_league_id()` of another schema, found first on the login's
+ * search path (its `"$user"` schema, or one set for the role), then reads as that schema's.
+ * The catalog is written (migration-catalog-file.ts) and read at start (check-fence.ts) so.
+ */
+export function readQualified<T>(
+  database: Kysely<Database>,
+  read: (qualified: Kysely<Database>) => Promise<T>,
+): Promise<T> {
+  return database
+    .transaction()
+    .setAccessMode('read only')
+    .execute(async (qualified) => {
+      await sql`select pg_catalog.set_config('search_path', '', true)`.execute(qualified);
+      return read(qualified);
+    });
+}
 
 /**
  * Every league table: its oid, name and whether its row-level security is on and forced.
@@ -213,6 +259,51 @@ export async function readRelations(
   }));
 }
 
+/**
+ * Every trigger on a relation in `schemas` that no extension brought, but PostgreSQL's own
+ * (a foreign key's), with its definition and whether it fires (T-486).
+ */
+export async function readTriggers(
+  database: Kysely<Database>,
+  schemas: readonly string[],
+): Promise<CatalogTrigger[]> {
+  const { rows } = await sql<{ table: string; name: string; definition: string; enabled: string }>`
+    select pg_catalog.quote_ident(n.nspname) || '.' || pg_catalog.quote_ident(c.relname)
+        as "table",
+      pg_catalog.quote_ident(t.tgname) as name,
+      pg_catalog.pg_get_triggerdef(t.oid) as definition, t.tgenabled::text as enabled
+    from pg_catalog.pg_trigger t
+    join pg_catalog.pg_class c on c.oid = t.tgrelid
+    join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+    where not t.tgisinternal
+      and n.nspname::text in (
+        select pg_catalog.jsonb_array_elements_text(${JSON.stringify(schemas)}::jsonb))
+      and ${notOfAnExtension('pg_catalog.pg_class', sql`c.oid`)}
+    order by 1, 2`.execute(database);
+  return rows.map((row) => ({ ...row, definition: rule(row.definition) ?? '' }));
+}
+
+/** Every rewrite rule on a relation in `schemas`, but a view's own `_RETURN` (T-486). */
+export async function readRules(
+  database: Kysely<Database>,
+  schemas: readonly string[],
+): Promise<CatalogRule[]> {
+  const { rows } = await sql<{ table: string; name: string; definition: string; enabled: string }>`
+    select pg_catalog.quote_ident(n.nspname) || '.' || pg_catalog.quote_ident(c.relname)
+        as "table",
+      pg_catalog.quote_ident(w.rulename) as name,
+      pg_catalog.pg_get_ruledef(w.oid) as definition, w.ev_enabled::text as enabled
+    from pg_catalog.pg_rewrite w
+    join pg_catalog.pg_class c on c.oid = w.ev_class
+    join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+    where w.rulename <> '_RETURN'
+      and n.nspname::text in (
+        select pg_catalog.jsonb_array_elements_text(${JSON.stringify(schemas)}::jsonb))
+      and ${notOfAnExtension('pg_catalog.pg_class', sql`c.oid`)}
+    order by 1, 2`.execute(database);
+  return rows.map((row) => ({ ...row, definition: sha256(rule(row.definition) ?? '') }));
+}
+
 /** Every policy on a league table (found, or one of `listed`). */
 export async function readFencePolicies(
   database: Kysely<Database>,
@@ -239,14 +330,10 @@ export async function readFencePolicies(
 }
 
 /**
- * A policy's rule as compared: the catalog writes `public.` before a name only when the
- * reading session's search path lacks it, so that, and spacing, do not count.
+ * A policy's rule as compared: spacing does not count. Every name in it carries its schema,
+ * since it is read with an empty search path (readQualified, T-485), so `public.` counts:
+ * the same name in another schema is another function.
  */
 export function rule(text: string | null): string | null {
-  return text === null
-    ? null
-    : text
-        .replace(/\bpublic\./g, '')
-        .replace(/\s+/g, ' ')
-        .trim();
+  return text === null ? null : text.replace(/\s+/g, ' ').trim();
 }

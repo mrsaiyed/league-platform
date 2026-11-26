@@ -15,16 +15,26 @@
 //       view, definition (T-481); every table, view and foreign table in their schemas is
 //       one they made, and in any other schema, none they did not make is readable by the
 //       login or a role it may become (T-476): a copy or a view of a league's rows holds no
-//       fence. A library's own schema (library-schemas.ts, T-482) is let be where it holds
-//       no league column and no view of a league table.
-// Each is named in a plain sentence with the one statement that puts it right.
+//       fence. In a library's own schema (library-schemas.ts, T-482) only ordinary tables
+//       without a league column are let be; any view or foreign table there is refused;
+//   (e) every trigger and rewrite rule on a relation the migrations made is theirs, as
+//       they made it and enabled (T-486): a rule that copies a league's rows elsewhere on
+//       each change, or a trigger that does, opens the fence without touching a policy.
+// All is read in one transaction with an empty search path (T-485), so every function a
+// policy calls is printed with its schema. Each is named in a plain sentence with the one
+// statement that puts it right.
 import { sql, type Kysely } from 'kysely';
 import { kyselyOf, type DatabaseHandle } from './database-handle.ts';
 import {
   leagueTables,
   readFencePolicies,
   readFunctionShapes,
+  readQualified,
   readRelations,
+  readRules,
+  readTriggers,
+  type CatalogRule,
+  type CatalogTrigger,
   type FencePolicy,
   type FunctionShape,
   type MigrationCatalog,
@@ -330,6 +340,65 @@ async function changedRelations(
   });
 }
 
+const notEnabled = (enabled: string) =>
+  enabled === 'D' ? 'disabled' : 'not enabled as the migrations left it';
+
+/**
+ * (e) A trigger or rule on a relation the migrations made that no migration made, or one of
+ * theirs missing, changed or not enabled as they left it (T-486).
+ */
+async function changedTriggersAndRules(
+  database: Kysely<Database>,
+  catalog: MigrationCatalog,
+): Promise<string[]> {
+  const made = new Set(catalog.relations.map((relation) => relation.name));
+  const again = "run the migrations' own definition again";
+  const compare = (
+    what: 'trigger' | 'rule',
+    theirs: readonly (CatalogTrigger | CatalogRule)[],
+    found: readonly (CatalogTrigger | CatalogRule)[],
+  ): string[] => {
+    const key = (one: CatalogTrigger | CatalogRule) => `${one.table} ${one.name}`;
+    const own = new Map(theirs.map((one) => [key(one), one]));
+    const seen = new Set(found.map(key));
+    const does = what === 'trigger' ? 'does on each change' : 'puts in place of each change';
+    const problems = found
+      .filter((now) => made.has(now.table))
+      .flatMap((now) => {
+        const was = own.get(key(now));
+        const name = `${what} ${now.name} on ${now.table}`;
+        if (was === undefined)
+          return [
+            `${now.table} has a ${what} ${now.name} that no migration made, so what it ${does} ` +
+              `is not known to keep to the league fence: drop ${name}`,
+          ];
+        if (now.definition !== was.definition)
+          return [
+            `${now.table} has its ${what} ${now.name} changed from the migrations', so what it ` +
+              `${does} may cross the league fence: drop ${name}, then ${again}`,
+          ];
+        if (now.enabled !== was.enabled)
+          return [
+            `${now.table} has its ${what} ${now.name}, which the migrations made, ` +
+              `${notEnabled(now.enabled)}, so what it keeps is not kept: ` +
+              `alter table ${now.table} enable ${what} ${now.name}`,
+          ];
+        return [];
+      });
+    for (const was of theirs)
+      if (!seen.has(key(was)) && made.has(was.table))
+        problems.push(
+          `${was.table} is missing its ${what} ${was.name}, which the migrations made, so what ` +
+            `it keeps is not kept: ${again}`,
+        );
+    return problems;
+  };
+  return [
+    ...compare('trigger', catalog.triggers, await readTriggers(database, catalog.schemas)),
+    ...compare('rule', catalog.rules, await readRules(database, catalog.schemas)),
+  ];
+}
+
 type Stranger = {
   name: string;
   kind: string;
@@ -398,7 +467,9 @@ async function strangers(
               catalog.relations.map((relation) => relation.name),
             )}::jsonb))
     ) relations
-    where (ours or reader is not null) and not (library and not leagueish)
+    -- In a library's schema only an ordinary table without a league column is let be
+    -- (T-482, tightened): a view, materialized view or foreign table there never is.
+    where (ours or reader is not null) and not (library and kind in ('r', 'p') and not leagueish)
     order by name`.execute(database);
   const reached = new Set(['public', ...roles.reached]);
   return rows.map(({ name, kind, ours, reader, holders, library }) => {
@@ -413,7 +484,7 @@ async function strangers(
     const statement =
       from.length > 0
         ? `revoke select on table ${name} from ${from.join(', ')}`
-        : library
+        : library && (kind === 'r' || kind === 'p')
           ? `revoke select on table ${name} from ${String(reader)}`
           : `drop ${what} ${name}`;
     const who =
@@ -435,14 +506,14 @@ export async function checkFence(
   roles: FenceRoles,
   catalog: MigrationCatalog = migrationCatalog,
 ): Promise<string[]> {
-  const database = kyselyOf(db);
-  return [
+  return readQualified(kyselyOf(db), async (database) => [
     ...(await lostLeagueColumns(database, catalog)),
     ...(await openTables(database, catalog)),
     ...(await widePolicies(database, catalog)),
     ...(await unreviewedDefiners(database, roles)),
     ...(await changedFunctions(database, catalog)),
     ...(await changedRelations(database, catalog)),
+    ...(await changedTriggersAndRules(database, catalog)),
     ...(await strangers(database, catalog, roles)),
-  ];
+  ]);
 }

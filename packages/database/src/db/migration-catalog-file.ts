@@ -12,8 +12,11 @@ import {
   readFencePolicies,
   readFunctionShapes,
   readLeagueTables,
+  readQualified,
   readRelations,
+  readRules,
   readSchemas,
+  readTriggers,
   type MigrationCatalog,
 } from './fence-catalog.ts';
 
@@ -31,15 +34,19 @@ export async function readMigrationCatalog(
   try {
     const run = await applyMigrations(pgliteDriver(pglite), folder);
     if (!run.ok) throw new Error(`migrations failed: ${run.error.code}: ${run.error.message}`);
-    const database = kyselyOf(db);
-    const schemas = await readSchemas(database);
-    return {
-      schemas,
-      relations: await readRelations(database, schemas),
-      leagueTables: await readLeagueTables(database),
-      policies: await readFencePolicies(database),
-      functions: await readFunctionShapes(database, schemas),
-    };
+    // With an empty search path, as the guard reads at start (T-485).
+    return await readQualified(kyselyOf(db), async (database) => {
+      const schemas = await readSchemas(database);
+      return {
+        schemas,
+        relations: await readRelations(database, schemas),
+        leagueTables: await readLeagueTables(database),
+        policies: await readFencePolicies(database),
+        functions: await readFunctionShapes(database, schemas),
+        triggers: await readTriggers(database, schemas),
+        rules: await readRules(database, schemas),
+      };
+    });
   } finally {
     await db.close();
     await pglite.close();
@@ -57,7 +64,9 @@ export async function migrationCatalogFile(
 // here that is missing or of another kind, owner or definition (T-481), a league table
 // listed here whose league column is gone or renamed, a policy on a league table that is
 // not listed here word for word or is missing, and a function listed here that is missing
-// or whose body, settings, owner, language, security or volatility differ (T-477).
+// or whose body, settings, owner, language, security or volatility differ (T-477), and a
+// trigger or rule on a relation listed here that is not listed, missing, changed or not
+// enabled as made (T-486). Every name is read with its schema (T-485).
 import type { MigrationCatalog } from './fence-catalog.ts';
 
 export const migrationCatalog: MigrationCatalog = ${JSON.stringify(catalog)};

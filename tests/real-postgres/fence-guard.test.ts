@@ -123,11 +123,14 @@ describe('with nothing planted', () => {
 
   it('every policy on a league table reads as the migrations’ own on this server', async () => {
     // migration-catalog.ts is generated on PGlite (PostgreSQL 17); this server is 16. Each
-    // rule is compared as the guard compares it (T-470: `public.` and spacing not counted).
+    // rule is read as the guard reads it, with an empty search path, so every function in it
+    // carries its schema (T-485), and compared as the guard compares it (spacing not counted).
     const { rows: version } = await owner.query<{ v: string }>(
       `select current_setting('server_version_num') as v`,
     );
     expect(Number(version[0]?.v)).toBeLessThan(170000);
+    await owner.exec('begin');
+    await owner.query(`select pg_catalog.set_config('search_path', '', true)`);
     const { rows } = await owner.query<{
       table: string;
       name: string;
@@ -142,8 +145,12 @@ describe('with nothing planted', () => {
        join pg_catalog.pg_class c on c.oid = p.polrelid
        join pg_catalog.pg_namespace n on n.oid = c.relnamespace`,
     );
+    await owner.exec('rollback');
     const here = new Map(rows.map((row) => [`${row.table} ${row.name}`, row]));
     expect(migrationCatalog.policies.length).toBeGreaterThan(20);
+    expect(
+      migrationCatalog.policies.every((made) => made.using?.includes('public.') !== false),
+    ).toBe(true);
     for (const made of migrationCatalog.policies) {
       const found = here.get(`${made.table} ${made.name}`);
       expect({
@@ -390,7 +397,7 @@ describe('(d) a table or view no migration made', () => {
   });
 });
 
-const fence = '(league_id = ( SELECT current_league_id() AS current_league_id))';
+const fence = '(league_id = ( SELECT public.current_league_id() AS current_league_id))';
 
 describe('(a) a listed league table whose league column was renamed (T-470, changed)', () => {
   it('renamed, then using (true): refused by name; put back, it passes', async () => {
@@ -566,6 +573,7 @@ describe('(d) a relation the migrations made, replaced by hand (T-481)', () => {
       ],
       [
         "public.accounts is a table the migrations made, but it is now a view, so it may hold rows of any league: drop view public.accounts, then run the migrations' own definition again",
+        "public.accounts is missing its trigger accounts_on_update, which the migrations made, so what it keeps is not kept: run the migrations' own definition again",
       ],
       putBack,
       async () => {
@@ -592,6 +600,7 @@ describe('(d) a relation the migrations made, replaced by hand (T-481)', () => {
       ],
       [
         `public.accounts is a table the migrations made, but it is now owned by ${role}, not postgres, so it may not be what they made: alter table public.accounts owner to postgres`,
+        "public.accounts is missing its trigger accounts_on_update, which the migrations made, so what it keeps is not kept: run the migrations' own definition again",
       ],
       [...putBack, `revoke create on schema public from ${role}`, `drop role if exists ${role}`],
       async () => {
@@ -667,5 +676,204 @@ describe('(b) a fence policy the migrations made, dropped', () => {
       ],
       [],
     );
+  });
+});
+
+describe('(b) a policy calling a function found first on the login’s search path (T-485)', () => {
+  const programsPolicies = () =>
+    migrationCatalog.policies.filter((policy) => policy.table === 'public.programs');
+  const alterAll = (map: (rule: string) => string) =>
+    programsPolicies().map(
+      (policy) =>
+        `alter policy ${policy.name} on ${policy.table}` +
+        (policy.using === null ? '' : ` using (${map(policy.using)})`) +
+        (policy.check === null ? '' : ` with check (${map(policy.check)})`),
+    );
+  const unqualified = (rule: string) =>
+    rule.replaceAll('public.current_league_id()', 'current_league_id()');
+  const said = (schema: string) =>
+    programsPolicies().map((policy) => {
+      const now = (rule: string | null) =>
+        rule === null
+          ? null
+          : rule.replaceAll('public.current_league_id()', `${schema}.current_league_id()`);
+      const text = (using: string | null, check: string | null) =>
+        `to ${policy.roles}` +
+        (using === null ? '' : ` using (${using})`) +
+        (check === null ? '' : ` with check (${check})`);
+      return (
+        `public.programs has its policy ${policy.name} changed from the migrations' (now ` +
+        `${policy.permissive ? '' : 'as restrictive '}${policy.command === 'all' ? '' : `for ${policy.command} `}` +
+        `${text(now(policy.using), now(policy.check))}): alter policy ${policy.name} on public.programs ` +
+        `${text(policy.using, policy.check)}`
+      );
+    });
+  const plantShadow = (schema: string) => [
+    `create schema ${schema}`,
+    `grant usage on schema ${schema} to app_login`,
+    `create function ${schema}.current_league_id() returns uuid language sql stable
+       as $$ select '${b}'::uuid $$`,
+    `grant execute on function ${schema}.current_league_id() to app_login`,
+  ];
+
+  it('the "$user" schema app_login with its own current_league_id: refused, though the login read league B', async () => {
+    // The second look's plant B: the login's session finds app_login.current_league_id first.
+    await plantedAndMended(
+      [
+        ...plantShadow('app_login'),
+        'set search_path = app_login, public',
+        ...alterAll(unqualified),
+      ],
+      said('app_login'),
+      [`reset search_path`, ...alterAll((rule) => rule), 'drop schema if exists app_login cascade'],
+      async () => {
+        expect(await asLogin(a, (login) => leaguesSeen(login, 'public.programs'))).toEqual([b]);
+      },
+      [...alterAll((rule) => rule), 'reset search_path', 'drop schema app_login cascade'],
+    );
+  });
+
+  it('a search path set for the login role, read on a fresh connection: refused', async () => {
+    const fresh = appDatabase(1);
+    let failure: unknown = null;
+    try {
+      for (const statement of [
+        ...plantShadow('made_up_shadow'),
+        'alter role app_login set search_path = made_up_shadow, public',
+        `set search_path = made_up_shadow, public`,
+        ...alterAll(unqualified),
+        'reset search_path',
+      ])
+        await owner.exec(statement);
+      expect(await checkLoginRole(fresh)).toEqual(said('made_up_shadow'));
+      expect(await asLogin(a, (login) => leaguesSeen(login, 'public.programs'))).toEqual([b]);
+    } catch (error) {
+      failure = error;
+    }
+    const undone = await undoAll([
+      ...alterAll((rule) => rule),
+      'alter role app_login reset search_path',
+      'drop schema if exists made_up_shadow cascade',
+    ]);
+    await fresh.close();
+    if (failure !== null) throw withUndoFailures(failure, undone);
+    expect(undone).toEqual([]);
+    expect(await checkLoginRole(db)).toEqual([]);
+  });
+});
+
+describe('(e) a rule or trigger on a league table the migrations made (T-486)', () => {
+  // The copy sits in pg-boss's schema without a league column, which T-482 lets be (its
+  // stated limit, closed by step 2.112): the rule or trigger that fills it is what is refused.
+  let madeQueueSchema = false;
+  const copy = [
+    'create table pgboss.c4 (id uuid, lid text)',
+    'grant select on pgboss.c4 to app_login',
+  ];
+  // The schema itself is dropped after the last of these, if this file made it.
+  const undoCopy = () => ['drop table if exists pgboss.c4'];
+  beforeAll(async () => {
+    const { rows } = await owner.query<{ there: boolean }>(
+      `select exists (select 1 from pg_catalog.pg_namespace where nspname = 'pgboss') as there`,
+    );
+    madeQueueSchema = rows[0]?.there !== true;
+    if (madeQueueSchema) await owner.exec('create schema pgboss');
+    await owner.exec('grant usage on schema pgboss to app_login');
+  });
+  afterAll(async () => {
+    await owner.exec('revoke usage on schema pgboss from app_login');
+    if (madeQueueSchema) await owner.exec('drop schema if exists pgboss');
+  });
+  async function leagueBCopied(): Promise<void> {
+    // League B updates its programs; the login, set to league A, reads B's rows in the copy.
+    const login = await connectPostgresDriver(server.appUrl, { ca });
+    try {
+      await login.exec('begin');
+      await login.query(`select pg_catalog.set_config('app.league_id', $1, true)`, [b]);
+      await login.exec('update public.programs set league_id = league_id');
+      await login.exec('commit');
+    } finally {
+      await login.close();
+    }
+    const seen = await asLogin(a, (reader) => leaguesSeen(reader, 'pgboss.c4', 'lid::uuid'));
+    expect(seen).toEqual([b]);
+  }
+
+  it('the second look’s rule, copying each update: refused, though the login read league B', async () => {
+    await plantedAndMended(
+      [
+        ...copy,
+        `create rule made_up_copy as on update to public.programs do also
+           insert into pgboss.c4 (id, lid) values (new.id, new.league_id::text)`,
+      ],
+      [
+        'public.programs has a rule made_up_copy that no migration made, so what it puts in place of each change is not known to keep to the league fence: drop rule made_up_copy on public.programs',
+      ],
+      ['drop rule if exists made_up_copy on public.programs', ...undoCopy()],
+      leagueBCopied,
+    );
+  });
+
+  it('a trigger added, its function a security definer: refused by name', async () => {
+    await plantedAndMended(
+      [
+        ...copy,
+        'create schema made_up_hooks',
+        `create function made_up_hooks.copy() returns trigger language plpgsql security definer
+           as $$ begin insert into pgboss.c4 values (new.id, new.league_id::text); return new; end $$`,
+        `create trigger made_up_copy after update on public.programs
+           for each row execute function made_up_hooks.copy()`,
+      ],
+      [
+        'public.programs has a trigger made_up_copy that no migration made, so what it does on each change is not known to keep to the league fence: drop trigger made_up_copy on public.programs',
+      ],
+      [
+        'drop trigger if exists made_up_copy on public.programs',
+        'drop schema if exists made_up_hooks cascade',
+        ...undoCopy(),
+      ],
+      leagueBCopied,
+    );
+  });
+
+  it('a migration’s trigger disabled: refused, and the sentence’s statement enables it', async () => {
+    await plantedAndMended(
+      ['alter table public.programs disable trigger programs_on_update'],
+      [
+        'public.programs has its trigger programs_on_update, which the migrations made, disabled, so what it keeps is not kept: alter table public.programs enable trigger programs_on_update',
+      ],
+      ['alter table public.programs enable trigger programs_on_update'],
+    );
+  });
+});
+
+describe('(d) a view in a library’s schema, whatever its columns (T-482, tightened)', () => {
+  it('is refused with a revoke, never a drop of the library’s tables', async () => {
+    const { rows } = await owner.query<{ there: boolean }>(
+      `select exists (select 1 from pg_catalog.pg_namespace where nspname = 'pgboss') as there`,
+    );
+    const made = rows[0]?.there !== true;
+    const said = [
+      'pgboss.made_up_names is a view that no migration made, and app_login may read it, so nothing has checked its fence: revoke select on table pgboss.made_up_names from app_login',
+    ];
+    await plantedAndMended(
+      [
+        ...(made ? ['create schema pgboss'] : []),
+        'grant usage on schema pgboss to app_login',
+        'create table pgboss.made_up_job (id uuid, name text)',
+        'grant select on pgboss.made_up_job to app_login',
+        // No league column, reading no league table: a view there is refused all the same.
+        'create view pgboss.made_up_names as select name as lid from pgboss.made_up_job',
+        'grant select on pgboss.made_up_names to app_login',
+      ],
+      said,
+      [
+        'drop view if exists pgboss.made_up_names',
+        'drop table if exists pgboss.made_up_job',
+        'revoke usage on schema pgboss from app_login',
+        ...(made ? ['drop schema if exists pgboss'] : []),
+      ],
+    );
+    expect(said.join(' ')).not.toMatch(/drop table/);
   });
 });

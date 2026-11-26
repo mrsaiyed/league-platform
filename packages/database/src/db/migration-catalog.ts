@@ -4,7 +4,9 @@
 // here that is missing or of another kind, owner or definition (T-481), a league table
 // listed here whose league column is gone or renamed, a policy on a league table that is
 // not listed here word for word or is missing, and a function listed here that is missing
-// or whose body, settings, owner, language, security or volatility differ (T-477).
+// or whose body, settings, owner, language, security or volatility differ (T-477), and a
+// trigger or rule on a relation listed here that is not listed, missing, changed or not
+// enabled as made (T-486). Every name is read with its schema (T-485).
 import type { MigrationCatalog } from './fence-catalog.ts';
 
 export const migrationCatalog: MigrationCatalog = {
@@ -108,8 +110,8 @@ export const migrationCatalog: MigrationCatalog = {
       permissive: true,
       command: 'all',
       roles: 'public',
-      using: '(league_id = ( SELECT current_league_id() AS current_league_id))',
-      check: '(league_id = ( SELECT current_league_id() AS current_league_id))',
+      using: '(league_id = ( SELECT public.current_league_id() AS current_league_id))',
+      check: '(league_id = ( SELECT public.current_league_id() AS current_league_id))',
     },
     {
       table: 'public.command_receipts',
@@ -117,8 +119,8 @@ export const migrationCatalog: MigrationCatalog = {
       permissive: true,
       command: 'all',
       roles: 'public',
-      using: '(league_id = ( SELECT current_league_id() AS current_league_id))',
-      check: '(league_id = ( SELECT current_league_id() AS current_league_id))',
+      using: '(league_id = ( SELECT public.current_league_id() AS current_league_id))',
+      check: '(league_id = ( SELECT public.current_league_id() AS current_league_id))',
     },
     {
       table: 'public.courts',
@@ -126,8 +128,8 @@ export const migrationCatalog: MigrationCatalog = {
       permissive: true,
       command: 'all',
       roles: 'public',
-      using: '(league_id = ( SELECT current_league_id() AS current_league_id))',
-      check: '(league_id = ( SELECT current_league_id() AS current_league_id))',
+      using: '(league_id = ( SELECT public.current_league_id() AS current_league_id))',
+      check: '(league_id = ( SELECT public.current_league_id() AS current_league_id))',
     },
     {
       table: 'public.divisions',
@@ -135,8 +137,8 @@ export const migrationCatalog: MigrationCatalog = {
       permissive: true,
       command: 'all',
       roles: 'public',
-      using: '(league_id = ( SELECT current_league_id() AS current_league_id))',
-      check: '(league_id = ( SELECT current_league_id() AS current_league_id))',
+      using: '(league_id = ( SELECT public.current_league_id() AS current_league_id))',
+      check: '(league_id = ( SELECT public.current_league_id() AS current_league_id))',
     },
     {
       table: 'public.game_assignments',
@@ -144,8 +146,8 @@ export const migrationCatalog: MigrationCatalog = {
       permissive: true,
       command: 'all',
       roles: 'public',
-      using: '(league_id = ( SELECT current_league_id() AS current_league_id))',
-      check: '(league_id = ( SELECT current_league_id() AS current_league_id))',
+      using: '(league_id = ( SELECT public.current_league_id() AS current_league_id))',
+      check: '(league_id = ( SELECT public.current_league_id() AS current_league_id))',
     },
     {
       table: 'public.game_corrections',
@@ -153,8 +155,8 @@ export const migrationCatalog: MigrationCatalog = {
       permissive: true,
       command: 'all',
       roles: 'public',
-      using: '(league_id = ( SELECT current_league_id() AS current_league_id))',
-      check: '(league_id = ( SELECT current_league_id() AS current_league_id))',
+      using: '(league_id = ( SELECT public.current_league_id() AS current_league_id))',
+      check: '(league_id = ( SELECT public.current_league_id() AS current_league_id))',
     },
     {
       table: 'public.game_events',
@@ -162,8 +164,8 @@ export const migrationCatalog: MigrationCatalog = {
       permissive: true,
       command: 'all',
       roles: 'public',
-      using: '(league_id = ( SELECT current_league_id() AS current_league_id))',
-      check: '(league_id = ( SELECT current_league_id() AS current_league_id))',
+      using: '(league_id = ( SELECT public.current_league_id() AS current_league_id))',
+      check: '(league_id = ( SELECT public.current_league_id() AS current_league_id))',
     },
     {
       table: 'public.game_states',
@@ -171,8 +173,8 @@ export const migrationCatalog: MigrationCatalog = {
       permissive: true,
       command: 'all',
       roles: 'public',
-      using: '(league_id = ( SELECT current_league_id() AS current_league_id))',
-      check: '(league_id = ( SELECT current_league_id() AS current_league_id))',
+      using: '(league_id = ( SELECT public.current_league_id() AS current_league_id))',
+      check: '(league_id = ( SELECT public.current_league_id() AS current_league_id))',
     },
     {
       table: 'public.games',
@@ -180,8 +182,8 @@ export const migrationCatalog: MigrationCatalog = {
       permissive: true,
       command: 'all',
       roles: 'public',
-      using: '(league_id = ( SELECT current_league_id() AS current_league_id))',
-      check: '(league_id = ( SELECT current_league_id() AS current_league_id))',
+      using: '(league_id = ( SELECT public.current_league_id() AS current_league_id))',
+      check: '(league_id = ( SELECT public.current_league_id() AS current_league_id))',
     },
     {
       table: 'public.imports',
@@ -189,8 +191,8 @@ export const migrationCatalog: MigrationCatalog = {
       permissive: true,
       command: 'all',
       roles: 'public',
-      using: '(league_id = ( SELECT current_league_id() AS current_league_id))',
-      check: '(league_id = ( SELECT current_league_id() AS current_league_id))',
+      using: '(league_id = ( SELECT public.current_league_id() AS current_league_id))',
+      check: '(league_id = ( SELECT public.current_league_id() AS current_league_id))',
     },
     {
       table: 'public.invitations',
@@ -198,8 +200,8 @@ export const migrationCatalog: MigrationCatalog = {
       permissive: true,
       command: 'all',
       roles: 'public',
-      using: '(league_id = ( SELECT current_league_id() AS current_league_id))',
-      check: '(league_id = ( SELECT current_league_id() AS current_league_id))',
+      using: '(league_id = ( SELECT public.current_league_id() AS current_league_id))',
+      check: '(league_id = ( SELECT public.current_league_id() AS current_league_id))',
     },
     {
       table: 'public.jobs',
@@ -207,8 +209,8 @@ export const migrationCatalog: MigrationCatalog = {
       permissive: true,
       command: 'all',
       roles: 'public',
-      using: '(league_id = ( SELECT current_league_id() AS current_league_id))',
-      check: '(league_id = ( SELECT current_league_id() AS current_league_id))',
+      using: '(league_id = ( SELECT public.current_league_id() AS current_league_id))',
+      check: '(league_id = ( SELECT public.current_league_id() AS current_league_id))',
     },
     {
       table: 'public.league_features',
@@ -216,8 +218,8 @@ export const migrationCatalog: MigrationCatalog = {
       permissive: true,
       command: 'all',
       roles: 'public',
-      using: '(league_id = ( SELECT current_league_id() AS current_league_id))',
-      check: '(league_id = ( SELECT current_league_id() AS current_league_id))',
+      using: '(league_id = ( SELECT public.current_league_id() AS current_league_id))',
+      check: '(league_id = ( SELECT public.current_league_id() AS current_league_id))',
     },
     {
       table: 'public.league_slug_history',
@@ -225,8 +227,8 @@ export const migrationCatalog: MigrationCatalog = {
       permissive: true,
       command: 'all',
       roles: 'public',
-      using: '(league_id = ( SELECT current_league_id() AS current_league_id))',
-      check: '(league_id = ( SELECT current_league_id() AS current_league_id))',
+      using: '(league_id = ( SELECT public.current_league_id() AS current_league_id))',
+      check: '(league_id = ( SELECT public.current_league_id() AS current_league_id))',
     },
     {
       table: 'public.leagues',
@@ -234,8 +236,8 @@ export const migrationCatalog: MigrationCatalog = {
       permissive: true,
       command: 'all',
       roles: 'public',
-      using: '(id = ( SELECT current_league_id() AS current_league_id))',
-      check: '(id = ( SELECT current_league_id() AS current_league_id))',
+      using: '(id = ( SELECT public.current_league_id() AS current_league_id))',
+      check: '(id = ( SELECT public.current_league_id() AS current_league_id))',
     },
     {
       table: 'public.people',
@@ -243,8 +245,8 @@ export const migrationCatalog: MigrationCatalog = {
       permissive: true,
       command: 'all',
       roles: 'public',
-      using: '(league_id = ( SELECT current_league_id() AS current_league_id))',
-      check: '(league_id = ( SELECT current_league_id() AS current_league_id))',
+      using: '(league_id = ( SELECT public.current_league_id() AS current_league_id))',
+      check: '(league_id = ( SELECT public.current_league_id() AS current_league_id))',
     },
     {
       table: 'public.player_game_stats',
@@ -252,8 +254,8 @@ export const migrationCatalog: MigrationCatalog = {
       permissive: true,
       command: 'all',
       roles: 'public',
-      using: '(league_id = ( SELECT current_league_id() AS current_league_id))',
-      check: '(league_id = ( SELECT current_league_id() AS current_league_id))',
+      using: '(league_id = ( SELECT public.current_league_id() AS current_league_id))',
+      check: '(league_id = ( SELECT public.current_league_id() AS current_league_id))',
     },
     {
       table: 'public.programs',
@@ -261,8 +263,8 @@ export const migrationCatalog: MigrationCatalog = {
       permissive: true,
       command: 'all',
       roles: 'public',
-      using: '(league_id = ( SELECT current_league_id() AS current_league_id))',
-      check: '(league_id = ( SELECT current_league_id() AS current_league_id))',
+      using: '(league_id = ( SELECT public.current_league_id() AS current_league_id))',
+      check: '(league_id = ( SELECT public.current_league_id() AS current_league_id))',
     },
     {
       table: 'public.role_grants',
@@ -270,8 +272,8 @@ export const migrationCatalog: MigrationCatalog = {
       permissive: true,
       command: 'all',
       roles: 'public',
-      using: '(league_id = ( SELECT current_league_id() AS current_league_id))',
-      check: '(league_id = ( SELECT current_league_id() AS current_league_id))',
+      using: '(league_id = ( SELECT public.current_league_id() AS current_league_id))',
+      check: '(league_id = ( SELECT public.current_league_id() AS current_league_id))',
     },
     {
       table: 'public.roster_entries',
@@ -279,8 +281,8 @@ export const migrationCatalog: MigrationCatalog = {
       permissive: true,
       command: 'all',
       roles: 'public',
-      using: '(league_id = ( SELECT current_league_id() AS current_league_id))',
-      check: '(league_id = ( SELECT current_league_id() AS current_league_id))',
+      using: '(league_id = ( SELECT public.current_league_id() AS current_league_id))',
+      check: '(league_id = ( SELECT public.current_league_id() AS current_league_id))',
     },
     {
       table: 'public.rounds',
@@ -288,8 +290,8 @@ export const migrationCatalog: MigrationCatalog = {
       permissive: true,
       command: 'all',
       roles: 'public',
-      using: '(league_id = ( SELECT current_league_id() AS current_league_id))',
-      check: '(league_id = ( SELECT current_league_id() AS current_league_id))',
+      using: '(league_id = ( SELECT public.current_league_id() AS current_league_id))',
+      check: '(league_id = ( SELECT public.current_league_id() AS current_league_id))',
     },
     {
       table: 'public.schedule_drafts',
@@ -297,8 +299,8 @@ export const migrationCatalog: MigrationCatalog = {
       permissive: true,
       command: 'all',
       roles: 'public',
-      using: '(league_id = ( SELECT current_league_id() AS current_league_id))',
-      check: '(league_id = ( SELECT current_league_id() AS current_league_id))',
+      using: '(league_id = ( SELECT public.current_league_id() AS current_league_id))',
+      check: '(league_id = ( SELECT public.current_league_id() AS current_league_id))',
     },
     {
       table: 'public.schedule_revisions',
@@ -306,8 +308,8 @@ export const migrationCatalog: MigrationCatalog = {
       permissive: true,
       command: 'all',
       roles: 'public',
-      using: '(league_id = ( SELECT current_league_id() AS current_league_id))',
-      check: '(league_id = ( SELECT current_league_id() AS current_league_id))',
+      using: '(league_id = ( SELECT public.current_league_id() AS current_league_id))',
+      check: '(league_id = ( SELECT public.current_league_id() AS current_league_id))',
     },
     {
       table: 'public.scoring_sessions',
@@ -315,8 +317,8 @@ export const migrationCatalog: MigrationCatalog = {
       permissive: true,
       command: 'all',
       roles: 'public',
-      using: '(league_id = ( SELECT current_league_id() AS current_league_id))',
-      check: '(league_id = ( SELECT current_league_id() AS current_league_id))',
+      using: '(league_id = ( SELECT public.current_league_id() AS current_league_id))',
+      check: '(league_id = ( SELECT public.current_league_id() AS current_league_id))',
     },
     {
       table: 'public.season_player_totals',
@@ -324,8 +326,8 @@ export const migrationCatalog: MigrationCatalog = {
       permissive: true,
       command: 'all',
       roles: 'public',
-      using: '(league_id = ( SELECT current_league_id() AS current_league_id))',
-      check: '(league_id = ( SELECT current_league_id() AS current_league_id))',
+      using: '(league_id = ( SELECT public.current_league_id() AS current_league_id))',
+      check: '(league_id = ( SELECT public.current_league_id() AS current_league_id))',
     },
     {
       table: 'public.seasons',
@@ -333,8 +335,8 @@ export const migrationCatalog: MigrationCatalog = {
       permissive: true,
       command: 'all',
       roles: 'public',
-      using: '(league_id = ( SELECT current_league_id() AS current_league_id))',
-      check: '(league_id = ( SELECT current_league_id() AS current_league_id))',
+      using: '(league_id = ( SELECT public.current_league_id() AS current_league_id))',
+      check: '(league_id = ( SELECT public.current_league_id() AS current_league_id))',
     },
     {
       table: 'public.setting_values',
@@ -342,8 +344,8 @@ export const migrationCatalog: MigrationCatalog = {
       permissive: true,
       command: 'all',
       roles: 'public',
-      using: '(league_id = ( SELECT current_league_id() AS current_league_id))',
-      check: '(league_id = ( SELECT current_league_id() AS current_league_id))',
+      using: '(league_id = ( SELECT public.current_league_id() AS current_league_id))',
+      check: '(league_id = ( SELECT public.current_league_id() AS current_league_id))',
     },
     {
       table: 'public.site_releases',
@@ -351,8 +353,8 @@ export const migrationCatalog: MigrationCatalog = {
       permissive: true,
       command: 'all',
       roles: 'public',
-      using: '(league_id = ( SELECT current_league_id() AS current_league_id))',
-      check: '(league_id = ( SELECT current_league_id() AS current_league_id))',
+      using: '(league_id = ( SELECT public.current_league_id() AS current_league_id))',
+      check: '(league_id = ( SELECT public.current_league_id() AS current_league_id))',
     },
     {
       table: 'public.sites',
@@ -360,8 +362,8 @@ export const migrationCatalog: MigrationCatalog = {
       permissive: true,
       command: 'all',
       roles: 'public',
-      using: '(league_id = ( SELECT current_league_id() AS current_league_id))',
-      check: '(league_id = ( SELECT current_league_id() AS current_league_id))',
+      using: '(league_id = ( SELECT public.current_league_id() AS current_league_id))',
+      check: '(league_id = ( SELECT public.current_league_id() AS current_league_id))',
     },
     {
       table: 'public.stages',
@@ -369,8 +371,8 @@ export const migrationCatalog: MigrationCatalog = {
       permissive: true,
       command: 'all',
       roles: 'public',
-      using: '(league_id = ( SELECT current_league_id() AS current_league_id))',
-      check: '(league_id = ( SELECT current_league_id() AS current_league_id))',
+      using: '(league_id = ( SELECT public.current_league_id() AS current_league_id))',
+      check: '(league_id = ( SELECT public.current_league_id() AS current_league_id))',
     },
     {
       table: 'public.standings_adjustments',
@@ -378,8 +380,8 @@ export const migrationCatalog: MigrationCatalog = {
       permissive: true,
       command: 'all',
       roles: 'public',
-      using: '(league_id = ( SELECT current_league_id() AS current_league_id))',
-      check: '(league_id = ( SELECT current_league_id() AS current_league_id))',
+      using: '(league_id = ( SELECT public.current_league_id() AS current_league_id))',
+      check: '(league_id = ( SELECT public.current_league_id() AS current_league_id))',
     },
     {
       table: 'public.standings_coin_flips',
@@ -387,8 +389,8 @@ export const migrationCatalog: MigrationCatalog = {
       permissive: true,
       command: 'all',
       roles: 'public',
-      using: '(league_id = ( SELECT current_league_id() AS current_league_id))',
-      check: '(league_id = ( SELECT current_league_id() AS current_league_id))',
+      using: '(league_id = ( SELECT public.current_league_id() AS current_league_id))',
+      check: '(league_id = ( SELECT public.current_league_id() AS current_league_id))',
     },
     {
       table: 'public.standings_rows',
@@ -396,8 +398,8 @@ export const migrationCatalog: MigrationCatalog = {
       permissive: true,
       command: 'all',
       roles: 'public',
-      using: '(league_id = ( SELECT current_league_id() AS current_league_id))',
-      check: '(league_id = ( SELECT current_league_id() AS current_league_id))',
+      using: '(league_id = ( SELECT public.current_league_id() AS current_league_id))',
+      check: '(league_id = ( SELECT public.current_league_id() AS current_league_id))',
     },
     {
       table: 'public.support_access_log',
@@ -405,8 +407,8 @@ export const migrationCatalog: MigrationCatalog = {
       permissive: true,
       command: 'all',
       roles: 'public',
-      using: '(league_id = ( SELECT current_league_id() AS current_league_id))',
-      check: '(league_id = ( SELECT current_league_id() AS current_league_id))',
+      using: '(league_id = ( SELECT public.current_league_id() AS current_league_id))',
+      check: '(league_id = ( SELECT public.current_league_id() AS current_league_id))',
     },
     {
       table: 'public.teams',
@@ -414,8 +416,8 @@ export const migrationCatalog: MigrationCatalog = {
       permissive: true,
       command: 'all',
       roles: 'public',
-      using: '(league_id = ( SELECT current_league_id() AS current_league_id))',
-      check: '(league_id = ( SELECT current_league_id() AS current_league_id))',
+      using: '(league_id = ( SELECT public.current_league_id() AS current_league_id))',
+      check: '(league_id = ( SELECT public.current_league_id() AS current_league_id))',
     },
     {
       table: 'public.venues',
@@ -423,8 +425,8 @@ export const migrationCatalog: MigrationCatalog = {
       permissive: true,
       command: 'all',
       roles: 'public',
-      using: '(league_id = ( SELECT current_league_id() AS current_league_id))',
-      check: '(league_id = ( SELECT current_league_id() AS current_league_id))',
+      using: '(league_id = ( SELECT public.current_league_id() AS current_league_id))',
+      check: '(league_id = ( SELECT public.current_league_id() AS current_league_id))',
     },
   ],
   functions: [
@@ -927,4 +929,448 @@ export const migrationCatalog: MigrationCatalog = {
       volatility: 'v',
     },
   ],
+  triggers: [
+    {
+      table: 'platform.activity_log',
+      name: 'platform_activity_log_is_history',
+      definition:
+        'CREATE TRIGGER platform_activity_log_is_history BEFORE DELETE OR UPDATE ON platform.activity_log FOR EACH ROW EXECUTE FUNCTION public.refuse_history_change()',
+      enabled: 'O',
+    },
+    {
+      table: 'public.accounts',
+      name: 'accounts_on_update',
+      definition:
+        'CREATE TRIGGER accounts_on_update BEFORE UPDATE ON public.accounts FOR EACH ROW EXECUTE FUNCTION public.on_row_update()',
+      enabled: 'O',
+    },
+    {
+      table: 'public.activity_log',
+      name: 'activity_log_is_history',
+      definition:
+        'CREATE TRIGGER activity_log_is_history BEFORE DELETE OR UPDATE ON public.activity_log FOR EACH ROW EXECUTE FUNCTION public.refuse_history_change()',
+      enabled: 'O',
+    },
+    {
+      table: 'public.command_receipts',
+      name: 'command_receipts_is_history',
+      definition:
+        'CREATE TRIGGER command_receipts_is_history BEFORE DELETE OR UPDATE ON public.command_receipts FOR EACH ROW EXECUTE FUNCTION public.refuse_history_change()',
+      enabled: 'O',
+    },
+    {
+      table: 'public.courts',
+      name: 'courts_on_update',
+      definition:
+        "CREATE TRIGGER courts_on_update BEFORE UPDATE ON public.courts FOR EACH ROW EXECUTE FUNCTION public.on_row_update('venue_id')",
+      enabled: 'O',
+    },
+    {
+      table: 'public.divisions',
+      name: 'divisions_on_update',
+      definition:
+        "CREATE TRIGGER divisions_on_update BEFORE UPDATE ON public.divisions FOR EACH ROW EXECUTE FUNCTION public.on_row_update('season_id')",
+      enabled: 'O',
+    },
+    {
+      table: 'public.divisions',
+      name: 'divisions_parent_chain',
+      definition:
+        'CREATE TRIGGER divisions_parent_chain BEFORE INSERT OR UPDATE OF parent_division_id ON public.divisions FOR EACH ROW EXECUTE FUNCTION public.check_division_parent_chain()',
+      enabled: 'O',
+    },
+    {
+      table: 'public.game_assignments',
+      name: 'game_assignments_on_update',
+      definition:
+        "CREATE TRIGGER game_assignments_on_update BEFORE UPDATE ON public.game_assignments FOR EACH ROW EXECUTE FUNCTION public.on_row_update('game_id', 'account_id')",
+      enabled: 'O',
+    },
+    {
+      table: 'public.game_corrections',
+      name: 'game_corrections_at_now',
+      definition:
+        'CREATE TRIGGER game_corrections_at_now BEFORE INSERT ON public.game_corrections FOR EACH ROW EXECUTE FUNCTION public.stamp_game_correction()',
+      enabled: 'O',
+    },
+    {
+      table: 'public.game_corrections',
+      name: 'game_corrections_is_history',
+      definition:
+        'CREATE TRIGGER game_corrections_is_history BEFORE DELETE OR UPDATE ON public.game_corrections FOR EACH ROW EXECUTE FUNCTION public.refuse_history_change()',
+      enabled: 'O',
+    },
+    {
+      table: 'public.game_events',
+      name: 'game_events_in_order',
+      definition:
+        'CREATE TRIGGER game_events_in_order BEFORE INSERT ON public.game_events FOR EACH ROW EXECUTE FUNCTION public.check_game_event_in_order()',
+      enabled: 'O',
+    },
+    {
+      table: 'public.game_events',
+      name: 'game_events_is_history',
+      definition:
+        'CREATE TRIGGER game_events_is_history BEFORE DELETE OR UPDATE ON public.game_events FOR EACH ROW EXECUTE FUNCTION public.refuse_history_change()',
+      enabled: 'O',
+    },
+    {
+      table: 'public.game_states',
+      name: 'game_states_on_update',
+      definition:
+        "CREATE TRIGGER game_states_on_update BEFORE UPDATE ON public.game_states FOR EACH ROW EXECUTE FUNCTION public.on_row_update('game_id')",
+      enabled: 'O',
+    },
+    {
+      table: 'public.games',
+      name: 'games_format_fixed_once_started',
+      definition:
+        'CREATE TRIGGER games_format_fixed_once_started BEFORE UPDATE OF format ON public.games FOR EACH ROW EXECUTE FUNCTION public.check_game_format_fixed()',
+      enabled: 'O',
+    },
+    {
+      table: 'public.games',
+      name: 'games_given_format_fixed_once_started',
+      definition:
+        'CREATE TRIGGER games_given_format_fixed_once_started BEFORE UPDATE OF given_format ON public.games FOR EACH ROW EXECUTE FUNCTION public.check_game_given_format()',
+      enabled: 'O',
+    },
+    {
+      table: 'public.games',
+      name: 'games_on_update',
+      definition:
+        "CREATE TRIGGER games_on_update BEFORE UPDATE ON public.games FOR EACH ROW EXECUTE FUNCTION public.on_row_update('season_id')",
+      enabled: 'O',
+    },
+    {
+      table: 'public.games',
+      name: 'games_result_change_needs_correction',
+      definition:
+        "CREATE CONSTRAINT TRIGGER games_result_change_needs_correction AFTER UPDATE ON public.games DEFERRABLE INITIALLY DEFERRED FOR EACH ROW WHEN (((old.status = ANY (ARRAY['final'::text, 'forfeit'::text])) AND ((new.status IS DISTINCT FROM old.status) OR (new.home_score IS DISTINCT FROM old.home_score) OR (new.away_score IS DISTINCT FROM old.away_score) OR (new.overtime_periods IS DISTINCT FROM old.overtime_periods) OR (new.home_team_id IS DISTINCT FROM old.home_team_id) OR (new.away_team_id IS DISTINCT FROM old.away_team_id) OR (new.division_id IS DISTINCT FROM old.division_id) OR (new.stage_id IS DISTINCT FROM old.stage_id) OR (new.finalized_at IS DISTINCT FROM old.finalized_at) OR ((old.deleted_at IS NULL) <> (new.deleted_at IS NULL))))) EXECUTE FUNCTION public.check_game_result_corrected()",
+      enabled: 'O',
+    },
+    {
+      table: 'public.games',
+      name: 'games_scored_not_binned',
+      definition:
+        'CREATE TRIGGER games_scored_not_binned BEFORE UPDATE OF deleted_at ON public.games FOR EACH ROW WHEN (((old.deleted_at IS NULL) AND (new.deleted_at IS NOT NULL))) EXECUTE FUNCTION public.check_game_bin_unscored()',
+      enabled: 'O',
+    },
+    {
+      table: 'public.games',
+      name: 'games_stamp_format_fixed',
+      definition:
+        'CREATE TRIGGER games_stamp_format_fixed BEFORE INSERT OR UPDATE ON public.games FOR EACH ROW EXECUTE FUNCTION public.stamp_game_format_fixed()',
+      enabled: 'O',
+    },
+    {
+      table: 'public.imports',
+      name: 'imports_on_update',
+      definition:
+        "CREATE TRIGGER imports_on_update BEFORE UPDATE ON public.imports FOR EACH ROW EXECUTE FUNCTION public.on_row_update('season_id', 'kind', 'account_id')",
+      enabled: 'O',
+    },
+    {
+      table: 'public.invitations',
+      name: 'invitations_email_fixed',
+      definition:
+        'CREATE TRIGGER invitations_email_fixed BEFORE UPDATE ON public.invitations FOR EACH ROW EXECUTE FUNCTION public.check_invitation_email_fixed()',
+      enabled: 'O',
+    },
+    {
+      table: 'public.invitations',
+      name: 'invitations_on_update',
+      definition:
+        "CREATE TRIGGER invitations_on_update BEFORE UPDATE ON public.invitations FOR EACH ROW EXECUTE FUNCTION public.on_row_update('role', 'scope_type', 'scope_id')",
+      enabled: 'O',
+    },
+    {
+      table: 'public.jobs',
+      name: 'jobs_on_update',
+      definition:
+        "CREATE TRIGGER jobs_on_update BEFORE UPDATE ON public.jobs FOR EACH ROW EXECUTE FUNCTION public.on_row_update('type', 'ids', 'dedupe_key', 'max_attempts')",
+      enabled: 'O',
+    },
+    {
+      table: 'public.league_features',
+      name: 'league_features_on_update',
+      definition:
+        'CREATE TRIGGER league_features_on_update BEFORE UPDATE ON public.league_features FOR EACH ROW EXECUTE FUNCTION public.on_row_update()',
+      enabled: 'O',
+    },
+    {
+      table: 'public.league_slug_history',
+      name: 'league_slug_history_on_update',
+      definition:
+        'CREATE TRIGGER league_slug_history_on_update BEFORE UPDATE ON public.league_slug_history FOR EACH ROW EXECUTE FUNCTION public.on_row_update()',
+      enabled: 'O',
+    },
+    {
+      table: 'public.league_slug_history',
+      name: 'league_slug_history_slug_free',
+      definition:
+        'CREATE TRIGGER league_slug_history_slug_free BEFORE INSERT OR UPDATE ON public.league_slug_history FOR EACH ROW EXECUTE FUNCTION public.check_old_slug_free()',
+      enabled: 'O',
+    },
+    {
+      table: 'public.leagues',
+      name: 'leagues_have_default_program',
+      definition:
+        'CREATE CONSTRAINT TRIGGER leagues_have_default_program AFTER INSERT ON public.leagues DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.check_league_has_default_program()',
+      enabled: 'O',
+    },
+    {
+      table: 'public.leagues',
+      name: 'leagues_on_update',
+      definition:
+        'CREATE TRIGGER leagues_on_update BEFORE UPDATE ON public.leagues FOR EACH ROW EXECUTE FUNCTION public.on_row_update()',
+      enabled: 'O',
+    },
+    {
+      table: 'public.leagues',
+      name: 'leagues_slug_free',
+      definition:
+        'CREATE TRIGGER leagues_slug_free BEFORE INSERT OR UPDATE OF slug ON public.leagues FOR EACH ROW EXECUTE FUNCTION public.check_league_slug_free()',
+      enabled: 'O',
+    },
+    {
+      table: 'public.people',
+      name: 'people_birth_date_not_future',
+      definition:
+        'CREATE TRIGGER people_birth_date_not_future BEFORE INSERT OR UPDATE OF birth_date ON public.people FOR EACH ROW EXECUTE FUNCTION public.check_person_birth_date()',
+      enabled: 'O',
+    },
+    {
+      table: 'public.people',
+      name: 'people_on_update',
+      definition:
+        'CREATE TRIGGER people_on_update BEFORE UPDATE ON public.people FOR EACH ROW EXECUTE FUNCTION public.on_row_update()',
+      enabled: 'O',
+    },
+    {
+      table: 'public.player_game_stats',
+      name: 'player_game_stats_on_update',
+      definition:
+        "CREATE TRIGGER player_game_stats_on_update BEFORE UPDATE ON public.player_game_stats FOR EACH ROW EXECUTE FUNCTION public.on_row_update('game_id', 'person_id')",
+      enabled: 'O',
+    },
+    {
+      table: 'public.player_game_stats',
+      name: 'player_game_stats_team_in_game',
+      definition:
+        'CREATE TRIGGER player_game_stats_team_in_game BEFORE INSERT OR UPDATE OF game_id, team_id ON public.player_game_stats FOR EACH ROW EXECUTE FUNCTION public.check_player_game_team()',
+      enabled: 'O',
+    },
+    {
+      table: 'public.profile_access',
+      name: 'profile_access_on_update',
+      definition:
+        'CREATE TRIGGER profile_access_on_update BEFORE UPDATE ON public.profile_access FOR EACH ROW EXECUTE FUNCTION public.on_row_update()',
+      enabled: 'O',
+    },
+    {
+      table: 'public.profiles',
+      name: 'profiles_on_update',
+      definition:
+        'CREATE TRIGGER profiles_on_update BEFORE UPDATE ON public.profiles FOR EACH ROW EXECUTE FUNCTION public.on_row_update()',
+      enabled: 'O',
+    },
+    {
+      table: 'public.programs',
+      name: 'programs_keep_default_program',
+      definition:
+        'CREATE CONSTRAINT TRIGGER programs_keep_default_program AFTER DELETE OR UPDATE ON public.programs DEFERRABLE INITIALLY DEFERRED FOR EACH ROW WHEN (old.is_default) EXECUTE FUNCTION public.check_league_has_default_program()',
+      enabled: 'O',
+    },
+    {
+      table: 'public.programs',
+      name: 'programs_on_update',
+      definition:
+        'CREATE TRIGGER programs_on_update BEFORE UPDATE ON public.programs FOR EACH ROW EXECUTE FUNCTION public.on_row_update()',
+      enabled: 'O',
+    },
+    {
+      table: 'public.role_grants',
+      name: 'role_grants_on_update',
+      definition:
+        "CREATE TRIGGER role_grants_on_update BEFORE UPDATE ON public.role_grants FOR EACH ROW EXECUTE FUNCTION public.on_row_update('account_id', 'role', 'scope_type', 'scope_id')",
+      enabled: 'O',
+    },
+    {
+      table: 'public.roster_entries',
+      name: 'roster_entries_added_at_game_team',
+      definition:
+        'CREATE TRIGGER roster_entries_added_at_game_team BEFORE INSERT ON public.roster_entries FOR EACH ROW EXECUTE FUNCTION public.check_roster_added_at_game()',
+      enabled: 'O',
+    },
+    {
+      table: 'public.roster_entries',
+      name: 'roster_entries_on_update',
+      definition:
+        "CREATE TRIGGER roster_entries_on_update BEFORE UPDATE ON public.roster_entries FOR EACH ROW EXECUTE FUNCTION public.on_row_update('team_id', 'person_id', 'added_at_game_id')",
+      enabled: 'O',
+    },
+    {
+      table: 'public.roster_entries',
+      name: 'roster_entries_unique_jersey',
+      definition:
+        'CREATE TRIGGER roster_entries_unique_jersey BEFORE INSERT OR UPDATE OF jersey_number, left_on, team_id, needs_review ON public.roster_entries FOR EACH ROW EXECUTE FUNCTION public.check_roster_jersey()',
+      enabled: 'O',
+    },
+    {
+      table: 'public.rounds',
+      name: 'rounds_on_update',
+      definition:
+        "CREATE TRIGGER rounds_on_update BEFORE UPDATE ON public.rounds FOR EACH ROW EXECUTE FUNCTION public.on_row_update('season_id')",
+      enabled: 'O',
+    },
+    {
+      table: 'public.schedule_drafts',
+      name: 'schedule_drafts_on_update',
+      definition:
+        "CREATE TRIGGER schedule_drafts_on_update BEFORE UPDATE ON public.schedule_drafts FOR EACH ROW EXECUTE FUNCTION public.on_row_update('season_id')",
+      enabled: 'O',
+    },
+    {
+      table: 'public.schedule_revisions',
+      name: 'schedule_revisions_in_order',
+      definition:
+        'CREATE TRIGGER schedule_revisions_in_order BEFORE INSERT ON public.schedule_revisions FOR EACH ROW EXECUTE FUNCTION public.check_schedule_revision_in_order()',
+      enabled: 'O',
+    },
+    {
+      table: 'public.schedule_revisions',
+      name: 'schedule_revisions_is_history',
+      definition:
+        'CREATE TRIGGER schedule_revisions_is_history BEFORE DELETE OR UPDATE ON public.schedule_revisions FOR EACH ROW EXECUTE FUNCTION public.refuse_history_change()',
+      enabled: 'O',
+    },
+    {
+      table: 'public.scoring_sessions',
+      name: 'scoring_sessions_on_update',
+      definition:
+        "CREATE TRIGGER scoring_sessions_on_update BEFORE UPDATE ON public.scoring_sessions FOR EACH ROW EXECUTE FUNCTION public.on_row_update('game_id', 'account_id', 'device_id')",
+      enabled: 'O',
+    },
+    {
+      table: 'public.season_player_totals',
+      name: 'season_player_totals_on_update',
+      definition:
+        "CREATE TRIGGER season_player_totals_on_update BEFORE UPDATE ON public.season_player_totals FOR EACH ROW EXECUTE FUNCTION public.on_row_update('season_id', 'person_id')",
+      enabled: 'O',
+    },
+    {
+      table: 'public.seasons',
+      name: 'seasons_on_update',
+      definition:
+        'CREATE TRIGGER seasons_on_update BEFORE UPDATE ON public.seasons FOR EACH ROW EXECUTE FUNCTION public.on_row_update()',
+      enabled: 'O',
+    },
+    {
+      table: 'public.seasons',
+      name: 'seasons_unique_jerseys_on',
+      definition:
+        'CREATE TRIGGER seasons_unique_jerseys_on AFTER UPDATE OF rules ON public.seasons FOR EACH ROW WHEN ((new.unique_jerseys AND (NOT old.unique_jerseys))) EXECUTE FUNCTION public.check_season_unique_jerseys()',
+      enabled: 'O',
+    },
+    {
+      table: 'public.setting_values',
+      name: 'setting_values_on_update',
+      definition:
+        "CREATE TRIGGER setting_values_on_update BEFORE UPDATE ON public.setting_values FOR EACH ROW EXECUTE FUNCTION public.on_row_update('level', 'program_id', 'season_id', 'key')",
+      enabled: 'O',
+    },
+    {
+      table: 'public.site_releases',
+      name: 'site_releases_is_history',
+      definition:
+        'CREATE TRIGGER site_releases_is_history BEFORE DELETE OR UPDATE ON public.site_releases FOR EACH ROW EXECUTE FUNCTION public.refuse_history_change()',
+      enabled: 'O',
+    },
+    {
+      table: 'public.sites',
+      name: 'sites_on_update',
+      definition:
+        'CREATE TRIGGER sites_on_update BEFORE UPDATE ON public.sites FOR EACH ROW EXECUTE FUNCTION public.on_row_update()',
+      enabled: 'O',
+    },
+    {
+      table: 'public.stages',
+      name: 'stages_on_update',
+      definition:
+        "CREATE TRIGGER stages_on_update BEFORE UPDATE ON public.stages FOR EACH ROW EXECUTE FUNCTION public.on_row_update('season_id', 'type')",
+      enabled: 'O',
+    },
+    {
+      table: 'public.standings_adjustments',
+      name: 'standings_adjustments_on_update',
+      definition:
+        "CREATE TRIGGER standings_adjustments_on_update BEFORE UPDATE ON public.standings_adjustments FOR EACH ROW EXECUTE FUNCTION public.on_row_update('season_id', 'team_id', 'account_id', 'paired_with', 'games_played', 'game_id')",
+      enabled: 'O',
+    },
+    {
+      table: 'public.standings_coin_flips',
+      name: 'standings_coin_flips_on_update',
+      definition:
+        "CREATE TRIGGER standings_coin_flips_on_update BEFORE UPDATE ON public.standings_coin_flips FOR EACH ROW EXECUTE FUNCTION public.on_row_update('season_id', 'team_ids', 'method', 'note', 'account_id')",
+      enabled: 'O',
+    },
+    {
+      table: 'public.standings_coin_flips',
+      name: 'standings_coin_flips_teams',
+      definition:
+        'CREATE TRIGGER standings_coin_flips_teams BEFORE INSERT ON public.standings_coin_flips FOR EACH ROW EXECUTE FUNCTION public.standings_coin_flip_teams()',
+      enabled: 'O',
+    },
+    {
+      table: 'public.standings_rows',
+      name: 'standings_rows_on_update',
+      definition:
+        "CREATE TRIGGER standings_rows_on_update BEFORE UPDATE ON public.standings_rows FOR EACH ROW EXECUTE FUNCTION public.on_row_update('season_id', 'team_id')",
+      enabled: 'O',
+    },
+    {
+      table: 'public.standings_rows',
+      name: 'standings_rows_team_division',
+      definition:
+        'CREATE TRIGGER standings_rows_team_division BEFORE INSERT OR UPDATE OF team_id, division_id ON public.standings_rows FOR EACH ROW EXECUTE FUNCTION public.check_standings_row_division()',
+      enabled: 'O',
+    },
+    {
+      table: 'public.support_access_log',
+      name: 'support_access_log_end_early',
+      definition:
+        'CREATE TRIGGER support_access_log_end_early BEFORE UPDATE ON public.support_access_log FOR EACH ROW EXECUTE FUNCTION public.check_support_access_update()',
+      enabled: 'O',
+    },
+    {
+      table: 'public.support_access_log',
+      name: 'support_access_log_is_history',
+      definition:
+        'CREATE TRIGGER support_access_log_is_history BEFORE DELETE ON public.support_access_log FOR EACH ROW EXECUTE FUNCTION public.refuse_history_change()',
+      enabled: 'O',
+    },
+    {
+      table: 'public.support_access_log',
+      name: 'support_access_log_starts_now',
+      definition:
+        'CREATE TRIGGER support_access_log_starts_now BEFORE INSERT ON public.support_access_log FOR EACH ROW EXECUTE FUNCTION public.start_support_access()',
+      enabled: 'O',
+    },
+    {
+      table: 'public.teams',
+      name: 'teams_on_update',
+      definition:
+        "CREATE TRIGGER teams_on_update BEFORE UPDATE ON public.teams FOR EACH ROW EXECUTE FUNCTION public.on_row_update('season_id')",
+      enabled: 'O',
+    },
+    {
+      table: 'public.venues',
+      name: 'venues_on_update',
+      definition:
+        'CREATE TRIGGER venues_on_update BEFORE UPDATE ON public.venues FOR EACH ROW EXECUTE FUNCTION public.on_row_update()',
+      enabled: 'O',
+    },
+  ],
+  rules: [],
 };

@@ -12,7 +12,7 @@ import type { DatabaseHandle } from './database-handle.ts';
 import { migrationCatalog } from './migration-catalog.ts';
 
 const login = 'made_up_app_login';
-const fence = '(league_id = ( SELECT current_league_id() AS current_league_id))';
+const fence = '(league_id = ( SELECT public.current_league_id() AS current_league_id))';
 
 let pglite: PGlite;
 let db: DatabaseHandle;
@@ -312,6 +312,7 @@ describe('the start-up guard reads the league fence (step 2.238)', () => {
       grant select on public.accounts to ${login};`);
     expect(await checkLoginRole(db, login)).toEqual([
       "public.accounts is a table the migrations made, but it is now a view, so it may hold rows of any league: drop view public.accounts, then run the migrations' own definition again",
+      "public.accounts is missing its trigger accounts_on_update, which the migrations made, so what it keeps is not kept: run the migrations' own definition again",
     ]);
     await pglite.exec(`
       drop view public.accounts;
@@ -330,6 +331,7 @@ describe('the start-up guard reads the league fence (step 2.238)', () => {
       grant select on public.accounts to ${login};`);
     expect(await checkLoginRole(db, login)).toEqual([
       'public.accounts is a table the migrations made, but it is now owned by made_up_other_owner, not postgres, so it may not be what they made: alter table public.accounts owner to postgres',
+      "public.accounts is missing its trigger accounts_on_update, which the migrations made, so what it keeps is not kept: run the migrations' own definition again",
     ]);
     await pglite.exec(`
       drop table public.accounts;
@@ -429,6 +431,129 @@ describe('the start-up guard reads the league fence (step 2.238)', () => {
     ]);
     expect(said.join(' ')).not.toMatch(/drop (table|view)/);
     await pglite.exec('drop schema pgboss cascade; drop role made_up_queue_owner');
+    expect(await checkLoginRole(db, login)).toEqual([]);
+  });
+
+  // T-485: the second look's plant B. A schema named as the session's user is the "$user"
+  // entry of the search path, so a plain current_league_id() there is found first, and the
+  // session printed the policy as `current_league_id()` unqualified, as the catalog had it.
+  const shadowFence = (schema: string) =>
+    `(league_id = ( SELECT ${schema}.current_league_id() AS current_league_id))`;
+  const shadowed = (schema: string) =>
+    `public.programs has its policy programs_league_fence changed from the migrations' (now to public using (${shadowFence(schema)}) with check (${shadowFence(schema)})): alter policy programs_league_fence on public.programs to public using (${fence}) with check (${fence})`;
+
+  it('(b) refuses a policy calling a current_league_id of the "$user" schema (T-485)', async () => {
+    const { rows } = await pglite.query<{ me: string }>('select current_user::text as me');
+    const user = rows[0]?.me ?? '';
+    // PostgreSQL's own default search path; PGlite's session may not start with it.
+    await plantedAndMended(
+      `set search_path = "$user", public;
+       create schema ${user};
+       create function ${user}.current_league_id() returns uuid language sql stable
+         as $$ select null::uuid $$;
+       alter policy programs_league_fence on public.programs
+         using (league_id = (select current_league_id()))
+         with check (league_id = (select current_league_id()));`,
+      [shadowed(user)],
+    );
+    await pglite.exec(`reset search_path; drop schema ${user} cascade`);
+    expect(await checkLoginRole(db, login)).toEqual([]);
+  });
+
+  it('(b) refuses it with the search path set for the session, as a role setting does (T-485)', async () => {
+    await plantedAndMended(
+      `create schema made_up_shadow;
+       create function made_up_shadow.current_league_id() returns uuid language sql stable
+         as $$ select null::uuid $$;
+       set search_path = made_up_shadow, public;
+       alter policy programs_league_fence on public.programs
+         using (league_id = (select current_league_id()))
+         with check (league_id = (select current_league_id()));`,
+      [shadowed('made_up_shadow')],
+    );
+    await pglite.exec('reset search_path; drop schema made_up_shadow cascade');
+    expect(await checkLoginRole(db, login)).toEqual([]);
+  });
+
+  // T-486: the second look's item 4. A rule or a trigger on a league table copies its rows
+  // elsewhere on each change; the copy (a table without a league column in pg-boss's schema)
+  // is let be (T-482's stated limit), so the rule or trigger is what is refused.
+  const copySchema = `
+    create role made_up_queue_owner nologin;
+    create schema pgboss authorization made_up_queue_owner;
+    create table pgboss.c4 (id uuid, lid text);
+    grant usage on schema pgboss to ${login};
+    grant select on pgboss.c4 to ${login};`;
+  const dropCopySchema = 'drop schema pgboss cascade; drop role made_up_queue_owner';
+
+  it('(e) refuses a rule no migration made on a league table, which copies its rows (T-486)', async () => {
+    await pglite.exec(copySchema);
+    await plantedAndMended(
+      `create rule made_up_copy as on update to public.programs do also
+         insert into pgboss.c4 (id, lid) values (new.id, new.league_id::text)`,
+      [
+        'public.programs has a rule made_up_copy that no migration made, so what it puts in place of each change is not known to keep to the league fence: drop rule made_up_copy on public.programs',
+      ],
+    );
+    await pglite.exec(dropCopySchema);
+  });
+
+  it('(e) refuses a trigger no migration made, whose function is a security definer (T-486)', async () => {
+    await pglite.exec(copySchema);
+    await plantedAndMended(
+      `create schema made_up_hooks;
+       create function made_up_hooks.copy() returns trigger language plpgsql security definer
+         as $$ begin insert into pgboss.c4 values (new.id, new.league_id::text); return new; end $$;
+       create trigger made_up_copy after update on public.programs
+         for each row execute function made_up_hooks.copy();`,
+      [
+        'public.programs has a trigger made_up_copy that no migration made, so what it does on each change is not known to keep to the league fence: drop trigger made_up_copy on public.programs',
+      ],
+    );
+    await pglite.exec(`drop schema made_up_hooks cascade; ${dropCopySchema}`);
+  });
+
+  it('(e) refuses a migration’s trigger disabled, or made again otherwise (T-486)', async () => {
+    await plantedAndMended('alter table public.programs disable trigger programs_on_update', [
+      'public.programs has its trigger programs_on_update, which the migrations made, disabled, so what it keeps is not kept: alter table public.programs enable trigger programs_on_update',
+    ]);
+    const made = migrationCatalog.triggers.find(
+      (trigger) => trigger.table === 'public.programs' && trigger.name === 'programs_on_update',
+    );
+    expect(made?.definition).toMatch(/^CREATE TRIGGER programs_on_update BEFORE UPDATE/);
+    await pglite.exec(`
+      drop trigger programs_on_update on public.programs;
+      create trigger programs_on_update after update on public.programs
+        for each row execute function public.on_row_update();`);
+    const said = await checkLoginRole(db, login);
+    expect(said).toEqual([
+      "public.programs has its trigger programs_on_update changed from the migrations', so what it does on each change may cross the league fence: drop trigger programs_on_update on public.programs, then run the migrations' own definition again",
+    ]);
+    // The migrations' own definition, as the catalog holds it, puts it right.
+    await pglite.exec(
+      `drop trigger programs_on_update on public.programs; ${made?.definition ?? ''}`,
+    );
+    expect(await checkLoginRole(db, login)).toEqual([]);
+  });
+
+  it('(d) refuses any view or materialized view in a library’s schema, whatever its columns (T-482, tightened)', async () => {
+    await pglite.exec(`
+      create role made_up_queue_owner nologin;
+      create schema pgboss authorization made_up_queue_owner;
+      create table pgboss.job (id uuid, name text, data jsonb);
+      create view pgboss.queue_names as select name from pgboss.job;
+      create materialized view pgboss.job_ids as select id from pgboss.job;
+      grant usage on schema pgboss to ${login};
+      grant select on pgboss.job, pgboss.queue_names, pgboss.job_ids to ${login};`);
+    const said = await checkLoginRole(db, login);
+    expect(said).toEqual([
+      `pgboss.job_ids is a materialized view that no migration made, and ${login} may read it, so nothing has checked its fence: revoke select on table pgboss.job_ids from ${login}`,
+      `pgboss.queue_names is a view that no migration made, and ${login} may read it, so nothing has checked its fence: revoke select on table pgboss.queue_names from ${login}`,
+    ]);
+    expect(said.join(' ')).not.toMatch(/drop table/);
+    for (const problem of said) await pglite.exec(statementOf(problem));
+    expect(await checkLoginRole(db, login)).toEqual([]);
+    await pglite.exec(dropCopySchema);
     expect(await checkLoginRole(db, login)).toEqual([]);
   });
 });
