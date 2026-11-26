@@ -18,6 +18,7 @@ import { scoringSessionRequest } from '../../server/scoring-session-endpoint.ts'
 import { sendTrackerCommands } from '../../server/tracker-commands-endpoint.ts';
 import {
   bears,
+  bearsBench,
   bearsNames,
   games,
   hawks,
@@ -46,6 +47,7 @@ import {
 import { GameContent, type GameView } from './game-content.tsx';
 import { latestPlayText, redrawsFor, redrawsWhileHeld } from './live-game-view.tsx';
 import type { ViewerGame } from './viewer-state.ts';
+import { publicPlayerKey } from '../../server/player-key.ts';
 
 const viewing = {
   leagueId: liveLeagueId,
@@ -94,7 +96,7 @@ async function scoreHawksBears(world: ReturnType<typeof trackerWorld>) {
 
 async function viewOf(world: ReturnType<typeof trackerWorld>, gameId: string) {
   const store = world.tracker.snapshotStoreOf(liveLeagueId);
-  const snapshot = await readGameSnapshot(store, { gameId }, viewing, Date.now());
+  const snapshot = await readGameSnapshot(store, { gameId }, viewing, Date.now(), publicPlayerKey);
   const page = await readGamePage(store, { gameId }, viewing);
   if (!snapshot.ok || !page.ok) throw new Error('no game');
   const view: GameView = {
@@ -167,7 +169,13 @@ describe('a game page', () => {
       const store = world.tracker.snapshotStoreOf(leagueId);
       const as = { ...viewing, leagueId, viewer: publicViewer(leagueId) };
       for (const game of listed) {
-        const shot = await readGameSnapshot(store, { gameId: game.id }, as, Date.now());
+        const shot = await readGameSnapshot(
+          store,
+          { gameId: game.id },
+          as,
+          Date.now(),
+          publicPlayerKey,
+        );
         const page = await readGamePage(store, { gameId: game.id }, as);
         if (!shot.ok || !page.ok) throw new Error(`no page for ${game.id}`);
         expect(page.value.scoreboard.home.name).toBe(game.homeTeam.name);
@@ -464,6 +472,25 @@ describe('a game page', () => {
     expect(built.tables[0]?.players).toBeNull();
     expect(built.tables[1]?.players?.map((p) => p.name)).toEqual(['Name not shown', '#12']);
     expect(built.tables[0]?.columns.map((c) => c.label)).toEqual(['PTS']);
+    // Rows are keyed by their place in the table, never by the person's id (step 2.225).
+    expect(built.tables[1]?.players?.map((p) => p.id)).toEqual(['home-player-0', 'home-player-1']);
+  });
+
+  it("holds no person's id, in its drawn page or in what it hands the browser (step 2.225)", async () => {
+    const world = trackerWorld();
+    await scoreHawksBears(world);
+    const { view, page } = await viewOf(world, games.hawksBears);
+    // The box scores drawn as a final game draws them, beside the live snapshot.
+    const shown = { ...view, boxScores: buildBoxScores(page) };
+    const built = shown.boxScores;
+    if (built.kind !== 'tables') throw new Error(built.kind);
+    expect(built.tables.some((table) => (table.players?.length ?? 0) > 0)).toBe(true);
+    expect(view.snapshot.players.length).toBeGreaterThan(0);
+    const served = `${draw(shown)}${JSON.stringify(shown)}`;
+    for (const id of [...hawks, ...bears, bearsBench]) {
+      expect(served).not.toContain(id);
+      expect(served).not.toContain(id.toUpperCase());
+    }
   });
 
   it('draws the play-by-play as a table a period: clock, team mark, and the score after a basket', async () => {

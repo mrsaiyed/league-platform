@@ -681,6 +681,12 @@ export const LiveMessageReading = z.object({
 });
 
 const snapshotPlayerShape = {
+  /**
+   * The player's key in this game (T-462, T-463): the same all through the game, different
+   * in every other, made on the server under its secret and written as a UUID so a page
+   * opened before it existed still reads it. Never a person's or roster place's id: no
+   * public answer carries one (step 2.225).
+   */
   playerId: Id,
   side: Side,
   name: z.string().max(120).nullable(),

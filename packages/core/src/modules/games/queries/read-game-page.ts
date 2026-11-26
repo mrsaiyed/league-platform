@@ -16,6 +16,7 @@ import { recordingOf } from '../game-fields.ts';
 import type { MarkResult } from '../corrected-mark.ts';
 import { statisticsKept } from '../statistics-kept.ts';
 import { teamOwnCounts } from '../team-own-counts.ts';
+import type { PlayerKeyOf } from './read-game-snapshot.ts';
 import type {
   GamePageTeam,
   GamePersonRecord,
@@ -199,6 +200,13 @@ export async function readGamePage(
   store: GamesReadStore,
   input: { readonly gameId: string },
   viewing: GameViewing,
+  /**
+   * Each player's key in this game, the snapshot's (T-462): the box score's last order
+   * where two players share a number, or have none, and the same name shown. Never the
+   * person's id, whose order tells when they were added. Without it such players keep the
+   * store's order.
+   */
+  keyOf?: PlayerKeyOf,
 ): Promise<Result<GamePage, ReadGamePageError>> {
   const game = await store.findGame(input.gameId);
   if (game === undefined || game.binned) return fail({ code: 'game-not-found' });
@@ -299,15 +307,25 @@ export async function readGamePage(
     const playersPoints = shown[side] ? linesPoints : null;
     const score = scoreOf(side);
     if (linesPoints !== null && score !== null) totals['points'] = score;
+    // By number; then by the name shown (none last); then by the player's key in this game.
+    const keyOfLine = (personId: string) =>
+      keyOf === undefined ? '' : keyOf(game.id.toLowerCase(), personId.toLowerCase());
     const players: BoxScorePlayer[] = shown[side]
-      ? [...own]
+      ? own
+          .map((line) => ({
+            line,
+            ref: refOf(side, line.personId),
+            key: keyOfLine(line.personId),
+          }))
           .sort(
             (a, b) =>
-              Number(a.jerseyNumber ?? '999') - Number(b.jerseyNumber ?? '999') ||
-              a.personId.localeCompare(b.personId),
+              Number(a.line.jerseyNumber ?? '999') - Number(b.line.jerseyNumber ?? '999') ||
+              (a.ref.name === null ? 1 : 0) - (b.ref.name === null ? 1 : 0) ||
+              (a.ref.name ?? '').localeCompare(b.ref.name ?? '') ||
+              a.key.localeCompare(b.key),
           )
-          .map((line) => ({
-            ...refOf(side, line.personId),
+          .map(({ line, ref }) => ({
+            ...ref,
             played: line.played,
             seconds: line.secondsPlayed,
             stats: countsOf(line.stats),

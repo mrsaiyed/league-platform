@@ -23,6 +23,7 @@ import { standInLeagues, standInPeople } from './stand-in-ports.ts';
 import { standInSeasonIds, youthTeams } from './stand-in-public-stats.ts';
 import { sendTrackerCommands } from './tracker-commands-endpoint.ts';
 import { tap, trackerWorld } from './tracker-endpoints.test-helper.ts';
+import { publicPlayerKey } from './player-key.ts';
 
 const adult = standInLeagues.live.id;
 const youth = standInLeagues.other.id;
@@ -108,14 +109,22 @@ function world() {
     const names = await w.tracker.namesShownOf(adult);
     const viewing = { leagueId: adult, viewer: publicViewer(adult), ...names };
     const store = w.tracker.snapshotStoreOf(adult);
-    const snapshot = await readGameSnapshot(store, { gameId: hawksLions }, viewing, Date.now());
+    const snapshot = await readGameSnapshot(
+      store,
+      { gameId: hawksLions },
+      viewing,
+      Date.now(),
+      publicPlayerKey,
+    );
     const page = await readGamePage(store, { gameId: hawksLions }, viewing);
     if (!snapshot.ok || !page.ok) throw new Error('expected the game');
     const inPage = page.value.boxScores
       .flatMap((box) => box.players)
       .find((p) => p.personId === pia);
     return {
-      snapshot: snapshot.value.players.find((p) => p.playerId === pia)?.name ?? null,
+      snapshot:
+        snapshot.value.players.find((p) => p.playerId === publicPlayerKey(hawksLions, pia))?.name ??
+        null,
       page: inPage?.name ?? null,
       responses: [snapshot.value, page.value],
     };
@@ -200,10 +209,17 @@ describe("the admin's names setting reaches every public surface through standIn
       const names = await w.tracker.namesShownOf(adult);
       const store = w.tracker.snapshotStoreOf(adult);
       const viewing = { leagueId: adult, viewer: publicViewer(adult), ...names };
-      const snapshot = await readGameSnapshot(store, { gameId: hawksLions }, viewing, Date.now());
+      const snapshot = await readGameSnapshot(
+        store,
+        { gameId: hawksLions },
+        viewing,
+        Date.now(),
+        publicPlayerKey,
+      );
       if (!snapshot.ok) throw new Error('expected the game');
       const name = (id: string | undefined) =>
-        snapshot.value.players.find((p) => p.playerId === id)?.name ?? null;
+        snapshot.value.players.find((p) => p.playerId === publicPlayerKey(hawksLions, id ?? ''))
+          ?.name ?? null;
       return { adult: name(hawks[0]), pia: name(pia) };
     };
     await w.scoreByPia();

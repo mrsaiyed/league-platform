@@ -176,6 +176,7 @@ export {
 export {
   liveMessageOf,
   readGameSnapshot,
+  type PlayerKeyOf,
   type ReadGameSnapshotError,
 } from './queries/read-game-snapshot.ts';
 export type {

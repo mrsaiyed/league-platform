@@ -10,7 +10,12 @@ import {
 } from '../../people/index.ts';
 import type { GameSnapshotStore } from '../read-ports.ts';
 import type { GameViewing } from './read-game-page.ts';
-import { foulRulesOf, liveMessageOf, readGameSnapshot } from './read-game-snapshot.ts';
+import {
+  foulRulesOf,
+  liveMessageOf,
+  readGameSnapshot,
+  type PlayerKeyOf,
+} from './read-game-snapshot.ts';
 
 const leagueId = '01900000-0000-7000-8000-000000000001';
 const gameId = '01900000-0000-7000-8000-0000000b0001';
@@ -21,6 +26,23 @@ const homeIds = [1, 2, 3, 4, 5].map(player);
 const awayIds = [11, 12, 13, 14, 15].map(player);
 const bench = player(6);
 const now = 1_800_000_000_000;
+
+/**
+ * A stand-in for the server's keyed hash (T-462): a new UUID-shaped key for every game and
+ * player, the same when asked again, and nothing of either id in it.
+ */
+function madeUpKeys(): PlayerKeyOf {
+  const keys = new Map<string, string>();
+  return (game, playerId) => {
+    const asked = `${game}|${playerId}`;
+    const made =
+      keys.get(asked) ??
+      `aaaaaaaa-bbbb-8ccc-8ddd-${(keys.size + 1).toString(16).padStart(12, '0')}`;
+    keys.set(asked, made);
+    return made;
+  };
+}
+const keyOf = madeUpKeys();
 
 /** A game tracked on the engine: line-ups, tip-off, a home basket and an away foul. */
 function playedState(): basketball.GameState {
@@ -124,7 +146,7 @@ const viewing = (viewer: Viewer): GameViewing => ({
 const visitor = viewing(publicViewer(leagueId));
 
 async function snapshot(s: GameSnapshotStore, v: GameViewing = visitor) {
-  const result = await readGameSnapshot(s, { gameId }, v, now);
+  const result = await readGameSnapshot(s, { gameId }, v, now, keyOf);
   if (!result.ok) throw new Error('expected a snapshot');
   return result.value;
 }
@@ -147,7 +169,7 @@ describe('readGameSnapshot', () => {
     expect(shot.clock).toMatchObject({ state: 'stopped' });
     expect(shot.players).toHaveLength(10);
     expect(shot.players[0]).toMatchObject({
-      playerId: homeIds[0],
+      playerId: keyOf(gameId, homeIds[0] ?? ''),
       name: 'Hana Shooter',
       jersey: '4',
       points: 3,
@@ -191,7 +213,9 @@ describe('readGameSnapshot', () => {
       points: 2,
     });
     // The open team's own lines are still there.
-    expect(shot.players.find((p) => p.playerId === homeIds[0])?.points).toBe(5);
+    expect(shot.players.find((p) => p.playerId === keyOf(gameId, homeIds[0] ?? ''))?.points).toBe(
+      5,
+    );
   });
 
   it('gives a basket taken back as the latest play as a take-back, with its points (T-432)', async () => {
@@ -214,7 +238,9 @@ describe('readGameSnapshot', () => {
       jersey: null,
       points: 2,
     });
-    expect(hidden.players.find((p) => p.playerId === homeIds[0])?.points).toBe(3);
+    expect(hidden.players.find((p) => p.playerId === keyOf(gameId, homeIds[0] ?? ''))?.points).toBe(
+      3,
+    );
     const open = await snapshot(store({ state: takenBack, awayVisibility: 'everyone' }));
     expect(open.latestPlay?.type).toBe('unscore');
     expect(open.latestPlay?.playerName).toEqual(expect.any(String));
@@ -287,8 +313,39 @@ describe('readGameSnapshot', () => {
       { gameId: '01900000-0000-7000-8000-0000000b0009' },
       visitor,
       now,
+      keyOf,
     );
     expect(result).toEqual({ ok: false, error: { code: 'game-not-found' } });
+  });
+
+  it('keys each player by the key it is handed for this game, never by an id (T-462)', async () => {
+    const asked: string[] = [];
+    const recording: PlayerKeyOf = (game, playerId) => {
+      asked.push(`${game} ${playerId}`);
+      return keyOf(game, playerId);
+    };
+    const result = await readGameSnapshot(
+      store({ awayVisibility: 'everyone' }),
+      { gameId },
+      visitor,
+      now,
+      recording,
+    );
+    if (!result.ok) throw new Error('expected a snapshot');
+    const shot = result.value;
+    expect(shot.players).toHaveLength(10);
+    // Each key is the one made for this game and that player, once each.
+    expect(asked.sort()).toEqual([...homeIds, ...awayIds].map((id) => `${gameId} ${id}`).sort());
+    expect(new Set(shot.players.map((p) => p.playerId)).size).toBe(10);
+    // The same game read twice gives the same keys.
+    expect((await snapshot(store({ awayVisibility: 'everyone' }))).players).toEqual(shot.players);
+    // No person's or team's id appears anywhere in the answer, nor in the live message.
+    const served = JSON.stringify(shot);
+    for (const id of [...homeIds, ...awayIds, bench, home, away]) {
+      expect(served).not.toContain(id);
+      expect(served).not.toContain(id.toUpperCase());
+    }
+    expect(JSON.stringify(liveMessageOf(shot))).not.toContain(homeIds[0]);
   });
 
   it('cuts the live message from the snapshot, in the contract shape', async () => {

@@ -27,6 +27,15 @@ import type { GameViewing } from './read-game-page.ts';
 
 export type ReadGameSnapshotError = { readonly code: 'game-not-found' };
 
+/**
+ * A player's key in one game's public snapshot (T-462, step 2.225): made on the server
+ * under a secret only it holds, the same for one player all through one game, different
+ * in every other game, and never their person's or roster place's id, which no public
+ * answer carries. Core is handed it and holds no secret; it must give a UUID-shaped text
+ * (T-463), so a page opened before the key existed still reads the snapshot.
+ */
+export type PlayerKeyOf = (gameId: string, playerId: string) => string;
+
 type Side = basketball.Side;
 const sides: readonly Side[] = ['home', 'away'];
 
@@ -132,6 +141,8 @@ export async function readGameSnapshot(
   viewing: GameViewing,
   /** The server's time now (ms), sent as `sentAt`. */
   now: number,
+  /** Each listed player's public key in this game (T-462). */
+  keyOf: PlayerKeyOf,
 ): Promise<Result<GameSnapshot, ReadGameSnapshotError>> {
   const game = await store.findGame(input.gameId);
   if (game === undefined || game.binned) return fail({ code: 'game-not-found' });
@@ -211,9 +222,10 @@ export async function readGameSnapshot(
 
   const onCourt = (side: Side) => new Set(view?.teams[side].onCourt ?? []);
   const court: Record<Side, ReadonlySet<string>> = { home: onCourt('home'), away: onCourt('away') };
+  // The page is told each player's key in this game, never their id (T-462).
   const players = listed
     .map(({ side, personId, line }) => ({
-      playerId: personId,
+      playerId: keyOf(game.id.toLowerCase(), personId.toLowerCase()),
       side,
       name: nameOf(side, personId),
       jersey: jerseyOf.get(personId) ?? null,
