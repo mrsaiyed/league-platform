@@ -31,6 +31,7 @@
 import { randomUUID } from 'node:crypto';
 import {
   accessibilityProblems,
+  answerNameScreen,
   buildNext,
   freePort,
   launch,
@@ -541,6 +542,9 @@ async function ownerCookie(address) {
     page.waitForURL((url) => url.pathname !== '/signup/password'),
     page.getByRole('button', { name: 'Save and sign in' }).click(),
   ]);
+  // The one name screen a seed person meets at their first sign-in (step 2.128): until it
+  // is answered, every page an owner asks for sends them to it, the admin pages included.
+  await answerNameScreen(page, 'Made-up', 'Owner');
   const cookie = (await context.cookies()).find((c) => c.name === 'srl_session')?.value ?? '';
   await context.close();
   note(`${address} is signed in`, cookie !== '');

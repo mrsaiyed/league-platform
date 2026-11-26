@@ -40,10 +40,16 @@ import type { SessionError, SessionIdentity } from '@srleagues/providers';
  * `address-refused`: an address no account may be linked or made for: one the database
  * refuses (on .invalid, or not in the accounts' email format), or one with characters
  * other than plain ASCII, which could be folded into another person's address.
+ * `name-needed` (R-21, step 2.128, T-445): an account of ours that has not yet given its
+ * first and last name; the account page is then the one screen that asks it, once.
  * Whichever, the person stays signed in, is told so plainly on the account page and
  * may sign out there.
  */
-export type AccountProblem = 'sign-in-link-conflict' | 'address-not-confirmed' | 'address-refused';
+export type AccountProblem =
+  | 'sign-in-link-conflict'
+  | 'address-not-confirmed'
+  | 'address-refused'
+  | 'name-needed';
 
 export type AccountRefusal = { readonly code: 'account-problem'; readonly problem: AccountProblem };
 

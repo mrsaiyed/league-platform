@@ -16,6 +16,7 @@ import {
   signUp,
   strongPassword,
   value,
+  type Setup,
 } from './local-sign-in.test-helper.ts';
 
 const elsewhere = '203.0.113.7';
@@ -974,5 +975,319 @@ describe('email confirmation (step 2.115)', () => {
   it('says it confirms every address: none counts without a code or Google', async () => {
     const env = setup();
     expect(await env.sign.emailConfirmation()).toBe('on');
+  });
+});
+
+describe('changing the password while signed in (T-85, step 2.128)', () => {
+  const newOne = 'a brand new passphrase';
+
+  it('needs the old one, judges the new one by the sign-up rule, and changes nothing when refused', async () => {
+    const env = setup();
+    const { session } = await signUp(env, 'ana@example.test');
+    const change = (oldPassword: string, newPassword: string) =>
+      env.sign.changePassword({
+        accessToken: session.accessToken,
+        oldPassword,
+        newPassword,
+        networkAddress: here,
+      });
+    expect(await change('not my password', newOne)).toEqual(fail({ code: 'wrong-password' }));
+    expect(await change(strongPassword, 'short')).toEqual(fail({ code: 'password-too-short' }));
+    expect(await change(strongPassword, 'x'.repeat(73))).toEqual(
+      fail({ code: 'password-too-long' }),
+    );
+    expect(await change(strongPassword, 'password123')).toEqual(fail({ code: 'password-leaked' }));
+    const old = await env.sign.signIn({
+      email: 'ana@example.test',
+      password: strongPassword,
+      device: phone,
+    });
+    expect(old.ok).toBe(true);
+  });
+
+  it('ends every other session, keeps this one, and swaps which password signs in', async () => {
+    const env = setup();
+    const { session } = await signUp(env, 'ana@example.test');
+    const other = value(
+      await env.sign.signIn({ email: 'ana@example.test', password: strongPassword, device: phone }),
+    );
+    expect(
+      await env.sign.changePassword({
+        accessToken: session.accessToken,
+        oldPassword: strongPassword,
+        newPassword: newOne,
+        networkAddress: here,
+      }),
+    ).toEqual({ ok: true, value: { endedSessions: 1 } });
+    expect((await env.sign.identify({ accessToken: session.accessToken })).ok).toBe(true);
+    expect(errorCode(await env.sign.identify({ accessToken: other.session.accessToken }))).toBe(
+      'session-ended',
+    );
+    const signIn = (password: string) =>
+      env.sign.signIn({ email: 'ana@example.test', password, device: phone });
+    expect(errorCode(await signIn(strongPassword))).toBe('wrong-email-or-password');
+    expect((await signIn(newOne)).ok).toBe(true);
+  });
+
+  it('counts a wrong old password as a wrong sign-in, and a refused new one not at all', async () => {
+    const env = setup();
+    const { session } = await signUp(env, 'ana@example.test');
+    const change = (oldPassword: string, newPassword: string) =>
+      env.sign.changePassword({
+        accessToken: session.accessToken,
+        oldPassword,
+        newPassword,
+        networkAddress: here,
+      });
+    for (let i = 0; i < 12; i++) await change('wrong', 'short');
+    expect((await change(strongPassword, newOne)).ok).toBe(true);
+    for (let i = 0; i < 5; i++) await change('wrong', newOne);
+    expect(errorCode(await change(newOne, strongPassword))).toBe('too-many-attempts');
+  });
+});
+
+describe('changing the email while signed in (T-73, step 2.128, T-455)', () => {
+  const ana = 'ana@example.test';
+  const fresh = 'ana.new@example.test';
+  const start = (env: Setup, accessToken: string, newEmail = fresh, password = strongPassword) =>
+    env.sign.startEmailChange({
+      accessToken,
+      password,
+      newEmail,
+      takenElsewhere: false,
+      networkAddress: here,
+    });
+  const confirm = (env: Setup, accessToken: string, code: string, networkAddress = here) =>
+    env.sign.confirmEmailChange({ accessToken, code, networkAddress });
+  const signsIn = async (env: Setup, email: string) =>
+    (await env.sign.signIn({ email, password: strongPassword, device: phone })).ok;
+  const wrongOf = (code: string) => (code === '000000' ? '111111' : '000000');
+
+  it('needs the password, sends a code to the new address only, and changes nothing yet', async () => {
+    const env = setup();
+    const { session } = await signUp(env, ana);
+    env.capture.clear();
+    expect(await start(env, session.accessToken, fresh, 'not my password')).toEqual(
+      fail({ code: 'wrong-password' }),
+    );
+    expect(await start(env, session.accessToken, ana)).toEqual(fail({ code: 'same-email' }));
+    expect(await start(env, session.accessToken, 'not an address')).toEqual(
+      fail({ code: 'invalid-email' }),
+    );
+    expect(env.capture.messages()).toEqual([]);
+    expect((await start(env, session.accessToken)).ok).toBe(true);
+    expect(env.capture.messages().map((m) => [m.to, m.purpose, m.code !== null])).toEqual([
+      [fresh, 'email-change', true],
+    ]);
+    expect(await signsIn(env, ana)).toBe(true);
+    expect(await signsIn(env, fresh)).toBe(false);
+  });
+
+  it('answers a taken address exactly as a free one, and its code matches nothing', async () => {
+    const env = setup();
+    const { session } = await signUp(env, ana);
+    await signUp(env, 'bo@example.test');
+    env.capture.clear();
+    const taken = await start(env, session.accessToken, 'bo@example.test');
+    expect(taken).toEqual(await start(env, session.accessToken, fresh));
+    const elsewhereTaken = await env.sign.startEmailChange({
+      accessToken: session.accessToken,
+      password: strongPassword,
+      newEmail: 'cy@example.test',
+      takenElsewhere: true,
+      networkAddress: here,
+    });
+    expect(elsewhereTaken).toEqual(taken);
+    expect(env.capture.messages().map((m) => [m.to, m.code !== null, m.accountExists])).toEqual([
+      ['bo@example.test', false, true],
+      [fresh, true, false],
+      ['cy@example.test', false, true],
+    ]);
+    // The pending change is now cy's, with no code: no guess can match.
+    expect(errorCode(await confirm(env, session.accessToken, codeFor(env, fresh)))).toBe(
+      'code-wrong',
+    );
+    expect(await signsIn(env, ana)).toBe(true);
+  });
+
+  it('a wrong code changes nothing; the right one moves the address and ends the other sessions', async () => {
+    const env = setup();
+    const { session } = await signUp(env, ana);
+    const other = value(
+      await env.sign.signIn({ email: ana, password: strongPassword, device: phone }),
+    );
+    value(await start(env, session.accessToken));
+    const code = codeFor(env, fresh);
+    expect(await confirm(env, session.accessToken, wrongOf(code))).toEqual(
+      fail({ code: 'code-wrong' }),
+    );
+    expect(await signsIn(env, ana)).toBe(true);
+    expect(await signsIn(env, fresh)).toBe(false);
+    const changed = value(await confirm(env, session.accessToken, code));
+    expect(changed).toEqual({ oldEmail: ana, newEmail: fresh, endedSessions: 2 });
+    expect(value(await env.sign.identify({ accessToken: session.accessToken })).email).toBe(fresh);
+    expect(errorCode(await env.sign.identify({ accessToken: other.session.accessToken }))).toBe(
+      'session-ended',
+    );
+    expect(await signsIn(env, fresh)).toBe(true);
+    expect(await signsIn(env, ana)).toBe(false);
+    // Spent: the same code again changes nothing.
+    expect(await confirm(env, session.accessToken, code)).toEqual(fail({ code: 'code-expired' }));
+  });
+
+  it('an expired code, a used-up one and one asked by another account change nothing', async () => {
+    const env = setup();
+    const { session } = await signUp(env, ana);
+    const bo = await signUp(env, 'bo@example.test');
+    value(await start(env, session.accessToken));
+    env.advanceSeconds(10 * 60);
+    expect(await confirm(env, session.accessToken, codeFor(env, fresh))).toEqual(
+      fail({ code: 'code-expired' }),
+    );
+    value(await start(env, session.accessToken));
+    const code = codeFor(env, fresh);
+    // Bo has no pending change: Ana's code is nothing to Bo's account.
+    expect(await confirm(env, bo.session.accessToken, code)).toEqual(
+      fail({ code: 'code-expired' }),
+    );
+    for (let i = 0; i < 4; i++) await confirm(env, session.accessToken, wrongOf(code), elsewhere);
+    expect(errorCode(await confirm(env, session.accessToken, wrongOf(code)))).toBe(
+      'too-many-attempts',
+    );
+    expect(errorCode(await confirm(env, session.accessToken, code))).toBe('too-many-attempts');
+    expect(await signsIn(env, ana)).toBe(true);
+    expect(await signsIn(env, fresh)).toBe(false);
+    expect(value(await env.sign.identify({ accessToken: bo.session.accessToken })).email).toBe(
+      'bo@example.test',
+    );
+  });
+});
+
+describe('a waiting change of email is the account’s own (T-455; the review’s H1, M1, M2, L2)', () => {
+  const ana = 'ana@example.test';
+  const bo = 'bo@example.test';
+  const target = 'shared.new@example.test';
+  const begin = (env: Setup, accessToken: string, newEmail = target, takenElsewhere = false) =>
+    env.sign.startEmailChange({
+      accessToken,
+      password: strongPassword,
+      newEmail,
+      takenElsewhere,
+      networkAddress: here,
+    });
+  const confirm = (env: Setup, accessToken: string, code: string) =>
+    env.sign.confirmEmailChange({ accessToken, code, networkAddress: here });
+  const signsIn = async (env: Setup, email: string) =>
+    (await env.sign.signIn({ email, password: strongPassword, device: phone })).ok;
+  const emailOf = async (env: Setup, accessToken: string) =>
+    value(await env.sign.identify({ accessToken })).email;
+  const wrongOf = (code: string) => (code === '000000' ? '111111' : '000000');
+
+  it('B typing A’s code for the same address changes nothing of A, anywhere (H1)', async () => {
+    const env = setup();
+    const a = await signUp(env, ana);
+    const b = await signUp(env, bo);
+    const aElsewhere = value(
+      await env.sign.signIn({ email: ana, password: strongPassword, device: phone }),
+    );
+    value(await begin(env, a.session.accessToken));
+    const codeOfA = codeFor(env, target);
+    value(await begin(env, b.session.accessToken));
+    const codeOfB = codeFor(env, target);
+    expect(codeOfB).not.toBe(codeOfA);
+    expect(await confirm(env, b.session.accessToken, codeOfA)).toEqual(
+      fail({ code: 'code-wrong' }),
+    );
+    expect(await emailOf(env, a.session.accessToken)).toBe(ana);
+    expect(await emailOf(env, aElsewhere.session.accessToken)).toBe(ana);
+    expect(await emailOf(env, b.session.accessToken)).toBe(bo);
+    expect(await signsIn(env, target)).toBe(false);
+    expect(await signsIn(env, ana)).toBe(true);
+    // A's own code is still A's alone.
+    expect(value(await confirm(env, a.session.accessToken, codeOfA))).toMatchObject({
+      oldEmail: ana,
+      newEmail: target,
+    });
+    // B's right code now meets a taken address: a wrong code's answer, nothing moves.
+    expect(await confirm(env, b.session.accessToken, codeOfB)).toEqual(
+      fail({ code: 'code-wrong' }),
+    );
+    expect(await emailOf(env, b.session.accessToken)).toBe(bo);
+    expect(await signsIn(env, bo)).toBe(true);
+  });
+
+  it('a taken address and a free one answer alike on the first code typed (M1)', async () => {
+    const env = setup();
+    const a = await signUp(env, ana);
+    const c = await signUp(env, 'cy@example.test');
+    const d = await signUp(env, 'dee@example.test');
+    await signUp(env, bo);
+    env.capture.clear();
+    // Each typed at once, before anything else is asked.
+    value(await begin(env, a.session.accessToken, bo));
+    const takenThere = await confirm(
+      env,
+      a.session.accessToken,
+      env.capture.latestCodeFor(bo) ?? '123456',
+    );
+    value(await begin(env, c.session.accessToken, 'elsewhere@example.test', true));
+    const takenHere = await confirm(env, c.session.accessToken, '123456');
+    value(await begin(env, d.session.accessToken, 'free@example.test'));
+    const free = await confirm(
+      env,
+      d.session.accessToken,
+      wrongOf(codeFor(env, 'free@example.test')),
+    );
+    expect(takenThere).toEqual(fail({ code: 'code-wrong' }));
+    expect(takenHere).toEqual(takenThere);
+    expect(free).toEqual(takenThere);
+    expect(await emailOf(env, a.session.accessToken)).toBe(ana);
+    expect(await signsIn(env, bo)).toBe(true);
+  });
+
+  it('asking again replaces the waiting change: the first code is dead (M2)', async () => {
+    const env = setup();
+    const a = await signUp(env, ana);
+    await signUp(env, bo);
+    value(await begin(env, a.session.accessToken, 'y@example.test'));
+    const first = codeFor(env, 'y@example.test');
+    value(await begin(env, a.session.accessToken, bo));
+    expect(await confirm(env, a.session.accessToken, first)).toEqual(fail({ code: 'code-wrong' }));
+    value(await begin(env, a.session.accessToken, 'z@example.test'));
+    expect(await confirm(env, a.session.accessToken, first)).toEqual(fail({ code: 'code-wrong' }));
+    expect(await emailOf(env, a.session.accessToken)).toBe(ana);
+    expect(await signsIn(env, 'y@example.test')).toBe(false);
+  });
+
+  it('the address taken after our check passed: nothing changes, the answer a wrong code’s', async () => {
+    const env = setup();
+    const a = await signUp(env, ana);
+    const aElsewhere = value(
+      await env.sign.signIn({ email: ana, password: strongPassword, device: phone }),
+    );
+    value(await begin(env, a.session.accessToken));
+    const code = codeFor(env, target);
+    await signUp(env, target);
+    expect(await confirm(env, a.session.accessToken, code)).toEqual(fail({ code: 'code-wrong' }));
+    expect(await emailOf(env, a.session.accessToken)).toBe(ana);
+    expect(await emailOf(env, aElsewhere.session.accessToken)).toBe(ana);
+    expect(await signsIn(env, ana)).toBe(true);
+  });
+
+  it('a new password ends a waiting change of email (L2)', async () => {
+    const env = setup();
+    const a = await signUp(env, ana);
+    value(await begin(env, a.session.accessToken));
+    const code = codeFor(env, target);
+    value(
+      await env.sign.changePassword({
+        accessToken: a.session.accessToken,
+        oldPassword: strongPassword,
+        newPassword: 'a brand new passphrase',
+        networkAddress: here,
+      }),
+    );
+    expect(await confirm(env, a.session.accessToken, code)).toEqual(fail({ code: 'code-expired' }));
+    expect(await emailOf(env, a.session.accessToken)).toBe(ana);
   });
 });

@@ -1,4 +1,3 @@
-import { platformUrl } from '@srleagues/core';
 import { redirect } from 'next/navigation';
 import {
   NextField,
@@ -23,7 +22,10 @@ export default async function Page({ searchParams }: SearchProps) {
   const search = await searchParams;
   const next = safeReturnPath(search['next']);
   const person = await signedInPerson();
-  if (person.kind === 'account-problem') redirect(platformUrl('account'));
+  // A name to give first (S-125), then back to this same action.
+  if (person.kind === 'account-problem') {
+    redirect(screenUrl('account', { next: screenUrl('confirmPassword', { next }) }));
+  }
   if (person.kind === 'visitor') {
     redirect(screenUrl('signin', { next: screenUrl('confirmPassword', { next }) }));
   }

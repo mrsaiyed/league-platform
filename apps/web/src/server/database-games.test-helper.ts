@@ -35,6 +35,7 @@ import { randomUUID } from 'node:crypto';
 import { databasePorts } from './database-ports.ts';
 import type { WebPorts } from './ports.ts';
 import type { SignInMail } from './sign-in/sign-in-mail.ts';
+import { identifyNamed, madeUpNameOf } from './named-identify.test-helper.ts';
 
 /** The people the step names, and someone signed out. */
 export const actors = [
@@ -124,7 +125,7 @@ export async function gamesWorld(counts: GamesWorldOptions) {
       passwordEnteredAt: null,
       lastSignInAt: new Date('2026-11-01T10:00:00Z'),
     });
-    const who = await ports.identify(token);
+    const who = await identifyNamed(ports, token, madeUpNameOf(email));
     if (!who.ok) throw new Error(`${email} not signed in: ${who.error.code}`);
     return who.value.accountId;
   };

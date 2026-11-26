@@ -71,6 +71,28 @@ export type CodeAttempt =
       readonly attemptsLeft: number;
     };
 
+/**
+ * A waiting change of email (T-455): ours alone, never the sign-in service's. One per
+ * account; the code only as its hash, so the store never holds a code that works.
+ */
+export type PendingEmailChange = {
+  readonly newEmail: string;
+  readonly codeHash: string;
+  readonly expiresAt: Date;
+  readonly attemptsLeft: number;
+};
+
+export type EmailChangeAttempt =
+  | { readonly status: 'none' }
+  | { readonly status: 'used-up' }
+  /** One attempt taken; `attemptsLeft` is what remains after it. */
+  | {
+      readonly status: 'taken';
+      readonly newEmail: string;
+      readonly codeHash: string;
+      readonly attemptsLeft: number;
+    };
+
 /** What a proof stands for: Supabase's session from the right code, good for one new password. */
 export type HeldProof = {
   readonly email: string;
@@ -90,6 +112,11 @@ export type SignInCodeStore = {
   /** Takes one attempt at the address's code, if it has one that has not expired at `at`. */
   readonly takeCodeAttempt: (email: string, at: Date) => Promise<CodeAttempt>;
   readonly dropCode: (email: string) => Promise<void>;
+  /** Replaces the account's waiting change of email, if it had one: its older code is dead. */
+  readonly putEmailChange: (accountId: string, change: PendingEmailChange) => Promise<void>;
+  /** Takes one attempt at the account's own waiting change, if it has not expired at `at`. */
+  readonly takeEmailChangeAttempt: (accountId: string, at: Date) => Promise<EmailChangeAttempt>;
+  readonly dropEmailChange: (accountId: string) => Promise<void>;
   readonly putProof: (proofHash: string, proof: HeldProof) => Promise<void>;
   /** The proof, if it has not expired at `at`, without using it. Forgets proofs that have run out. */
   readonly peekProof: (proofHash: string, at: Date) => Promise<HeldProof | undefined>;

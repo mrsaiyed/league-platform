@@ -218,6 +218,12 @@ export type TrackerControllerStatus = {
    * signed in again. The screen offers a sign-in that comes back to this game.
    */
   readonly signedOut: boolean;
+  /**
+   * The sign-in question (`signedOut`, or read-only `signed-out`) is the name gate's
+   * (T-460): this person is signed in but has not given their name. The screen says to
+   * give it, not to sign in; the taps are held all the same and sent once named.
+   */
+  readonly nameNeeded: boolean;
   /** True while the server's state is being reloaded after a refusal. */
   readonly reloading: boolean;
   /**
@@ -562,6 +568,8 @@ type Rejection = {
  */
 const asksSignIn = (rejection: Rejection): boolean =>
   rejection.httpStatus === 401 ||
+  // No name yet (T-460): held as for a sign-in question; the screen asks for the name.
+  rejection.error === 'name-needed' ||
   (rejection.httpStatus === 404 && rejection.error !== 'unknown-game');
 
 const reasonOfStatus = (rejection: Rejection): ReadOnlyReason => {
@@ -787,6 +795,7 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     waiting: [],
     lastSavedAt: null,
     signedOut: false,
+    nameNeeded: false,
     reloading: false,
     offlineLong: false,
     queue: queue.status(),
@@ -1103,8 +1112,15 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     }
   };
 
+  /** Whether this sign-in question is the name gate's (T-460), for the screen's words. */
+  const askedFor = (rejection: Rejection): void => {
+    const nameNeeded = rejection.error === 'name-needed';
+    if (current.nameNeeded !== nameNeeded) update({ nameNeeded });
+  };
+
   /** Refused while scoring (M4, T-456): signed out, keep scoring; else read-only, taps kept. */
   const refusedWhileScoring = async (rejection: Rejection): Promise<void> => {
+    askedFor(rejection);
     if (await stillSignedIn(rejection)) return readOnly('cannot-open');
     signedOutWhileScoring();
   };
@@ -1112,6 +1128,7 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
   /** Why a refusal turns the tracker read-only, asking who is signed in for a 404 (T-456). */
   const refusedReason = async (rejection: Rejection): Promise<ReadOnlyReason> => {
     const reason = reasonOfStatus(rejection);
+    if (reason === 'signed-out') askedFor(rejection);
     return reason === 'signed-out' && (await stillSignedIn(rejection)) ? 'cannot-open' : reason;
   };
 
@@ -1127,7 +1144,7 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
   /** Signed in again: send what waited, and ask again now for what was put off. */
   const signedInAgain = (): void => {
     if (!current.signedOut) return;
-    update({ signedOut: false });
+    update({ signedOut: false, nameNeeded: false });
     queue.resume();
     askAgainNow();
   };
@@ -2349,6 +2366,7 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
       // about the lost game when the takeover began is finished, as when it goes
       // unanswered (finding L2): another device has had the game whatever the reason.
       if (taken.kind === 'rejected') {
+        askedFor(taken);
         await track(readOnly(reasonOfStatus(taken), true));
         return { ok: true };
       }

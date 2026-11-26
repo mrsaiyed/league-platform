@@ -138,6 +138,11 @@ function claimsOf(accessToken: string): { sessionId: string; exp: number } | und
   }
 }
 
+// A to Z only: toLowerCase() folds some other characters into ASCII (the Kelvin sign
+// into k), which would turn one mailbox's address into another's (record 055).
+const asciiLower = (email: string) =>
+  email.replace(/[A-Z]/g, (letter) => String.fromCharCode(letter.charCodeAt(0) + 32));
+
 function userOf(value: unknown, what: string): GoTrueUser {
   if (!isObject(value)) throw new SupabaseAuthUnexpected(what);
   const id = text(value['id']);
@@ -148,9 +153,7 @@ function userOf(value: unknown, what: string): GoTrueUser {
   const confirmedAt = confirmed === undefined ? null : new Date(confirmed);
   return {
     id,
-    // A to Z only: toLowerCase() folds some other characters into ASCII (the Kelvin
-    // sign into k), which would turn one mailbox's address into another's (record 055).
-    email: email.replace(/[A-Z]/g, (letter) => String.fromCharCode(letter.charCodeAt(0) + 32)),
+    email: asciiLower(email),
     emailConfirmedAt:
       confirmedAt === null || Number.isNaN(confirmedAt.getTime()) ? null : confirmedAt,
   };
@@ -339,6 +342,21 @@ export function createGoTrueClient(options: GoTrueClientOptions) {
           verifyType: verifyType as GoTrueVerifyType,
         };
       });
+    },
+
+    /**
+     * Sets the address of the user with this id, at once and confirmed
+     * (`PUT /admin/users/{id}`, T-455): called only after our own check of the person's
+     * code has passed. Supabase keeps no pending change and sends nothing. Refused with
+     * `email_exists` when another user holds the address.
+     */
+    async setUserEmail(userId: string, email: string) {
+      const what = 'admin user update';
+      const answer = await call(what, 'PUT', `/admin/users/${encodeURIComponent(userId)}`, admin, {
+        email,
+        email_confirm: true,
+      });
+      return mapAnswer(answer, (body) => userOf(body, what));
     },
 
     /** Checks an emailed code; a right one gives a session. */

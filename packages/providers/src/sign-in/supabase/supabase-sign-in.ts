@@ -29,7 +29,7 @@
 // accepts only the codes it expects, and anything else is thrown as unexpected. A
 // refusal that is not the person's doing (Supabase busy, down or silent) never counts
 // as a wrong guess, and never uses up a proof.
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, randomBytes, randomInt, timingSafeEqual } from 'node:crypto';
 import {
   emailCode,
   networkAddress as networkAddressShape,
@@ -98,6 +98,11 @@ const expiryMarginMs = 30_000;
 const realSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 const token = () => randomBytes(32).toString('base64url');
 const digest = (value: string) => createHash('sha256').update(value).digest('base64url');
+/** A change of email's code as our store keeps it: bound to the account and the address (T-455). */
+const emailChangeHash = (accountId: string, newEmail: string, code: string) =>
+  digest(`email-change\n${accountId}\n${newEmail}\n${code}`);
+const sameHash = (a: string, b: string) =>
+  a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b));
 
 /** A device or network address that does not fit is the app's mistake: thrown (T-23). */
 const parseDevice = (device: SignInDevice) => {
@@ -618,6 +623,185 @@ export function createSupabaseSignIn(options: SupabaseSignInOptions): SignInServ
       const at = now();
       await store.sessions.passwordEntered(session.sessionId, at);
       return ok({ passwordEnteredAt: at });
+    },
+
+    async changePassword({ accessToken, oldPassword, newPassword: typedNew, networkAddress }) {
+      const network = parseNetwork(networkAddress);
+      const live = await liveSession(accessToken);
+      if ('code' in live) return fail(live);
+      const { session, user } = live;
+      if (!(await store.accounts.hasPassword(session.accountId))) {
+        return fail({ code: 'no-password' });
+      }
+      // The new one's length first, by setPassword's rule: it spends no guess. Whether it
+      // is leaked only Supabase can say, below.
+      const checked = newPassword.safeParse(typedNew);
+      if (!checked.success) {
+        const tooLong = checked.error.issues.some((issue) => issue.message === 'too-long');
+        return fail({ code: tooLong ? 'password-too-long' : 'password-too-short' });
+      }
+      // The old one exactly as confirmPassword checks it (T-85, T-225): a sign-in, whose
+      // session is ended with every other below. The change itself is made with this
+      // session's own token, since Supabase keeps alive only the session that changed it.
+      const reserved = await reserveGuess(user.email, network);
+      if ('retryAfterSeconds' in reserved) return fail(tooMany(reserved.retryAfterSeconds));
+      const answer = await checkPassword(user.email, oldPassword, reserved.ticket);
+      if ('limited' in answer) return fail(answer.limited);
+      if ('wrong' in answer) return fail({ code: 'wrong-password' });
+      const check = answer.session;
+      if (check.user.id !== session.accountId) {
+        await auth.signOut(check.accessToken, 'local');
+        return fail({ code: 'wrong-password' });
+      }
+      await store.limits.forgiveGuess(reserved.ticket);
+      let set;
+      try {
+        set = await auth.setPassword(accessToken, checked.data);
+      } catch (error) {
+        await auth.signOut(check.accessToken, 'local');
+        throw error;
+      }
+      if (!set.ok) {
+        const { refusal } = set;
+        await auth.signOut(check.accessToken, 'local');
+        if (refusal.status === 429) return unexpected('user update', refusal);
+        const refused = expectedRefusal('user update', refusal, [
+          'weak_password',
+          'same_password',
+          'session_not_found',
+          'bad_jwt',
+        ]);
+        if (refused === 'session_not_found') return fail({ code: 'session-ended' });
+        if (refused === 'bad_jwt') return fail({ code: 'access-expired' });
+        if (refused === 'weak_password') {
+          if (refusal.reasons.includes('pwned')) return fail({ code: 'password-leaked' });
+          if (refusal.reasons.includes('length')) return fail({ code: 'password-too-short' });
+          return unexpected('user update', refusal);
+        }
+        // The same password again: nothing to change, but the other devices are still
+        // signed out below, as a reset with the same password does.
+      }
+      // T-85: every other device is signed out, the check's session among them; this one
+      // stays. Supabase is told, and our list decides.
+      await auth.signOut(accessToken, 'others');
+      await store.codes.dropProofsFor(user.email);
+      // A new password ends a waiting change of email too (L2): it must be asked again.
+      await store.codes.dropEmailChange(session.accountId);
+      const endedSessions = await store.sessions.endSessionsOf(
+        session.accountId,
+        session.sessionId,
+      );
+      await store.sessions.passwordEntered(session.sessionId, now());
+      return ok({ endedSessions });
+    },
+
+    async startEmailChange({ accessToken, password, newEmail, takenElsewhere, networkAddress }) {
+      const network = parseNetwork(networkAddress);
+      const live = await liveSession(accessToken);
+      if ('code' in live) return fail(live);
+      const { session, user } = live;
+      if (!(await store.accounts.hasPassword(session.accountId))) {
+        return fail({ code: 'no-password' });
+      }
+      const parsed = signInEmail.safeParse(newEmail);
+      if (!parsed.success) return fail({ code: 'invalid-email' });
+      const email = parsed.data;
+      if (email === user.email) return fail({ code: 'same-email' });
+      // The password exactly as confirmPassword checks it (T-85, T-225).
+      const reserved = await reserveGuess(user.email, network);
+      if ('retryAfterSeconds' in reserved) return fail(tooMany(reserved.retryAfterSeconds));
+      const answer = await checkPassword(user.email, password, reserved.ticket);
+      if ('limited' in answer) return fail(answer.limited);
+      if ('wrong' in answer) return fail({ code: 'wrong-password' });
+      await auth.signOut(answer.session.accessToken, 'local');
+      if (answer.session.user.id !== session.accountId) return fail({ code: 'wrong-password' });
+      await store.limits.forgiveGuess(reserved.ticket);
+      await store.sessions.passwordEntered(session.sessionId, now());
+      const limited = await store.limits.countCodeRequest({
+        email,
+        network,
+        perEmail: settings.codesPerHour,
+        perNetwork: settings.codesPerHourPerNetwork,
+      });
+      if (limited) return fail(tooMany(limited.retryAfterSeconds));
+      // T-455: the waiting change is ours alone; Supabase hears nothing until our check of
+      // the code has passed. An address our records give another account gets no code and
+      // the same answer (T-68); its row holds the hash of a code no one has, so the first
+      // code typed answers as for a free address. One taken only at Supabase is found when
+      // the right code is typed, and answered then exactly as a wrong code.
+      const code = takenElsewhere ? null : String(randomInt(0, 1_000_000)).padStart(6, '0');
+      const expiresAt = new Date(now().getTime() + settings.codeValidMinutes * minute);
+      const sent = await codeSender.send({
+        to: email,
+        purpose: 'email-change',
+        code,
+        accountExists: code === null,
+        expiresAt,
+      });
+      if (!sent.ok) return fail({ code: 'code-not-sent' });
+      // Replaces any earlier change of this account: its code is dead.
+      await store.codes.putEmailChange(session.accountId, {
+        newEmail: email,
+        codeHash: emailChangeHash(session.accountId, email, code ?? token()),
+        expiresAt,
+        attemptsLeft: settings.attemptsPerCode,
+      });
+      return ok({ codeValidMinutes: settings.codeValidMinutes });
+    },
+
+    async confirmEmailChange({ accessToken, code: rawCode, networkAddress }) {
+      const network = parseNetwork(networkAddress);
+      const live = await liveSession(accessToken);
+      if ('code' in live) return fail(live);
+      const { session, user } = live;
+      const reserved = await reserveGuess(null, network);
+      if ('retryAfterSeconds' in reserved) return fail(tooMany(reserved.retryAfterSeconds));
+      // Only this account's own waiting change, by the session's account, never by address.
+      const attempt = await store.codes.takeEmailChangeAttempt(session.accountId, now());
+      if (attempt.status !== 'taken') {
+        await store.limits.cancelGuess(reserved.ticket);
+        return fail(
+          attempt.status === 'used-up' ? { code: 'too-many-attempts' } : { code: 'code-expired' },
+        );
+      }
+      const wrong = () =>
+        fail({ code: attempt.attemptsLeft <= 0 ? 'too-many-attempts' : 'code-wrong' } as const);
+      const code = emailCode.safeParse(rawCode);
+      const right =
+        code.success &&
+        sameHash(emailChangeHash(session.accountId, attempt.newEmail, code.data), attempt.codeHash);
+      if (!right) {
+        // One call to Supabase either way, so a wrong code takes about as long as a right
+        // one for an address Supabase refuses (T-68).
+        const nothing = await auth.verifyNothing(token());
+        if (!nothing.ok && !supabaseLimited(nothing.refusal)) {
+          expectedRefusal('verify', nothing.refusal, ['otp_expired']);
+        }
+        return wrong();
+      }
+      // Our check has passed: the one call that sets this account's own address.
+      const set = await auth.setUserEmail(session.accountId, attempt.newEmail);
+      if (!set.ok) {
+        const limit = supabaseLimited(set.refusal);
+        if (limit) {
+          await store.limits.cancelGuess(reserved.ticket);
+          return fail(limit);
+        }
+        // Another account's at Supabase: nothing changes, and the answer is a wrong code's.
+        expectedRefusal('admin user update', set.refusal, ['email_exists']);
+        return wrong();
+      }
+      await store.limits.cancelGuess(reserved.ticket);
+      await store.codes.dropEmailChange(session.accountId);
+      await store.codes.dropProofsFor(user.email);
+      await store.codes.dropProofsFor(attempt.newEmail);
+      // T-73: every other device is signed out; this one stays.
+      await auth.signOut(accessToken, 'others');
+      const endedSessions = await store.sessions.endSessionsOf(
+        session.accountId,
+        session.sessionId,
+      );
+      return ok({ oldEmail: user.email, newEmail: set.value.email, endedSessions });
     },
 
     async signOut(input) {

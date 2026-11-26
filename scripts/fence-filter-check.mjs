@@ -168,12 +168,20 @@ const excused = new Map([
     'before or beside any league by design, through a narrow database function that' +
       ' answers only for the account or name it is given (record 008)',
     'account-for-sign-in.ts',
+    'change-own-email.ts',
     'create-own-profile.ts',
+    'email-free-for-own-account.ts',
     'erase-account.ts',
     'find-account-of-sign-in.ts',
     'find-league-by-short-name.ts',
     'list-my-leagues.ts',
     'take-jobs.ts',
+  ),
+  ...wholeFiles(
+    "the signed-in account's own name: only its own 'self' profile and its own account row," +
+      ' keyed by the transaction account, no league data (step 2.128, decided by the lead)',
+    'read-own-name.ts',
+    'rename-own-profile.ts',
   ),
   ...wholeFiles(
     "the league is the transaction's own, inside public.access_list_names (0012)",
@@ -195,8 +203,11 @@ const excused = new Map([
 ]);
 // 4 of the purge, 12 repeated filters and 48 files with no filter of their own (2.224,
 // part 2); 14 filters of statements joined on league_id and 17 statements keyed by another
-// league-filtered statement or held by a composite key (part 3); the coin flip's insert (2.56).
-const mostExcused = 96;
+// league-filtered statement or held by a composite key (part 3); the coin flip's insert (2.56);
+// step 2.128's change-own-email.ts and email-free-for-own-account.ts (approved by the lead,
+// 2026-11-25); its read-own-name.ts and rename-own-profile.ts (decided by the lead,
+// 2026-11-26).
+const mostExcused = 100;
 
 /** Whole-file excuses: each file name with the one reason. */
 function wholeFiles(reason, ...files) {

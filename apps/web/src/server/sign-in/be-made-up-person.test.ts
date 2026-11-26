@@ -24,6 +24,7 @@ import {
   enterCode,
   type FlowDeps,
 } from './flows.ts';
+import { identifyNamed } from '../named-identify.test-helper.ts';
 
 const origin = 'http://127.0.0.1:3000';
 /** The scratch folders this file made in the system's temp folder: removed after each test. */
@@ -103,6 +104,14 @@ describe('on the made-up stand-in', () => {
     // An ordinary session of the sign-in stand-in, with its renewing token beside it.
     expect(cookies.has(cookieNames.renew)).toBe(true);
     expect((await ports.signIn.identify({ accessToken: token ?? '' })).ok).toBe(true);
+  });
+
+  it('lets the made-up member in with no name screen: they have their name (step 2.128)', async () => {
+    const { ports, tools, deps } = await onTheStandIn();
+    const { visit, cookies } = browser();
+    expect(await beMadeUpPerson({ person: 'member' }, visit, deps, tools)).not.toBeNull();
+    const who = await ports.identify(cookies.get(cookieNames.session) ?? '');
+    expect(who.ok).toBe(true);
   });
 
   it('signs nobody in for a key that is no made-up person, and goes nowhere but our paths', async () => {
@@ -324,7 +333,12 @@ describe('no code in a log line (T4 §10)', () => {
       to: platformUrl('account'),
     });
     const token = cookies.get(cookieNames.session) ?? '';
-    expect((await ports.identify(token)).ok).toBe(true);
+    // A new account meets the one name screen first (step 2.128), then is let in.
+    expect(await ports.identify(token)).toEqual({
+      ok: false,
+      error: { code: 'account-problem', problem: 'name-needed' },
+    });
+    expect((await identifyNamed(ports, token)).ok).toBe(true);
     // A line that tries to log them, as a careless one might: the logger's redaction must
     // remove both, so the check below also looks at a real line.
     await ports.signInMail.newDevice(email, 'made-up', new Date());

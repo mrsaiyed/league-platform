@@ -29,6 +29,7 @@ import {
   type RealSignInWiring,
   type StartupDeps,
 } from './startup.ts';
+import { identifyNamed } from './named-identify.test-helper.ts';
 
 const env = {
   PUBLIC_BASE_URL: 'http://localhost:3000',
@@ -150,7 +151,7 @@ describe('startWebApp', () => {
     if (!signedIn.ok)
       throw new Error(`the made-up member could not sign in: ${signedIn.error.code}`);
     // Who they are is one of the database's own accounts, not the stand-in's user id.
-    const who = await ports.identify(signedIn.value.session.accessToken);
+    const who = await identifyNamed(ports, signedIn.value.session.accessToken);
     const service = await ports.signIn.identify({
       accessToken: signedIn.value.session.accessToken,
     });
@@ -723,7 +724,7 @@ describe('LOCAL_NOW (step 2.179)', () => {
     const session = signedIn.value.session;
     // Its access lasts from this computer's now, not from 2020.
     expect(session.accessExpiresAt.getTime()).toBeGreaterThan(before);
-    expect((await ports.identify(session.accessToken)).ok).toBe(true);
+    expect((await identifyNamed(ports, session.accessToken)).ok).toBe(true);
     const renewed = await ports.renewSession(session.refreshToken);
     if (!renewed.ok) throw new Error(`the session could not be renewed: ${renewed.error.code}`);
     expect(renewed.value.accessExpiresAt.getTime()).toBeGreaterThan(before);

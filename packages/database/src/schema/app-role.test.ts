@@ -43,16 +43,20 @@ const historyTables = [
  * 2.127 added my_leagues (record 066): the leagues of the account set, no argument.
  * Step 2.204 added keep_email (record 098): adds one email to a made-up address to the
  * test copy's kept emails, outside public, keeps the newest 300, and returns nothing, so
- * it reads no row of anyone's (schema/kept-emails.test.ts).
+ * it reads no row of anyone's (schema/kept-emails.test.ts). Step 2.128 added
+ * email_free_for_own_account and change_own_email (T-458): the account set only, a yes or
+ * a no, never whose address (queries/change-own-email.test.ts).
  */
 const definerFunctions = [
   'access_list_names',
   'account_for_sign_in',
   'account_of_sign_in',
+  'change_own_email',
   'check_league_has_default_program',
   'check_league_slug_free',
   'check_old_slug_free',
   'create_own_profile',
+  'email_free_for_own_account',
   'erase_account',
   'find_league_by_slug',
   'keep_email',
@@ -64,6 +68,7 @@ const signInTables = [
   'code_requests',
   'codes',
   'devices',
+  'email_changes',
   'guess_locks',
   'guesses',
   'proofs',
@@ -615,6 +620,20 @@ describe('owner-run checks refuse to run where the owner is fenced', () => {
         }),
       ).rejects.toMatchObject(fencedRefusal);
     });
+  });
+
+  it('a change of email refuses instead of finding no other account (T-458)', async () => {
+    const { ownerId } = await newLeague(other);
+    for (const call of ['email_free_for_own_account', 'change_own_email']) {
+      await ownedByFencedRole(`${call}(text)`, async () => {
+        await expect(
+          other.transaction(async (tx) => {
+            await tx.query("select set_config('app.account_id', $1, true)", [ownerId]);
+            await tx.query(`select public.${call}('fenced@example.test')`);
+          }),
+        ).rejects.toMatchObject(fencedRefusal);
+      });
+    }
   });
 
   // Record 066: fenced, my_leagues would see no league and tell everyone they belong to

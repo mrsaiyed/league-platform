@@ -18,6 +18,7 @@
 import {
   answered,
   accessibilityProblems,
+  answerNameScreen,
   buildNext,
   freePort,
   launch,
@@ -114,6 +115,8 @@ async function signUpByTheKeptCode(page, origin, address) {
     page.waitForURL((url) => url.pathname !== '/signup/password'),
     page.getByRole('button', { name: 'Save and sign in' }).click(),
   ]);
+  // The one name screen a new account meets (step 2.128).
+  await answerNameScreen(page, 'Made-up', 'Signer');
   return code;
 }
 

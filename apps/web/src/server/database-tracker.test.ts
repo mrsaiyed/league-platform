@@ -160,7 +160,7 @@ describe('a game scored live on the database ports', () => {
     );
     expect(other).toMatchObject({ ok: true, value: { status: 'held-by-other' } });
     expect(await w.ports.tracker.displayNameOf(w.leagueId, scorer.accountId ?? '')).toBe(
-      'Sky Scorer',
+      'Made-up scorer',
     );
     // The device reads the rosters, in full: a staff read (T6 §4).
     const rosters = await readTrackerRosters(scorer, { gameId }, w.ports.tracker.deps);

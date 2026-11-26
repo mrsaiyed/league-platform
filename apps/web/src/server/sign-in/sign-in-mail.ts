@@ -1,5 +1,6 @@
 // The sign-in emails, sent through our own email service (T4 §3): the code (T-67),
-// the new-device notice (T-70) and the password-changed notice (T-85). The sign-in
+// the new-device notice (T-70), the password-changed notice (T-85) and the two notices of a
+// change of email to the old address (T-73). The sign-in
 // service decides when a code is due; the flows decide when a notice is (flows.ts).
 //
 // T-68: asking for a code must answer the same, in the same time, whether or not the
@@ -12,6 +13,8 @@
 // (record 031).
 import { ok, platformUrl, type EmailSender } from '@srleagues/core';
 import {
+  emailChangeAskedEmail,
+  emailChangedEmail,
   fromHeader,
   newDeviceEmail,
   passwordChangedEmail,
@@ -27,6 +30,9 @@ export type SignInMail = {
   /** Never throws: a notice that could not be sent must not undo the sign-in. */
   readonly newDevice: (to: string, deviceLabel: string, at: Date) => Promise<void>;
   readonly passwordChanged: (to: string, at: Date) => Promise<void>;
+  /** To the OLD address: a change of email to `newEmail` was asked, then made (T-73). */
+  readonly emailChangeAsked: (to: string, newEmail: string, at: Date) => Promise<void>;
+  readonly emailChanged: (to: string, newEmail: string, at: Date) => Promise<void>;
 };
 
 export type SignInMailOptions = {
@@ -36,7 +42,9 @@ export type SignInMailOptions = {
   /** PUBLIC_BASE_URL. */
   readonly siteOrigin: string;
   /** Told when an email could not be sent. Gets no address and no content (T-86). */
-  readonly onNoticeFailed: (kind: 'code' | 'new-device' | 'password-changed') => void;
+  readonly onNoticeFailed: (
+    kind: 'code' | 'new-device' | 'password-changed' | 'email-change-asked' | 'email-changed',
+  ) => void;
   /** The clock the sign-in service uses, for how long a code still works. */
   readonly now: () => Date;
 };
@@ -91,6 +99,20 @@ export function createSignInMail(options: SignInMailOptions): SignInMail {
         t,
       );
       await send(to, email).catch(() => options.onNoticeFailed('password-changed'));
+    },
+    emailChangeAsked: async (to, newEmail, at) => {
+      const email = emailChangeAskedEmail(
+        { newEmail, when: timeInWords(at), link: siteUrl + platformUrl('account'), siteUrl },
+        t,
+      );
+      await send(to, email).catch(() => options.onNoticeFailed('email-change-asked'));
+    },
+    emailChanged: async (to, newEmail, at) => {
+      const email = emailChangedEmail(
+        { newEmail, when: timeInWords(at), link: siteUrl, siteUrl },
+        t,
+      );
+      await send(to, email).catch(() => options.onNoticeFailed('email-changed'));
     },
   };
 }

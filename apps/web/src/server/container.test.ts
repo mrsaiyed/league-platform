@@ -212,6 +212,13 @@ describe('container.ts in staging, wired for real', () => {
 
     // Who they are is one of the database's own accounts, made for them on first sight.
     const first = made.value.session;
+    // A new account is asked its name first (R-21, step 2.128): until then it is refused.
+    const before = await ports.identify(first.accessToken);
+    expect(before.ok ? 'identified' : before.error.code).toBe('account-problem');
+    const nameless = await ports.ownName.accountOf(first.accessToken);
+    if (nameless === undefined) throw new Error('no account for the new session');
+    const name = { firstName: 'Made-up', lastName: 'Person' };
+    expect(await ports.ownName.store.create(nameless, name)).toBe('made');
     const who = await ports.identify(first.accessToken);
     if (!who.ok) throw new Error(`not identified: ${who.error.code}`);
     expect(who.value.email).toBe(email);

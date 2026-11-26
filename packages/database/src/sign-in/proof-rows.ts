@@ -5,7 +5,7 @@ import type { HeldProof, VerifyType } from './sign-in-store-types.ts';
 
 const verifyTypes: readonly VerifyType[] = ['signup', 'magiclink', 'recovery'];
 
-/** The kind of check a code answers, as stored (0012 allows only these). */
+/** The kind of check a code answers, as stored (0012 allows these). */
 export function verifyTypeOf(value: string | null): VerifyType | null {
   if (value === null) return null;
   const found = verifyTypes.find((type) => type === value);

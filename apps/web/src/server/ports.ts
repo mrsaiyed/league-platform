@@ -4,6 +4,7 @@
 //
 // The imports, and each area's ports below (adminSettings to tracker), are in alphabetical
 // order: a new area's go in their place, never at the end (step 2.188, record 072).
+import type { OwnName, OwnNameStore } from '@srleagues/core';
 import type {
   AccessHolder,
   AccountLeagueRow,
@@ -37,6 +38,24 @@ export type WebPorts = Omit<ContextDeps, 'siteOrigin'> & {
    * our accounts' (record 055).
    */
   readonly identify: (accessToken: string) => Promise<Result<SessionIdentity, IdentifyError>>;
+  /**
+   * The signed-in person's own name (R-21, step 2.128, T-445). `accountOf` is the session's
+   * account before the name gate (identify refuses a nameless account with `name-needed`),
+   * for the one screen that asks the name; nothing else calls it.
+   */
+  readonly ownName: {
+    readonly accountOf: (accessToken: string) => Promise<string | undefined>;
+    readonly read: (accountId: string) => Promise<OwnName | undefined>;
+    readonly store: OwnNameStore;
+  };
+  /**
+   * Our own account's address (T-73, T-458): whether no other account in our records holds
+   * one, a yes or a no only; and moving it once the sign-in service confirmed a change.
+   */
+  readonly ownEmail: {
+    readonly isFree: (accountId: string, email: string) => Promise<boolean>;
+    readonly change: (accountId: string, email: string) => Promise<'changed' | 'taken'>;
+  };
   /** The sign-in service (T-6): the local stand-in, or Supabase (record 018). */
   readonly signIn: SignInService;
   /** The sign-in emails, through our own email service (T4 §3). */

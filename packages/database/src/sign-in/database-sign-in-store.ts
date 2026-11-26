@@ -20,6 +20,7 @@ import { claimSignInUser } from './claim-sign-in-user.ts';
 import { clearGuesses } from './clear-guesses.ts';
 import { countCodeRequest } from './count-code-request.ts';
 import { dropCode } from './drop-code.ts';
+import { dropEmailChange } from './drop-email-change.ts';
 import { dropProofsFor } from './drop-proofs-for.ts';
 import { endSession } from './end-session.ts';
 import { endSessionsOf } from './end-sessions-of.ts';
@@ -29,6 +30,7 @@ import { liveSessionsOf } from './live-sessions-of.ts';
 import { passwordEntered } from './password-entered.ts';
 import { peekProof } from './peek-proof.ts';
 import { putCode } from './put-code.ts';
+import { putEmailChange } from './put-email-change.ts';
 import { putProof } from './put-proof.ts';
 import { releaseRefreshToken } from './release-refresh-token.ts';
 import { rememberDevice } from './remember-device.ts';
@@ -39,6 +41,7 @@ import { setHasPassword } from './set-has-password.ts';
 import { signInUserExists } from './sign-in-user-exists.ts';
 import type { DatabaseSignInStore } from './sign-in-store-types.ts';
 import { takeCodeAttempt } from './take-code-attempt.ts';
+import { takeEmailChangeAttempt } from './take-email-change-attempt.ts';
 import { takeProof } from './take-proof.ts';
 import { touchSession } from './touch-session.ts';
 import { useRefreshToken } from './use-refresh-token.ts';
@@ -67,6 +70,9 @@ export function createDatabaseSignInStore(
       putCode: (email, code) => step((s) => putCode(s, email, code)),
       takeCodeAttempt: (email, at) => step((s) => takeCodeAttempt(s, email, at)),
       dropCode: (email) => step((s) => dropCode(s, email)),
+      putEmailChange: (userId, change) => step((s) => putEmailChange(s, userId, change)),
+      takeEmailChangeAttempt: (userId, at) => step((s) => takeEmailChangeAttempt(s, userId, at)),
+      dropEmailChange: (userId) => step((s) => dropEmailChange(s, userId)),
       putProof: (proofHash, proof) => step((s) => putProof(s, proofHash, proof)),
       peekProof: (proofHash, at) => step((s) => peekProof(s, proofHash, at)),
       takeProof: (proofHash, at) => step((s) => takeProof(s, proofHash, at)),

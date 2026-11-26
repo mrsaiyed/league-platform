@@ -41,7 +41,7 @@ export type FakeCall = {
 
 type User = {
   readonly id: string;
-  readonly email: string;
+  email: string;
   readonly createdAt: Date;
   passwordDigest: string | null;
   confirmedAt: Date | null;
@@ -354,6 +354,29 @@ export function createFakeSupabaseAuth(options: FakeSupabaseAuthOptions) {
         endSessions(user.id, session.id);
         return json(200, userJson(user));
       }
+    }
+
+    if (call.method === 'PUT' && path.startsWith('/admin/users/')) {
+      // The adapter's one change of a user's address, after its own check (T-455).
+      if (call.headers['authorization'] !== `Bearer ${options.secretKey}`) {
+        return refuse(403, 'not_admin', 'User not allowed');
+      }
+      const user = users.get(decodeURIComponent(path.slice('/admin/users/'.length)));
+      if (!user) return refuse(404, 'user_not_found', 'User not found');
+      const email = field(body, 'email').toLowerCase();
+      if (email === '') return refuse(400, 'validation_failed', 'Unable to validate email address');
+      const holder = usersByEmail.get(email);
+      if (holder && holder !== user) {
+        return refuse(
+          422,
+          'email_exists',
+          'A user with this email address has already been registered',
+        );
+      }
+      usersByEmail.delete(user.email);
+      user.email = email;
+      usersByEmail.set(email, user);
+      return json(200, userJson(user));
     }
 
     if (call.method === 'DELETE' && path.startsWith('/admin/users/')) {

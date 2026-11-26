@@ -40,7 +40,7 @@ export type ApiAnswer = {
 /** Why there is no league request: each error with its own status, never another pairing. */
 export type ApiRefusal =
   | { readonly status: 401; readonly error: 'signed-out' }
-  | { readonly status: 403; readonly error: 'account-problem' }
+  | { readonly status: 403; readonly error: 'account-problem' | 'name-needed' }
   | { readonly status: 404; readonly error: 'not-found' };
 
 /**
@@ -95,7 +95,11 @@ export async function resolveLeagueApi(
     if (signedOut === 'visitor' && facts.session !== null) {
       return resolveLeagueApi({ ...facts, session: null }, parts, deps, signedOut);
     }
-    if (accountProblem) return { ok: false, refusal: { status: 403, error: 'account-problem' } };
+    if (accountProblem) {
+      // No name yet (T-460): said to this person, about their own account only.
+      const named = built.error.problem === 'name-needed' ? 'name-needed' : 'account-problem';
+      return { ok: false, refusal: { status: 403, error: named } };
+    }
     return { ok: false, refusal: { status: 401, error: 'signed-out' } };
   }
   const context = built.value;

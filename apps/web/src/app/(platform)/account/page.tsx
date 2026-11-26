@@ -9,8 +9,16 @@ import {
   waitingQuestionWords,
 } from '../../../features/shell/index.ts';
 import {
+  ChangeEmailForm,
+  changeEmailStart,
+  ChangePasswordForm,
+  changePasswordStart,
   LocalTime,
+  OwnNameForm,
+  type ChangeEmailWords,
+  type ChangePasswordWords,
   type LocalTimeWords,
+  type OwnNameWords,
   type SearchProps,
 } from '../../../features/sign-in/index.ts';
 import { SignOutForm } from '../../../features/tracker/index.ts';
@@ -18,7 +26,14 @@ import { webPorts } from '../../../server/container.ts';
 import type { AccountProblem } from '../../../server/context.ts';
 import { locale, t, type TextKey } from '../../../server/messages.ts';
 import { signOutAction, signOutEverywhereAction } from '../../../server/sign-in/actions.ts';
+import {
+  changeOwnNameAction,
+  giveOwnNameAction,
+} from '../../../server/sign-in/own-name-actions.ts';
 import { cookieNames } from '../../../server/sign-in/cookies.ts';
+import { changeEmailAction } from '../../../server/sign-in/email-actions.ts';
+import { changePasswordAction } from '../../../server/sign-in/password-actions.ts';
+import { safeReturnPath } from '../../../server/sign-in/device.ts';
 import { screenUrl } from '../../../server/sign-in/problems.ts';
 import { leaguesOfThisRequest, signedInPerson } from '../../../server/signed-in-leagues.ts';
 import { timeInWords } from '../../../server/sign-in/sign-in-mail.ts';
@@ -31,6 +46,9 @@ import { timeInWords } from '../../../server/sign-in/sign-in-mail.ts';
 // Since step 2.127 it says first who is signed in (the address the sign-in service holds
 // for the session), then lists the leagues they belong to with their role in each, each a
 // link (P2 line 71; record 066), before the devices.
+// Since step 2.128: "Your name", and "Your password" (the old one and a new one; a change
+// signs out every other device and emails the account, T-85), and "Your email" (a code to the
+// new address, a notice to the old one; the code changes it and signs out the others, T-73).
 // Since step 2.163 (M26, M30, L10): this device first and said to be this one; each time in
 // the reader's own time ("today at 8:41 PM"), by their browser (local-time.tsx); a list that
 // could not be read says so; and "Sign out everywhere" asks first, on this page
@@ -39,10 +57,17 @@ export default async function Page({ searchParams }: SearchProps) {
   // The cookies first: this makes the page drawn per request, never at build time.
   // The session is identified once for the whole request (this-request.ts).
   const accessToken = (await cookies()).get(cookieNames.session)?.value ?? '';
-  const asking = (await searchParams)['ask'] === 'signOutEverywhere';
+  const query = await searchParams;
+  const asking = query['ask'] === 'signOutEverywhere';
   const ports = await webPorts();
   const who = await signedInPerson();
-  if (who.kind === 'account-problem') return <AccountProblemPage problem={who.problem} />;
+  if (who.kind === 'account-problem') {
+    return who.problem === 'name-needed' ? (
+      <NameScreen next={safeReturnPath(query['next'])} />
+    ) : (
+      <AccountProblemPage problem={who.problem} />
+    );
+  }
   if (who.kind === 'visitor') redirect(screenUrl('signin', { next: platformUrl('account') }));
   const listed = await ports.signIn.listSessions({ accessToken });
   // This device first, then the others, most recent first, as the service lists them.
@@ -50,6 +75,7 @@ export default async function Page({ searchParams }: SearchProps) {
     ? [...listed.value.filter((s) => s.current), ...listed.value.filter((s) => !s.current)]
     : [];
   const leagues = await leaguesOfThisRequest();
+  const name = await ports.ownName.read(who.accountId);
   return (
     <StandalonePage>
       <main className="ui-message ui-form-card account">
@@ -58,6 +84,34 @@ export default async function Page({ searchParams }: SearchProps) {
         <p className="ui-kicker">{t('shell.siteName')}</p>
         <p className="account-who">{t('account.signedInAs', { email: who.email })}</p>
         <h1>{t('page.account')}</h1>
+        <h2>{t('account.name.heading')}</h2>
+        <p>{t('account.name.help')}</p>
+        <OwnNameForm
+          action={changeOwnNameAction}
+          initial={{
+            firstName: name?.firstName ?? '',
+            lastName: name?.lastName ?? '',
+            problem: null,
+            saved: false,
+            round: 0,
+          }}
+          words={ownNameWords()}
+          mark="change"
+        />
+        <h2>{t('account.password.heading')}</h2>
+        <p>{t('account.password.help')}</p>
+        <ChangePasswordForm
+          action={changePasswordAction}
+          initial={changePasswordStart}
+          words={changePasswordWords()}
+        />
+        <h2>{t('account.email.heading')}</h2>
+        <p>{t('account.email.help')}</p>
+        <ChangeEmailForm
+          action={changeEmailAction}
+          initial={changeEmailStart}
+          words={changeEmailWords()}
+        />
         <h2>{t('account.leagues')}</h2>
         <MyLeaguesList leagues={leagues} />
         <h2>{t('account.devices')}</h2>
@@ -141,7 +195,95 @@ const problemText = {
   'sign-in-link-conflict': 'account.problem.linkConflict',
   'address-not-confirmed': 'account.problem.notConfirmed',
   'address-refused': 'account.problem.addressRefused',
+  'name-needed': 'account.name.intro',
 } as const satisfies Record<AccountProblem, TextKey>;
+
+function ownNameWords(): OwnNameWords {
+  return {
+    firstName: t('account.name.firstName'),
+    lastName: t('account.name.lastName'),
+    save: t('account.name.save'),
+    saved: t('account.name.saved'),
+    problems: {
+      invalid: t('account.name.invalid'),
+      alreadyNamed: t('account.name.alreadyNamed'),
+      noNameYet: t('account.name.noNameYet'),
+    },
+  };
+}
+
+function changePasswordWords(): ChangePasswordWords {
+  const hole = '{count}';
+  return {
+    oldPassword: t('account.password.old'),
+    newPassword: t('account.password.new'),
+    newHelp: t('account.password.newHelp'),
+    save: t('account.password.save'),
+    saved: t('account.password.saved'),
+    problems: {
+      wrongOld: t('account.password.wrongOld'),
+      noPassword: t('account.password.noPassword'),
+      tooShort: t('problem.passwordTooShort'),
+      tooLong: t('problem.passwordTooLong'),
+      leaked: t('problem.passwordLeaked'),
+      tooManyAttempts: t.plural('problem.tooManyAttempts', 2, { count: hole }),
+    },
+    tooManyAttemptsOne: t.plural('problem.tooManyAttempts', 1, { count: hole }),
+  };
+}
+
+function changeEmailWords(): ChangeEmailWords {
+  const hole = '{count}';
+  return {
+    newEmail: t('account.email.newEmail'),
+    password: t('account.email.password'),
+    send: t('account.email.send'),
+    sent: t('account.email.sent', { email: '{email}' }),
+    code: t('account.email.code'),
+    confirm: t('account.email.confirm'),
+    changed: t('account.email.changed', { email: '{email}' }),
+    problems: {
+      wrongPassword: t('account.email.wrongPassword'),
+      noPassword: t('account.email.noPassword'),
+      invalid: t('account.email.invalid'),
+      same: t('account.email.same'),
+      notSent: t('account.email.notSent'),
+      codeWrong: t('account.email.codeWrong'),
+      codeExpired: t('account.email.codeExpired'),
+      tooManyAttempts: t.plural('problem.tooManyAttempts', 2, { count: hole }),
+    },
+    tooManyAttemptsOne: t.plural('problem.tooManyAttempts', 1, { count: hole }),
+  };
+}
+
+/**
+ * The one screen that asks a new account's first and last name, once (R-21, step 2.128):
+ * every page sends a signed-in person here until they have answered; they can still sign out.
+ * Answered, they go on to the page that sent them (`?next=`, S-125), else the account page.
+ */
+function NameScreen({ next }: { readonly next: string | null }) {
+  return (
+    <StandalonePage>
+      <main className="ui-message ui-form-card account" data-name-screen="">
+        <p className="ui-kicker">{t('shell.siteName')}</p>
+        <h1>{t('account.name.title')}</h1>
+        <p>{t('account.name.intro')}</p>
+        <OwnNameForm
+          action={giveOwnNameAction}
+          initial={{ firstName: '', lastName: '', problem: null, saved: false, round: 0 }}
+          words={ownNameWords()}
+          mark="give"
+          next={next}
+        />
+        <form action={signOutAction}>
+          <button className="ui-button" data-kind="quiet" type="submit">
+            {t('account.signOut')}
+          </button>
+        </form>
+      </main>
+    </StandalonePage>
+  );
+}
 
 /** What is wrong with the account, in plain words, and signing out (record 055). */
 function AccountProblemPage({ problem }: { readonly problem: AccountProblem }) {

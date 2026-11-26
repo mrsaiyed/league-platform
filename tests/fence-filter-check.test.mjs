@@ -31,8 +31,12 @@ const run = (...args) => execFileSync(process.execPath, [script, ...args], { enc
  * list-season-names #3, list-table-teams #2, list-venues #2, set-current-season #2 and #3,
  * update-published-game #2, update-season #1 to #3).
  * 96 since step 2.56, last part: insert-standings-coin-flip, an insert the fence checks.
+ * 98 since step 2.128: change-own-email.ts and email-free-for-own-account.ts, each only
+ * calling an owner-run function about the transaction's own account (approved by the lead,
+ * 2026-11-25). 100 since its read-own-name.ts and rename-own-profile.ts, each keyed by the
+ * transaction's own account and its 'self' profile (decided by the lead, 2026-11-26).
  */
-const reviewedExcused = 96;
+const reviewedExcused = 100;
 
 /** The audit's confirmed gaps, by name, each with the start of the filter it takes out. */
 const gaps = [

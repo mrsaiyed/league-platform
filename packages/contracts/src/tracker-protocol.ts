@@ -365,6 +365,12 @@ export const TrackerRefusal = z.discriminatedUnion('error', [
    */
   z.strictObject({ error: z.literal('account-problem') }),
   /**
+   * The signed-in person has not given their name yet (403, T-460): told only to that
+   * person, about their own account. A tracker holds every waiting tap, as for a sign-in
+   * question, and says to give the name; once named, the taps are sent.
+   */
+  z.strictObject({ error: z.literal('name-needed') }),
+  /**
    * Not there for this person (404): no such league, one in the bin, one hidden from
    * them (a draft or suspended league, U-9), or an address spelled another way. A
    * tracker never reads it as "the game is gone": it may be a scorer signed out in a
@@ -387,6 +393,7 @@ export const trackerRefusalStatus: Readonly<Record<TrackerRefusal['error'], numb
   'signed-out': 401,
   'not-allowed': 403,
   'account-problem': 403,
+  'name-needed': 403,
   'not-found': 404,
   'unknown-game': 404,
   'invalid-input': 400,

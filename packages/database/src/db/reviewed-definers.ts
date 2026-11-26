@@ -25,6 +25,10 @@ export const reviewedDefiners: ReadonlyMap<string, string> = new Map([
     'the account one sign-in id belongs to: its id only, from accounts; reads no league table (0012, record 052)',
   ],
   [
+    'public.change_own_email(given_email text)',
+    'moves the address of the account the transaction set, after a confirmed change of email (T-73, T-458): refuses an .invalid address, takes the address’s lock, returns taken when another account holds it (by lower()), else sets that one account’s email and returns changed; reads no league table (0032)',
+  ],
+  [
     'public.check_league_has_default_program()',
     'trigger function only, run on a write to leagues or programs: refuses to end a transaction in which a league that still exists has no default program; reads only that league’s own leagues and programs rows, returns nothing (0003, 0005)',
   ],
@@ -39,6 +43,10 @@ export const reviewedDefiners: ReadonlyMap<string, string> = new Map([
   [
     'public.create_own_profile(given_first_name text, given_last_name text, given_birth_date date)',
     'makes the own profile of the account the transaction set, once: that account’s personal rows only; reads no league table (0012)',
+  ],
+  [
+    'public.email_free_for_own_account(given_email text)',
+    'whether no account but the one the transaction set holds an address (T-458), by lower() under the address’s lock: a yes or a no, never whose; reads accounts only, no league table (0032)',
   ],
   [
     'public.erase_account()',

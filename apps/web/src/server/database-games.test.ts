@@ -197,8 +197,9 @@ describe('the games area on the database ports', () => {
     const names = await w.ports.games.namesOf(w.leagueId);
     expect(Object.values(names.teams)).toContain('Lakeside Herons');
     expect(Object.keys(names.seasons)).toContain(w.seasonId);
-    // The seed scorekeeper's display name, on every game assigned to them.
-    expect(names.scorekeepers[w.byHand[0] ?? '']).toEqual(['Sky Scorer']);
+    // The name the seed scorekeeper gave on the one name screen (step 2.128), on every game
+    // assigned to them.
+    expect(names.scorekeepers[w.byHand[0] ?? '']).toEqual(['Made-up scorer']);
     // Nothing of the other league's.
     const other = await w.ports.games.namesOf(w.otherLeagueId);
     expect(Object.values(other.teams)).not.toContain('Lakeside Herons');
@@ -421,7 +422,7 @@ describe('a scorekeeper assigned to a game who no longer holds a role in the lea
     });
     // Still assigned, as the row says, and named by nothing: they are not the league's staff.
     expect((await w.ports.games.namesOf(w.leagueId)).scorekeepers[gameId]).toEqual([
-      'Sky Scorer',
+      'Made-up scorer',
       '',
     ]);
   });

@@ -33,6 +33,7 @@ import { databasePorts } from './database-ports.ts';
 import { madeUpInvitationMail } from './made-up-invitation-mail.ts';
 import type { WebPorts } from './ports.ts';
 import type { SignInMail } from './sign-in/sign-in-mail.ts';
+import { identifyNamed, madeUpNameOf } from './named-identify.test-helper.ts';
 
 const actors = [
   'owner',
@@ -68,7 +69,7 @@ async function accountFor(email: string): Promise<string> {
     passwordEnteredAt: null,
     lastSignInAt: new Date('2026-11-01T10:00:00Z'),
   });
-  const who = await ports.identify(token);
+  const who = await identifyNamed(ports, token, madeUpNameOf(email));
   if (!who.ok) throw new Error(`${email} not signed in: ${who.error.code}`);
   return who.value.accountId;
 }
@@ -181,7 +182,7 @@ describe('Admins on the database (step 2.97)', () => {
   it('names the people on the list from their accounts, and only this league’s', async () => {
     const names = await ports.adminAccess.namesOf(leagueId);
     expect(names.get(accountOf.get('owner') ?? '')).toBe('Ola Lakeside');
-    expect(names.get(accountOf.get('scorekeeper') ?? '')).toBe('Sky Scorer');
+    expect(names.get(accountOf.get('scorekeeper') ?? '')).toBe('Made-up scorer');
     // Maple Street's admin holds nothing here: their name is not given through Lakeside.
     expect(names.has(accountOf.get('otherLeagueAdmin') ?? '')).toBe(false);
     const otherNames = await ports.adminAccess.namesOf(otherLeagueId);

@@ -440,6 +440,15 @@ export const enTracker = {
   'tracker.mercy.saidLastMinutes':
     'One team leads by {lead} or more (the mercy rule), but in these last minutes the clock stops on every foul.',
   'tracker.mercy.seen': 'Got it',
+  // Signed in with no name given yet (T-460): the taps wait, as for a sign-in, until it
+  // is given. Never "ask an admin": giving the name is all it takes.
+  'tracker.nameNeeded':
+    'Give your name to go on. Your taps are kept on this device and sent once you have given it.',
+  'tracker.nameNeededKept_one':
+    'Give your name to go on. {count} play is kept on this device and is sent once you have given it.',
+  'tracker.nameNeededKept_other':
+    'Give your name to go on. {count} plays are kept on this device and are sent once you have given it.',
+  'tracker.nameNeededLink': 'Give your name',
   'tracker.noStorage':
     'This browser window cannot save the game on this device, so scoring is off. If this is a private window, open the tracker in a normal one.',
   // No longer allowed to score, with plays still on the device (finding M2).

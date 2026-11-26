@@ -70,6 +70,17 @@ const reachNoLeagueData = new Map<unknown, string>([
   [venueSummary, 'turns a row already read into the returned shape; runs no SQL'],
   [courtSummary, 'turns a row already read into the returned shape; runs no SQL'],
   [teamSummary, 'turns a row already read into the returned shape; runs no SQL'],
+  // Step 2.128: the account's own name. Both run in a transaction opened for an account,
+  // on its personal tables only (profiles, profile_access, accounts), each fenced to that
+  // account (0005); tested in read-own-name.test.ts.
+  [
+    databasePackage.readOwnName,
+    "the own name of the account set: its own profile's first and last name, no league's data",
+  ],
+  [
+    databasePackage.renameOwnProfile,
+    "renames the own profile of the account set and its display name: that account's personal rows only",
+  ],
   [
     databasePackage.seedLeaguesInto,
     'development-only bootstrap: takes a PGlite, not a scope; runs the scoped commands (own cases) per league and writes accounts and role grants directly',
@@ -334,6 +345,16 @@ const narrowLookups = new Map<unknown, string>([
     databasePackage.listMyLeagues,
     "the leagues of the account set (my_leagues): no argument, that account's own owner, role and roster rows only, the fewest columns, no league in the bin; tested in list-my-leagues.test.ts",
   ],
+  // Step 2.128 (T-458): a change of email, for the account set only; neither reads nor
+  // writes a league's data, nor says whose an address is; tested in change-own-email.test.ts.
+  [
+    databasePackage.emailFreeForOwnAccount,
+    'whether no other account holds an address (email_free_for_own_account): a yes or a no only',
+  ],
+  [
+    databasePackage.changeOwnEmail,
+    "moves the address of the account set (change_own_email): that account's own row only, or taken",
+  ],
   [
     databasePackage.eraseAccount,
     "erases the account set (erase_account): its personal rows and sign-in rows, and writes across leagues by design (T-52): that account's grants ended, its game assignments and scoring sessions removed, its accepted invitations' email emptied; tested in erase-account.test.ts",
@@ -489,7 +510,7 @@ describe('every security-definer function in a schema app_user may use is review
           and has_schema_privilege('app_user', n.oid, 'USAGE')
         order by 1`);
       expect([...reviewedDefiners.keys()].sort()).toEqual(rows.map((row) => row.signature));
-      expect(rows.length).toBe(12);
+      expect(rows.length).toBe(14);
       for (const [signature, reason] of reviewedDefiners) {
         expect(reason.length, signature).toBeGreaterThan(40);
       }

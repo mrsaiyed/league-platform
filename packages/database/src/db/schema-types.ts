@@ -642,6 +642,14 @@ export interface SignInDevicesTable {
   first_seen_at: ColumnType<Date, Date | string | undefined, Date | string>;
 }
 
+export interface SignInEmailChangesTable {
+  user_id: string;
+  new_email: string;
+  code_hash: string;
+  expires_at: ColumnType<Date, Date | string, Date | string>;
+  attempts_left: number;
+}
+
 export interface SignInGuessLocksTable {
   scope: string;
   subject: string;
@@ -700,6 +708,7 @@ export interface SignInDatabase {
   'sign_in.code_requests': SignInCodeRequestsTable;
   'sign_in.codes': SignInCodesTable;
   'sign_in.devices': SignInDevicesTable;
+  'sign_in.email_changes': SignInEmailChangesTable;
   'sign_in.guess_locks': SignInGuessLocksTable;
   'sign_in.guesses': SignInGuessesTable;
   'sign_in.proofs': SignInProofsTable;

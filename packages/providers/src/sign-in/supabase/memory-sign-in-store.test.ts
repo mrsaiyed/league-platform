@@ -105,6 +105,38 @@ describe('the in-memory sign-in store', () => {
     expect(claims.map((c) => c.created).sort()).toEqual([false, true]);
   });
 
+  it('keeps one waiting change of email per account: asking again replaces it (T-455)', async () => {
+    const s = store();
+    await s.accounts.claimAccount('a-1');
+    await s.accounts.claimAccount('a-2');
+    const end = new Date(at.getTime() + 10 * 60_000);
+    const change = (newEmail: string, codeHash: string) => ({
+      newEmail,
+      codeHash,
+      expiresAt: end,
+      attemptsLeft: 2,
+    });
+    await s.codes.putEmailChange('a-1', change('y@example.com', 'hash-1'));
+    await s.codes.putEmailChange('a-1', change('z@example.com', 'hash-2'));
+    await s.codes.putEmailChange('a-2', change('z@example.com', 'hash-3'));
+    expect(await s.codes.takeEmailChangeAttempt('a-1', at)).toEqual({
+      status: 'taken',
+      newEmail: 'z@example.com',
+      codeHash: 'hash-2',
+      attemptsLeft: 1,
+    });
+    expect(await s.codes.takeEmailChangeAttempt('a-1', at)).toMatchObject({ attemptsLeft: 0 });
+    expect(await s.codes.takeEmailChangeAttempt('a-1', at)).toEqual({ status: 'used-up' });
+    // Another account's change is its own, untouched.
+    expect(await s.codes.takeEmailChangeAttempt('a-2', at)).toMatchObject({
+      codeHash: 'hash-3',
+      attemptsLeft: 1,
+    });
+    expect(await s.codes.takeEmailChangeAttempt('a-2', end)).toEqual({ status: 'none' });
+    await s.codes.dropEmailChange('a-2');
+    expect(await s.codes.takeEmailChangeAttempt('a-2', at)).toEqual({ status: 'none' });
+  });
+
   it('counts code requests per address and per network, and counts none that it refuses', async () => {
     const s = store();
     const ask = (email: string) =>

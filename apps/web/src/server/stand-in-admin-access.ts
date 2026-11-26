@@ -4,7 +4,7 @@
 // (record 075: the stand-in has no invitations; step 2.88 gives it some). The names are
 // made-up stand-in names, and some people have given none, so the page's "No name yet"
 // (A-14) is pictured too.
-import type { AccessTx, CommandDeps } from '@srleagues/core';
+import type { AccessTx, CommandDeps, OwnName, OwnNameStore } from '@srleagues/core';
 import type { LogThingName } from '../features/access-area/activity-log-view.ts';
 import type { AdminAccessPorts } from './admin-access.ts';
 import { standInPeople } from './stand-in-cast.ts';
@@ -20,13 +20,48 @@ const standInNames: ReadonlyMap<string, string> = new Map([
   [standInPeople.otherAdmin.accountId, 'Quinn Example'],
 ]);
 
-export function standInAdminAccess(deps: CommandDeps<AccessTx>, world: World): AdminAccessPorts {
+/**
+ * The made-up world's own names (R-21, step 2.128), in memory: the named made-up people's to
+ * start with, and whatever a person gives or changes on the account page. The Admins page
+ * reads them, so a changed name shows there.
+ */
+export function standInOwnNames(): OwnNameStore & { readonly names: Map<string, OwnName> } {
+  const names = new Map<string, OwnName>();
+  for (const [accountId, name] of standInNames) {
+    const [firstName = '', lastName = ''] = name.split(' ');
+    names.set(accountId, { firstName, lastName });
+  }
+  return {
+    names,
+    create: async (accountId, name) => {
+      if (names.has(accountId)) return 'already-has-one';
+      names.set(accountId, name);
+      return 'made';
+    },
+    rename: async (accountId, name) => {
+      if (!names.has(accountId)) return 'no-own-profile';
+      names.set(accountId, name);
+      return 'renamed';
+    },
+  };
+}
+
+export function standInAdminAccess(
+  deps: CommandDeps<AccessTx>,
+  world: World,
+  ownNames: ReturnType<typeof standInOwnNames>,
+): AdminAccessPorts {
   return {
     deps,
     namesOf: async () => {
       const names = new Map<string, string | null>();
       for (const person of Object.values(standInPeople)) {
-        names.set(person.accountId, standInNames.get(person.accountId) ?? null);
+        const own = ownNames.names.get(person.accountId);
+        names.set(person.accountId, own === undefined ? null : `${own.firstName} ${own.lastName}`);
+      }
+      // Someone who signed up through the form and has given a name (step 2.128).
+      for (const [accountId, own] of ownNames.names) {
+        names.set(accountId, `${own.firstName} ${own.lastName}`);
       }
       return names;
     },

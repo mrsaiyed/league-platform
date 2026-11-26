@@ -273,7 +273,12 @@ const cases = [
   ],
   // The sign-in screens (step 1.14).
   ['visitor', '/account', 307, [], [], '/signin?next=%2Faccount'],
-  ['owner', '/account', 200, ['Your account', 'Signed-in devices', 'Sign out everywhere']],
+  [
+    'owner',
+    '/account',
+    200,
+    ['Your account', 'Your name', 'Save my name', 'Signed-in devices', 'Sign out everywhere'],
+  ],
   // Google is not set up here (GOOGLE_SIGN_IN), so no screen offers it (step 2.163, M27).
   [
     'visitor',

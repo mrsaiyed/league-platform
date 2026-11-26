@@ -96,7 +96,7 @@ export type InvitationRequest =
       readonly asNoLeague: CommandContext;
     }
   /** The session is none of our accounts' (record 055): the account page explains. */
-  | { readonly kind: 'account-problem' }
+  | { readonly kind: 'account-problem'; readonly path: string }
   | {
       readonly kind: 'league';
       readonly context: LeagueRequestContext;
@@ -133,7 +133,9 @@ export async function invitationRequest(): Promise<InvitationRequest> {
     },
   });
   if (!built.ok) {
-    return built.error.code === 'account-problem' ? { kind: 'account-problem' } : noLeague();
+    return built.error.code === 'account-problem'
+      ? { kind: 'account-problem', path: facts.path }
+      : noLeague();
   }
   const context = built.value;
   if (context.kind !== 'league') return noLeague();

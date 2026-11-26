@@ -26,6 +26,7 @@ import { serveFakeSupabaseAuth } from '../../packages/providers/index.ts';
 import { en } from '../../packages/site/index.ts';
 import {
   accessibilityProblems,
+  answerNameScreen,
   buildNext,
   freePort,
   launch,
@@ -242,6 +243,8 @@ if (browser !== null) {
           page.waitForURL((url) => url.pathname !== '/signup/password'),
           page.getByRole('button', { name: 'Save and sign in' }).click(),
         ]);
+        // The one name screen a new account meets (step 2.128).
+        await answerNameScreen(page, 'Made-up', 'Signer');
         await page.goto(`${origin}/account`);
         await lineOn(page, 'the account page', 'account');
         const admin = await page.goto(`${origin}/lakeside/admin`);

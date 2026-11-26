@@ -26,6 +26,7 @@ import {
   simulatedOwner,
 } from '../../packages/database/src/seed/simulate-league-plan.ts';
 import {
+  answerNameScreen,
   buildNext,
   freePort,
   launch,
@@ -352,6 +353,8 @@ if (browser) {
         page.waitForURL((url) => url.pathname !== '/signup/password'),
         page.getByRole('button', { name: 'Save and sign in' }).click(),
       ]);
+      // The one name screen a new account meets (step 2.128).
+      await answerNameScreen(page, 'Made-up', 'Signer');
     }
     note(
       'the owner is taken to the league’s admin',

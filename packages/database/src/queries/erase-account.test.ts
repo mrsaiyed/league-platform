@@ -128,6 +128,11 @@ async function signInRows(signInId: string, email: string, sessionId: string) {
     [email],
   );
   await pglite.query(
+    `insert into sign_in.email_changes (user_id, new_email, code_hash, expires_at, attempts_left)
+     values ($1, 'elsewhere@example.com', 'hash', now() + interval '10 minutes', 5)`,
+    [signInId],
+  );
+  await pglite.query(
     `insert into sign_in.proofs (proof_hash, email, user_id, expires_at, access_token,
        refresh_token, access_expires_at, vendor_session_id)
      values ($1 || '-proof', $2, $3, now() + interval '15 minutes', 'a', 'r', now(), 'v')`,
@@ -151,7 +156,7 @@ async function signInRows(signInId: string, email: string, sessionId: string) {
 
 /** How many rows the sign-in store holds for the sign-in user, its session or the address. */
 async function signInRowsLeft(signInId: string, email: string, sessionId: string) {
-  const byUser = ['users', 'devices', 'sessions', 'proofs'].map((table) =>
+  const byUser = ['users', 'devices', 'sessions', 'proofs', 'email_changes'].map((table) =>
     count(`select 1 from sign_in.${table} where user_id = $1`, [signInId]),
   );
   const byEmail = ['codes', 'proofs'].map((table) =>
@@ -276,7 +281,7 @@ describe('eraseAccount (record 052)', () => {
     expect(
       await one(pglite, 'select email from invitations where id = $1', [othersAccepted]),
     ).toEqual({ email: 'other-parent@example.test' });
-    expect(await signInRowsLeft(otherSignInId, 'other-parent@example.test', 's-other')).toBe(10);
+    expect(await signInRowsLeft(otherSignInId, 'other-parent@example.test', 's-other')).toBe(11);
     expect(
       await count('select 1 from sign_in.sessions where user_id = $1 and not ended', [
         otherSignInId,

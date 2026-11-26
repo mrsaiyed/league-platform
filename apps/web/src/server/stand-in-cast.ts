@@ -54,6 +54,12 @@ export const standInPeople = {
    * managers, S-131).
    */
   programAdmin: { accountId: id(0xaf), token: 'local-program-admin-token' },
+  /**
+   * The one made-up person with no name yet (step 2.128, T-446): an admin of the empty
+   * league who meets the one name screen at their first sign-in, as an account made before
+   * names were asked does. Every other made-up person has answered it already.
+   */
+  unnamed: { accountId: id(0xb0), token: 'local-unnamed-token' },
 } as const satisfies Record<string, MadeUpPerson>;
 
 function league(

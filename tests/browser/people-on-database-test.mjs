@@ -17,6 +17,7 @@
 // scorekeeper, another league's admin and a visitor refused, holding nothing of her.
 import {
   accessibilityProblems,
+  answerNameScreen,
   buildNext,
   freePort,
   launch,
@@ -62,6 +63,9 @@ async function codeOnThePage(page, origin, address) {
   return (await email.locator('code[data-code]').innerText()).trim();
 }
 
+/** The addresses that have answered the name screen in this run. */
+const named = new Set();
+
 /** A browser signed in as `address` through the screens, its code read on the page. */
 async function signedIn(browser, origin, address) {
   const context = await browser.newContext({ viewport: screen });
@@ -88,6 +92,12 @@ async function signedIn(browser, origin, address) {
     page.waitForURL((url) => url.pathname !== '/signup/password'),
     page.getByRole('button', { name: 'Save and sign in' }).click(),
   ]);
+  // The one name screen a seed person meets at their first sign-in (step 2.128), and never
+  // again: one signed in a second time in this run (the adult league's admin) is not asked.
+  if (!named.has(address)) {
+    await answerNameScreen(page, 'Made-up', 'Signer');
+    named.add(address);
+  }
   const cookie = (await context.cookies()).find((c) => c.name === 'srl_session')?.value ?? '';
   note(`${address} is signed in`, cookie !== '');
   return { context, page, cookie };
