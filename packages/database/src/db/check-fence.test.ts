@@ -6,7 +6,7 @@ import type { PGlite } from '@electric-sql/pglite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { freshSchema } from '../schema/schema.test-helper.ts';
 import { checkFence } from './check-fence.ts';
-import { checkLoginRole } from './check-login-role.ts';
+import { checkLoginRole, checkWorkerLoginRole } from './check-login-role.ts';
 import { createDatabase } from './create-database.ts';
 import type { DatabaseHandle } from './database-handle.ts';
 import { migrationCatalog } from './migration-catalog.ts';
@@ -141,13 +141,13 @@ describe('the start-up guard reads the league fence (step 2.238)', () => {
 
   it('(c) refuses a security-definer function the login may run that is not reviewed', async () => {
     // The migrations take EXECUTE from public by default, so the plant grants it by hand.
-    // One statement takes it from every holder the login reaches.
+    // Taking it back would not do (T-499): the function stops being a definer.
     await plantedAndMended(
       `create function public.made_up_peek() returns bigint language sql security definer
          as 'select count(*) from public.games';
        grant execute on function public.made_up_peek() to app_user, public;`,
       [
-        'made_up_app_login may run public.made_up_peek(), a security-definer function that is not on the reviewed list, so it may read past the league fence: revoke execute on function public.made_up_peek() from app_user, public',
+        'made_up_app_login may run, or use the schema of, public.made_up_peek(), a security-definer function that is not on the reviewed list, so it may read past the league fence, whoever may run it (T-499): alter function public.made_up_peek() security invoker',
       ],
     );
   });
@@ -162,17 +162,20 @@ describe('the start-up guard reads the league fence (step 2.238)', () => {
        grant execute on function made_up_tools.peek(uuid) to made_up_helper;
        grant made_up_helper to ${login} with inherit false, set true;`,
       [
-        'made_up_app_login may become made_up_helper, which may run made_up_tools.peek(wanted uuid), a security-definer function that is not on the reviewed list, so it may read past the league fence: revoke execute on function made_up_tools.peek(wanted uuid) from made_up_helper',
+        'made_up_app_login may become made_up_helper, which may run, or use the schema of, made_up_tools.peek(wanted uuid), a security-definer function that is not on the reviewed list, so it may read past the league fence, whoever may run it (T-499): alter function made_up_tools.peek(wanted uuid) security invoker',
       ],
     );
   });
 
-  it('(c) lets a trigger function be, which no one can call', async () => {
-    await pglite.exec(`
-      create function public.made_up_on_write() returns trigger language plpgsql
-        security definer as $$ begin return new; end $$;
-      grant execute on function public.made_up_on_write() to app_user;`);
-    expect(await checkLoginRole(db, login)).toEqual([]);
+  it('(c) refuses a trigger function too, in a schema the login may use, which it may not run (T-499)', async () => {
+    await plantedAndMended(
+      `create function public.made_up_on_write() returns trigger language plpgsql
+         security definer as $$ begin return new; end $$;
+       revoke execute on function public.made_up_on_write() from public;`,
+      [
+        'made_up_app_login may run, or use the schema of, public.made_up_on_write(), a security-definer function that is not on the reviewed list, so it may read past the league fence, whoever may run it (T-499): alter function public.made_up_on_write() security invoker',
+      ],
+    );
     await pglite.exec('drop function public.made_up_on_write()');
   });
 
@@ -411,26 +414,70 @@ describe('the start-up guard reads the league fence (step 2.238)', () => {
     );
   });
 
-  it('(d) lets a library’s own schema be, but never its view of a league table (T-482)', async () => {
+  // T-490: the website's login reaches nothing in the job queue's schema, which the
+  // migrations made (0031) for queue_owner, so a table there it may read is refused.
+  it('(d) refuses the website any reading of the job queue’s schema (T-490)', async () => {
     await pglite.exec(`
-      create role made_up_queue_owner nologin;
-      create schema pgboss authorization made_up_queue_owner;
       create table pgboss.job (id uuid, name text, data jsonb);
       grant usage on schema pgboss to ${login};
       grant select on pgboss.job to ${login};`);
+    const said = await checkLoginRole(db, login);
+    expect(said).toEqual([
+      `${login} may use the job queue (the pgboss schema), so ${login} could read or change a queued job: grant queue_owner to current_user with set true; set role queue_owner; revoke all on schema pgboss from ${login} cascade; reset role; revoke queue_owner from current_user`,
+      `pgboss.job is a table of the job queue (the pgboss schema) that ${login} has a right on, so the website could read or change a queued job: revoke all on table pgboss.job from ${login}`,
+    ]);
+    for (const problem of said) await pglite.exec(statementOf(problem));
     expect(await checkLoginRole(db, login)).toEqual([]);
+    await pglite.exec('drop table pgboss.job');
+  });
+
+  // Found on the real PostgreSQL (step 2.112, builder 2): the worker's login used as the
+  // website's reads pg-boss's tables through queue_owner, and no sentence may say to drop one.
+  // Since the review (T-491) the queue's own check names it alone: the membership is the
+  // fault, and a revoke of select from queue_owner, which owns the table, changed nothing.
+  it('(d) never says to drop a table in the job queue’s schema, even judging the website (T-490)', async () => {
+    await pglite.exec(`
+      create table pgboss.job (id uuid, name text, data jsonb);
+      alter table pgboss.job owner to queue_owner;
+      grant queue_owner to ${login};`);
+    try {
+      const said = await checkLoginRole(db, login);
+      expect(said).toEqual([
+        `${login} may become queue_owner, which owns a table (pgboss.job): revoke queue_owner from ${login}`,
+        `${login} is a member of queue_owner, which owns the job queue (the pgboss schema), and the website must never read or change a queued job: revoke queue_owner from ${login}`,
+      ]);
+      expect(said.join(' ')).not.toMatch(/drop table/);
+      await pglite.exec(statementOf(said[1] ?? ''));
+      expect(await checkLoginRole(db, login)).toEqual([]);
+    } finally {
+      await pglite.exec(`revoke queue_owner from ${login}; drop table if exists pgboss.job`);
+    }
+  });
+
+  // The worker's login holds queue_owner and owns pg-boss's tables (T-490); there only an
+  // ordinary table without a league column is let be (T-482's rule, now the worker's).
+  it('(d) lets the worker have pg-boss’s own tables, but never a view of a league table (T-482, T-490)', async () => {
+    await pglite.exec(`
+      grant queue_owner to ${login};
+      set role ${login};
+      create table pgboss.job (id uuid, name text, data jsonb);
+      reset role;`);
+    expect(await checkWorkerLoginRole(db, login)).toEqual([]);
     await pglite.exec(`
       create table pgboss.kept (id uuid, league_id uuid);
       create view pgboss.every_program as select name from public.programs;
       grant select on pgboss.kept, pgboss.every_program to ${login};`);
-    const said = await checkLoginRole(db, login);
+    const said = await checkWorkerLoginRole(db, login);
     expect(said).toEqual([
       'pgboss.kept has a league column but its row-level security is off, so every role that may read it sees every league: alter table pgboss.kept enable row level security, force row level security',
       `pgboss.every_program is a view that no migration made, and ${login} may read it, so nothing has checked its fence: revoke select on table pgboss.every_program from ${login}`,
-      `pgboss.kept is a table that no migration made, and ${login} may read it, so nothing has checked its fence: revoke select on table pgboss.kept from ${login}`,
+      // T-493: a league's rows do not belong in the queue's schema; moved out, never dropped.
+      `pgboss.kept has a league column, so it does not belong in the job queue's schema, which is for pg-boss's own tables: ${login} may use it there, and its owner postgres could switch its fence off; give it to the migrations' owner, out of the queue's schema (its rows are kept): do $mend$ begin alter table pgboss.kept set schema public; alter table public.kept owner to postgres; end $mend$`,
     ]);
     expect(said.join(' ')).not.toMatch(/drop (table|view)/);
-    await pglite.exec('drop schema pgboss cascade; drop role made_up_queue_owner');
+    await pglite.exec('drop table pgboss.kept; drop view pgboss.every_program');
+    expect(await checkWorkerLoginRole(db, login)).toEqual([]);
+    await pglite.exec(`drop table pgboss.job; revoke queue_owner from ${login}`);
     expect(await checkLoginRole(db, login)).toEqual([]);
   });
 
@@ -476,15 +523,11 @@ describe('the start-up guard reads the league fence (step 2.238)', () => {
   });
 
   // T-486: the second look's item 4. A rule or a trigger on a league table copies its rows
-  // elsewhere on each change; the copy (a table without a league column in pg-boss's schema)
-  // is let be (T-482's stated limit), so the rule or trigger is what is refused.
-  const copySchema = `
-    create role made_up_queue_owner nologin;
-    create schema pgboss authorization made_up_queue_owner;
-    create table pgboss.c4 (id uuid, lid text);
-    grant usage on schema pgboss to ${login};
-    grant select on pgboss.c4 to ${login};`;
-  const dropCopySchema = 'drop schema pgboss cascade; drop role made_up_queue_owner';
+  // elsewhere on each change; the copy (a table without a league column in pg-boss's schema,
+  // which the website's login cannot read since T-490) is not what is refused: the rule or
+  // trigger is.
+  const copySchema = 'create table pgboss.c4 (id uuid, lid text);';
+  const dropCopySchema = 'drop table pgboss.c4';
 
   it('(e) refuses a rule no migration made on a league table, which copies its rows (T-486)', async () => {
     await pglite.exec(copySchema);
@@ -538,24 +581,24 @@ describe('the start-up guard reads the league fence (step 2.238)', () => {
     expect(await checkLoginRole(db, login)).toEqual([]);
   });
 
-  it('(d) refuses any view or materialized view in a library’s schema, whatever its columns (T-482, tightened)', async () => {
+  it('(d) refuses the worker any view or materialized view in the queue’s schema, whatever its columns (T-482, T-490)', async () => {
     await pglite.exec(`
-      create role made_up_queue_owner nologin;
-      create schema pgboss authorization made_up_queue_owner;
+      grant queue_owner to ${login};
       create table pgboss.job (id uuid, name text, data jsonb);
       create view pgboss.queue_names as select name from pgboss.job;
       create materialized view pgboss.job_ids as select id from pgboss.job;
-      grant usage on schema pgboss to ${login};
       grant select on pgboss.job, pgboss.queue_names, pgboss.job_ids to ${login};`);
-    const said = await checkLoginRole(db, login);
+    const said = await checkWorkerLoginRole(db, login);
     expect(said).toEqual([
       `pgboss.job_ids is a materialized view that no migration made, and ${login} may read it, so nothing has checked its fence: revoke select on table pgboss.job_ids from ${login}`,
       `pgboss.queue_names is a view that no migration made, and ${login} may read it, so nothing has checked its fence: revoke select on table pgboss.queue_names from ${login}`,
     ]);
     expect(said.join(' ')).not.toMatch(/drop table/);
     for (const problem of said) await pglite.exec(statementOf(problem));
-    expect(await checkLoginRole(db, login)).toEqual([]);
-    await pglite.exec(dropCopySchema);
+    expect(await checkWorkerLoginRole(db, login)).toEqual([]);
+    await pglite.exec(
+      `drop materialized view pgboss.job_ids; drop view pgboss.queue_names; drop table pgboss.job; revoke queue_owner from ${login}`,
+    );
     expect(await checkLoginRole(db, login)).toEqual([]);
   });
 });

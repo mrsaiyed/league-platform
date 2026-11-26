@@ -2,8 +2,8 @@
 // this file, and get a handle and scopes, never the Kysely instance or a scope's
 // transaction. The query files in ../queries are inside this package and reach those
 // through kyselyOf and transactionOf on purpose; nothing outside the package can.
-export { checkLoginRole } from './check-login-role.ts';
-export { checkQueueSchema, queueSchema } from './check-queue-schema.ts';
+export { checkLoginRole, checkWorkerLoginRole } from './check-login-role.ts';
+export { checkQueueSchema, queueOwner, queueSchema } from './check-queue-schema.ts';
 export { checkSignInStoreLogin } from './check-sign-in-store-login.ts';
 export { commandTransaction } from './command-transaction.ts';
 export { createDatabase, type DatabaseSource } from './create-database.ts';
