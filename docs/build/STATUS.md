@@ -65,7 +65,6 @@ Every lane's work is on GitHub. Three at a time, by short helpers on the lead's 
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
 | 2.191-ci-parallel      | parked                                                                                                                                      | after the first test is in the founder's hands                                                 |
 | 2.128-your-account     | finished at b70c095b but for the fence-list edit; its merge with the build branch now conflicts in three files (the Handover part, point 1) | the founder's yes, then ONE closing helper: merge, mend, the edit, the tests, push twice, land |
-| 2.112-queue-owner      | pushed at e04d3d41: built, reviewed, mended once; the look found one more High (the Handover part, point 2)                                 | the written second fix round, a second look, the closing helper, push twice, land              |
 
 Next free: STEP 2.253, migration 0032, T-496, S-132, R-34, A-25, U-27 (the Handover part says which numbers were given out and are unused). Numbers already given out stand with their lanes (in each lane’s note).
 
