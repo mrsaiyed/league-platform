@@ -19,6 +19,7 @@ export function deviceRosters(
           personId: p.personId,
           firstName: p.firstName,
           lastName: p.lastName,
+          ordinal: p.ordinal,
           jerseyNumber: p.jerseyNumber,
           left: p.left,
           addedAtGameId: p.addedAtGameId,

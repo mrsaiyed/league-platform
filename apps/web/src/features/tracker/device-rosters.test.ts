@@ -10,6 +10,7 @@ const player = (teamId: string, n: number, left = false) => ({
   personId: `00000000-0000-4000-8000-0000000000e${n}`,
   firstName: `First${n}`,
   lastName: `Last${n}`,
+  ordinal: null,
   jerseyNumber: n === 3 ? null : String(n),
   left,
   addedAtGameId: null,
@@ -21,6 +22,7 @@ const walkUp = {
   personId: '00000000-0000-4000-8000-0000000000e9',
   firstName: '',
   lastName: '',
+  ordinal: null,
   jerseyNumber: '12',
   left: false,
   addedAtGameId: gameId,
@@ -40,6 +42,13 @@ const rostersOf = (players: TrackerRosters['players'], uniqueJerseys = false): T
 const kept = ({ teamId, ...p }: TrackerRosters['players'][number]) => p;
 
 describe('the rosters as the device keeps them', () => {
+  it('keeps the place of a player the number and name do not tell apart (R-33)', () => {
+    const nameless = { ...player(home, 3), firstName: '', lastName: '', ordinal: 1 };
+    const device = deviceRosters(rostersOf([nameless]), {});
+    expect(device.home.players[0]?.ordinal).toBe(1);
+    expect(JSON.stringify(device)).not.toContain('Last3');
+  });
+
   it('puts each player under their team, in the order read, with the team’s name', () => {
     const rosters = deviceRosters(
       rostersOf([player(away, 1), player(home, 2), player(home, 3, true)]),

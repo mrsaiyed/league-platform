@@ -244,6 +244,16 @@ describe('the engine’s plays in the tracker’s words', () => {
     expect(playerLabel(player('y', '8', '', 'Solo'), t)).toBe('#8 Solo');
   });
 
+  it('names one the number and name do not tell apart by their place (R-33)', () => {
+    const nameless = { ...player('z', null, '', ''), ordinal: 1 };
+    expect(playerLabel(nameless, t)).toBe('Player 1');
+    expect(playerShortLabel(nameless, t)).toBe('Player 1');
+    const twin = { ...player('w', null, 'Sam L.', ''), ordinal: 2 };
+    expect(playerLabel(twin, t)).toBe('Sam L. (player 2)');
+    // A number tells them apart: no place is worded beside it.
+    expect(playerLabel({ ...player('v', '5', 'Sam L.', ''), ordinal: null }, t)).toBe('#5 Sam L.');
+  });
+
   it('names periods as the format has them', () => {
     expect(periodText(3, 4, t)).toBe('Q3');
     expect(periodText(2, 2, t)).toBe('H2');

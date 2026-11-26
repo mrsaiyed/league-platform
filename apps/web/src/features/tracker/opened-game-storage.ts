@@ -21,6 +21,11 @@ export type DevicePlayer = {
   readonly personId: string;
   readonly firstName: string;
   readonly lastName: string;
+  /**
+   * "Player 1": the place of one the number and name do not tell apart (R-33), or null;
+   * absent in rosters a page stored before step 2.226, and for a player added here.
+   */
+  readonly ordinal?: number | null;
   readonly jerseyNumber: string | null;
   /** The player has left the team since (R-17). */
   readonly left: boolean;

@@ -15,6 +15,7 @@ import {
   inEarlierRound,
   inScoringReach,
   isEarlierGame,
+  namedRoster,
   needsResult,
   oldestFirst,
   rulesOfGame,
@@ -30,7 +31,7 @@ import {
   type TablePlayerRefusal,
 } from '@srleagues/core';
 import { newId } from './stand-in-world-ids.ts';
-import { addDays, dayIn, momentIn } from './stand-in-world-clock.ts';
+import { addDays, dayIn, minorAt, momentIn } from './stand-in-world-clock.ts';
 import { replacedAt } from './stand-in-world-rows.ts';
 import type { LeagueWorld, WorldGame, WorldRosterEntry } from './stand-in-world-state.ts';
 
@@ -265,9 +266,10 @@ export function worldGamesStore(s: LeagueWorld, now: () => Date): GamesStore {
       const team = s.teams.find((t) => t.id === teamId);
       return person !== undefined && team !== undefined && (person.binned || team.binned);
     },
-    listRoster: async (gameId) => {
+    // Named by the scoring screens' rule, as list-game-roster.ts names them (R-33).
+    listRoster: async (gameId, names) => {
       const teams = teamsOfGame(s, gameId);
-      return s.roster
+      const recorded = s.roster
         .filter((e) => teams.includes(e.teamId) && playing.includes(e.role))
         .map((e) => ({ e, p: s.people.find((x) => x.id === e.personId) }))
         .sort(
@@ -282,11 +284,14 @@ export function worldGamesStore(s: LeagueWorld, now: () => Date): GamesStore {
           personId: e.personId,
           firstName: p?.firstName ?? '',
           lastName: p?.lastName ?? '',
+          isMinor: p === undefined ? null : minorAt(p, s.timeZone, now()),
+          nameRequest: p?.visibility ?? 'none',
           jerseyNumber: e.jerseyNumber,
           left: e.leftOn !== null,
           addedAtGameId: e.addedAtGameId,
           needsReview: e.needsReview,
         }));
+      return namedRoster(recorded, { ...names, audience: s.audience });
     },
     // Plays past the last "not started" marker, by core's one rule; the players the
     // scorer's table changed are events too, but not plays (records 058, 061).

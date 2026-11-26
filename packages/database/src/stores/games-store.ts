@@ -56,7 +56,7 @@ export function gamesStore(scope: LeagueScope): GamesStore {
     listDecidedLines: (seasonId) => listDecidedGameLines(scope, seasonId),
     listLines: (gameId) => listGameLines(scope, gameId),
     replaceLines: (gameId, lines) => replaceGameLines(scope, gameId, lines),
-    listRoster: (gameId) => listGameRoster(scope, gameId),
+    listRoster: (gameId, names) => listGameRoster(scope, gameId, names),
     // Both still in the league, one of them in the bin: a restore brings the player back.
     inBin: async ({ teamId, personId }) => {
       const [person, team] = [

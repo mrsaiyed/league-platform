@@ -33,6 +33,7 @@ import {
   setBoxScore,
   takeOverScoring,
   unassignScorekeeper,
+  defaultNamePolicy,
 } from '@srleagues/core';
 import { defaultSeasonRules, refusedAddEventType, seasonRulesPreset } from '@srleagues/contracts';
 import type { JsonObject } from '../db/schema-types.ts';
@@ -481,7 +482,12 @@ registerIsolationCase({
 registerIsolationCase({
   subject: listGameRoster,
   name: "list the players of the target's upcoming game",
-  run: (scope, target) => listGameRoster(scope, target.upcomingGameId),
+  // With full names on: what the rule would show is the most another league could get.
+  run: (scope, target) =>
+    listGameRoster(scope, target.upcomingGameId, {
+      policy: defaultNamePolicy,
+      scorekeepersSeeFullNames: true,
+    }),
 });
 
 registerIsolationCase({

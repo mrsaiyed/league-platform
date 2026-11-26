@@ -132,7 +132,10 @@ const fullName = (player: DevicePlayer, t: Translate): string =>
 const hasNumber = (player: DevicePlayer): player is DevicePlayer & { jerseyNumber: string } =>
   player.jerseyNumber !== null && player.jerseyNumber !== '';
 
-/** "#4 Jordan Ellis", "Jordan Ellis" with no number, "#12" with no name (S-34). */
+/**
+ * "#4 Jordan Ellis", "Jordan Ellis" with no number, "#12" with no name (S-34), "Player 1"
+ * with neither (R-33).
+ */
 export function playerLabel(player: DevicePlayer | undefined, t: Translate): string {
   if (player === undefined) return t('tracker.player.unknown');
   const name = fullName(player, t);
@@ -140,6 +143,13 @@ export function playerLabel(player: DevicePlayer | undefined, t: Translate): str
     return name === ''
       ? t('tracker.player.number', { jersey: player.jerseyNumber })
       : t('tracker.player.numberName', { jersey: player.jerseyNumber, name });
+  }
+  // R-33: one the number and name do not tell apart reads by their place, "Player 1".
+  const place = player.ordinal ?? null;
+  if (place !== null) {
+    return name === ''
+      ? t('tracker.player.place', { place })
+      : t('tracker.player.namePlace', { name, place });
   }
   return name === '' ? t('tracker.player.unknown') : t('tracker.player.name', { name });
 }
