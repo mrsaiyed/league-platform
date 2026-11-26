@@ -32,6 +32,7 @@ import { commandContextOf } from '../../server/context.ts';
 import { clockTimeText, gameWhenText } from '../../server/game-when.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
 import { locale, t } from '../../server/messages.ts';
+import { scoringNameText } from '../../server/scoring-name-text.ts';
 import { noticeHolderOf, savedNoticesHere } from '../../server/saved-notice.ts';
 import { StaffTrail } from '../staff/index.ts';
 import { statLabel } from '../stats-pages/index.ts';
@@ -59,7 +60,11 @@ import { sheetNeedsOffer, sheetReopenViewOf, type ReopenView } from './reopen-vi
 
 const uuidShape = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** A player's name; one added at the scorer's table by number only is "#12" (S-34). */
+/**
+ * A player's name by the scoring screens' rule (R-33, the games store gives it), a place
+ * worded in ("Player 1", T-483); one added at the scorer's table by number only is "#12"
+ * (S-34).
+ */
 const nameOf = rosterName;
 
 /** What a box shows to start with: the saved number, or empty. */
@@ -71,7 +76,8 @@ function savedText(line: GameLine | undefined, key: string): string {
 /** A team's rows of the grid, with the words each box is read by. */
 function rowsOf(sheet: BoxScoreSheet, players: readonly GameRosterPlayer[]): SheetRow[] {
   const lineOf = new Map(sheet.lines.map((line) => [line.personId, line]));
-  return players.map((player) => {
+  return players.map((listed) => {
+    const player = { ...listed, ...scoringNameText(listed) };
     const line = lineOf.get(player.personId);
     const name = nameOf(player);
     const jersey =
