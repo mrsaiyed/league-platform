@@ -36,6 +36,7 @@ const valid: Record<ConfigName, string> = {
   LOCAL_DESIGN: 'crest-light',
   LOCAL_NOW: '2026-11-15T20:01:00Z',
   LOCAL_NO_CURRENT_SEASON: 'harbor-city',
+  LOCAL_SCORING_NAMES: 'north-valley',
   LOCAL_UNRELEASED: 'hidden',
   SESSION_SECRET: longValue('SESSION_SECRET'),
   SUPABASE_URL: 'http://localhost:54321',
