@@ -46,17 +46,43 @@ async function plantedAndMended(
   said: readonly string[],
   undo: readonly string[],
   whilePlanted: () => Promise<void> = async () => {},
+  mend: readonly string[] | null = null,
 ) {
+  let failure: unknown = null;
   try {
     for (const statement of plant) await owner.exec(statement);
     expect(await checkLoginRole(db)).toEqual(said);
     await whilePlanted();
-    for (const problem of said) await owner.exec(statementOf(problem));
+    for (const statement of mend ?? said.map(statementOf)) await owner.exec(statement);
     expect(await checkLoginRole(db)).toEqual([]);
-  } finally {
-    for (const statement of undo) await owner.exec(statement);
+  } catch (error) {
+    failure = error;
   }
+  // Every undo runs; one that fails does not hide the first failure, which is thrown.
+  const undone = await undoAll(undo);
+  if (failure !== null) throw withUndoFailures(failure, undone);
+  if (undone.length > 0) throw new Error(`the undo failed: ${undone.join('; ')}`);
   expect(await checkLoginRole(db)).toEqual([]);
+}
+
+/** Runs each undo statement, whatever the one before did; says each that failed. */
+async function undoAll(undo: readonly string[]): Promise<string[]> {
+  const failed: string[] = [];
+  for (const statement of undo) {
+    try {
+      await owner.exec(statement);
+    } catch (error) {
+      failed.push(`${statement}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  return failed;
+}
+
+/** The first failure, with the undo statements that failed after it said too. */
+function withUndoFailures(failure: unknown, undone: readonly string[]): unknown {
+  if (undone.length > 0 && failure instanceof Error)
+    failure.message += `\n(and the undo failed: ${undone.join('; ')})`;
+  return failure;
 }
 
 /** Runs `read` on a connection AS app_login itself, in a transaction with `league` set. */
@@ -360,6 +386,158 @@ describe('(d) a table or view no migration made', () => {
         `public.p_tbl_${word} is a table that no migration made, so nothing has checked its fence: drop table public.p_tbl_${word} (or make it in a migration)`,
       ],
       [`drop view if exists platform.p_view_${word}`, `drop table if exists public.p_tbl_${word}`],
+    );
+  });
+});
+
+const fence = '(league_id = ( SELECT current_league_id() AS current_league_id))';
+
+describe('(a) a listed league table whose league column was renamed (T-470, changed)', () => {
+  it('renamed, then using (true): refused by name; put back, it passes', async () => {
+    const renamed = fence.replace('league_id', 'lg');
+    await plantedAndMended(
+      [
+        'alter table public.activity_log rename column league_id to lg',
+        'create policy p_wide on public.activity_log for select using (true)',
+      ],
+      [
+        'public.activity_log is a league table the migrations made, but its league column league_id is now named lg, so its fence cannot be read: alter table public.activity_log rename column lg to league_id',
+        `public.activity_log has its policy activity_log_league_fence changed from the migrations' (now to public using (${renamed}) with check (${renamed})): alter policy activity_log_league_fence on public.activity_log to public using (${fence}) with check (${fence})`,
+        'public.activity_log has a policy p_wide that no migration made, so its rule (to public using (true)) is not known to name the league: drop policy p_wide on public.activity_log',
+      ],
+      [
+        'drop policy if exists p_wide on public.activity_log',
+        `do $$ begin
+           if exists (select 1 from pg_catalog.pg_attribute
+             where attrelid = 'public.activity_log'::regclass and attname = 'lg')
+           then alter table public.activity_log rename column lg to league_id; end if; end $$`,
+      ],
+    );
+  });
+});
+
+describe('(d) what no migration made, in a schema no migration made (T-476)', () => {
+  it('a view and a materialized view the login reads directly: each refused', async () => {
+    const schema = `p_copy_${fresh()}`;
+    await plantedAndMended(
+      [
+        `create schema ${schema}`,
+        `create view ${schema}.every_program as select * from public.programs`,
+        `create materialized view ${schema}.kept_programs as select * from public.programs`,
+        `grant usage on schema ${schema} to app_login`,
+        `grant select on ${schema}.every_program, ${schema}.kept_programs to app_login`,
+      ],
+      [
+        `${schema}.every_program is a view that no migration made, and app_login may read it, so nothing has checked its fence: revoke select on table ${schema}.every_program from app_login`,
+        `${schema}.kept_programs is a materialized view that no migration made, and app_login may read it, so nothing has checked its fence: revoke select on table ${schema}.kept_programs from app_login`,
+      ],
+      [`drop schema if exists ${schema} cascade`],
+      async () => {
+        // The view runs as its owner, past the fence: the login sees both leagues through it.
+        expect(await asLogin(a, (login) => leaguesSeen(login, `${schema}.every_program`))).toEqual(
+          both(),
+        );
+      },
+    );
+  });
+
+  it('a copy without a league column, read through a role the login may become: refused', async () => {
+    const word = fresh();
+    const schema = `p_copy_${word}`;
+    const role = `p_cpr_${word}`;
+    await plantedAndMended(
+      [
+        `create schema ${schema}`,
+        `create table ${schema}.program_names as select league_id as lg, name from public.programs`,
+        `create role ${role} nologin`,
+        `grant usage on schema ${schema} to ${role}`,
+        `grant select on ${schema}.program_names to ${role}`,
+        `grant ${role} to app_login with inherit false, set true`,
+      ],
+      [
+        `${schema}.program_names is a table that no migration made, and app_login may become ${role}, which may read it, so nothing has checked its fence: revoke select on table ${schema}.program_names from ${role}`,
+      ],
+      [`drop schema if exists ${schema} cascade`, `drop role if exists ${role}`],
+    );
+  });
+
+  it('one the login cannot read is let be', async () => {
+    const word = fresh();
+    const schema = `p_copy_${word}`;
+    const role = `p_far_${word}`;
+    try {
+      for (const statement of [
+        `create schema ${schema}`,
+        `create view ${schema}.every_program as select * from public.programs`,
+        `grant select on ${schema}.every_program to app_login`,
+        `create role ${role} nologin`,
+        `grant usage on schema ${schema} to ${role}`,
+      ])
+        await owner.exec(statement);
+      // SELECT without the schema's use; the use held by a role the login does not reach.
+      expect(await checkLoginRole(db)).toEqual([]);
+    } finally {
+      const undone = await undoAll([
+        `drop schema if exists ${schema} cascade`,
+        `drop role if exists ${role}`,
+      ]);
+      if (undone.length > 0) throw new Error(`the undo failed: ${undone.join('; ')}`);
+    }
+  });
+});
+
+describe('(c) a reviewed security-definer function changed by hand (T-477)', () => {
+  it('its body, its settings or its owner: each refused by name', async () => {
+    const signature = 'public.find_league_by_slug(text)';
+    const { rows } = await owner.query<{ d: string }>(
+      `select pg_catalog.pg_get_functiondef('${signature}'::regprocedure) as d`,
+    );
+    const original = rows[0]?.d ?? '';
+    // The `where` clauses taken out: the same name now answers every league.
+    const widened = original.replace(/AS \$function\$[\s\S]*\$function\$/, (body) =>
+      body.replace(/where[\s\S]*?(;|\$function\$)/i, (_whole, end: string) => ` ${end}`),
+    );
+    expect(widened).not.toBe(original);
+    const role = `p_fown_${fresh()}`;
+    const said = (part: string) => [
+      `public.find_league_by_slug(wanted text) is a reviewed security-definer function whose ${part} changed since the migrations made it, so its review no longer holds: run the migrations' own definition again`,
+    ];
+    const putBack = [original, `alter function ${signature} owner to postgres`];
+    await plantedAndMended(
+      [widened],
+      said('body'),
+      putBack,
+      async () => {
+        const counts = await asLogin(null, async (login) => {
+          const { rows: found } = await login.query<{ n: number }>(
+            `select count(*)::int as n from public.find_league_by_slug('no-such-slug')`,
+          );
+          return found[0]?.n;
+        });
+        expect(counts).toBeGreaterThanOrEqual(2);
+      },
+      putBack,
+    );
+    await plantedAndMended(
+      [`alter function ${signature} set search_path = public`],
+      said('settings'),
+      putBack,
+      async () => {},
+      putBack,
+    );
+    await plantedAndMended(
+      [
+        `create role ${role} nologin`,
+        // The tables' owner may make roles but must be granted one to give it a function,
+        // and a function's owner needs the use of making things in its schema.
+        `grant ${role} to postgres`,
+        `grant create on schema public to ${role}`,
+        `alter function ${signature} owner to ${role}`,
+      ],
+      said('owner'),
+      [...putBack, `revoke create on schema public from ${role}`, `drop role if exists ${role}`],
+      async () => {},
+      putBack,
     );
   });
 });
