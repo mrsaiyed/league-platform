@@ -19,6 +19,7 @@ import {
   type CommandDeps,
   type Job,
   type LeaguesTx,
+  type PlayerKeyOf,
   type TrackerTx,
 } from '@srleagues/core';
 import { randomUUID } from 'node:crypto';
@@ -48,6 +49,20 @@ import { gamesStore } from './games-store.ts';
 import { leaguesStore } from './leagues-store.ts';
 import { liveGamesStore } from './live-games-store.ts';
 import { scoringSessionsStore } from './scoring-sessions-store.ts';
+
+/** A stand-in for the server's player key (T-462): a new UUID-shaped key per game and player. */
+function madeUpKeys(): PlayerKeyOf {
+  const keys = new Map<string, string>();
+  return (game, playerId) => {
+    const asked = `${game}|${playerId}`;
+    const made =
+      keys.get(asked) ??
+      `aaaaaaaa-bbbb-8ccc-8ddd-${(keys.size + 1).toString(16).padStart(12, '0')}`;
+    keys.set(asked, made);
+    return made;
+  };
+}
+const keyOf = madeUpKeys();
 
 type Tx = TrackerTx & LeaguesTx & AccessTx;
 
@@ -240,7 +255,13 @@ describe('players at the scorer’s table on the database (record 058)', () => {
     };
     const seen = await withTransaction(db, { leagueId: l.leagueId }, async (scope) => ({
       page: await readGamePage(gamesReadStore(scope), { gameId: l.gameId }, viewing),
-      snapshot: await readGameSnapshot(gamesReadStore(scope), { gameId: l.gameId }, viewing, 1),
+      snapshot: await readGameSnapshot(
+        gamesReadStore(scope),
+        { gameId: l.gameId },
+        viewing,
+        1,
+        keyOf,
+      ),
       roster: await listPublicRoster(scope, l.awayTeamId, {
         policy: defaultNamePolicy,
         viewer: viewing.viewer,
@@ -255,13 +276,17 @@ describe('players at the scorer’s table on the database (record 058)', () => {
     });
     const scored = seen.page.value.plays.find((p) => p.player?.personId === twelve);
     expect(scored?.player).toEqual({ personId: twelve, name: null, jersey: '12', unnamed: true });
-    expect(seen.snapshot.value.players.find((p) => p.playerId === twelve)).toMatchObject({
+    expect(
+      seen.snapshot.value.players.find((p) => p.playerId === keyOf(l.gameId, twelve)),
+    ).toMatchObject({
       name: null,
       jersey: '12',
       unnamed: true,
     });
     // A named home player is not marked.
-    const named = seen.snapshot.value.players.find((p) => p.playerId === l.home[0]);
+    const named = seen.snapshot.value.players.find(
+      (p) => p.playerId === keyOf(l.gameId, l.home[0] ?? ''),
+    );
     expect(named?.name).toBe('Jordan Ellis0');
     expect(named).not.toHaveProperty('unnamed');
     const twelveLine = seen.roster.lines.find((r) => r.jerseyNumber === '12');

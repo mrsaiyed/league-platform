@@ -49,11 +49,17 @@ export const standInPeople = {
    */
   teamCoach: { accountId: id(0xae), token: 'local-team-coach-token' },
   /**
+   * An admin of one program of the draft league only (step 2.227): Settings opens with its
+   * head only, no league setting and no Admins row (step 2.97's page is for whole-league
+   * managers, S-131).
+   */
+  programAdmin: { accountId: id(0xaf), token: 'local-program-admin-token' },
+  /**
    * The one made-up person with no name yet (step 2.128, T-446): an admin of the empty
    * league who meets the one name screen at their first sign-in, as an account made before
    * names were asked does. Every other made-up person has answered it already.
    */
-  unnamed: { accountId: id(0xaf), token: 'local-unnamed-token' },
+  unnamed: { accountId: id(0xb0), token: 'local-unnamed-token' },
 } as const satisfies Record<string, MadeUpPerson>;
 
 function league(

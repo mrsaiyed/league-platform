@@ -8,6 +8,7 @@
 // are a document in the correction, never `player_game_stats` rows, so they count nowhere.
 import { z } from 'zod';
 import type { GameRecord, GameResultDocument, KeptSheet, TrackerTx } from './ports.ts';
+import { scoringNameSettingsOf } from './queries/read-scoring-name-view.ts';
 
 /** The sheet to keep in a reopen's "before": the game's lines, or undefined when it has none. */
 export async function sheetToKeep(tx: TrackerTx, game: GameRecord): Promise<KeptSheet | undefined> {
@@ -79,7 +80,9 @@ export async function keptSheetPlayersRefusal(
   sheet: KeptSheet,
 ): Promise<KeptSheetPlayersRefusal | undefined> {
   const key = (entry: { teamId: string; personId: string }) => `${entry.teamId} ${entry.personId}`;
-  const roster = new Set((await tx.games.listRoster(gameId)).map(key));
+  const roster = new Set(
+    (await tx.games.listRoster(gameId, await scoringNameSettingsOf(tx))).map(key),
+  );
   const missing = sheet.lines.filter((line) => !roster.has(key(line)));
   if (missing.length === 0) return undefined;
   for (const line of missing) if (!(await tx.games.inBin(line))) return 'player-gone';

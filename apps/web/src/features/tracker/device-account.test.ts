@@ -7,7 +7,12 @@ import {
   readDeviceAccount,
   writeDeviceAccount,
 } from './device-account.ts';
+import {
+  forgetOpenedGamesOnDevice,
+  openIndexedDbOpenedGameStorage,
+} from './indexeddb-opened-game-storage.ts';
 import { openIndexedDbQueueStorage } from './indexeddb-queue-storage.ts';
+import { madeUpRosters } from './opened-game-storage-contract.test-helper.ts';
 import { inLeague } from './queue-storage.ts';
 import { takeNewRelease } from './tracker-worker-registration.ts';
 
@@ -46,6 +51,23 @@ describe('who is signed in on this device (T-327)', () => {
     await markSignedInHere('account-2', forget, factory);
     expect(forgotten).toBe(1);
     expect(await readDeviceAccount(factory)).toBe('account-2');
+  });
+});
+
+describe('a game’s stored roster when another account signs in (step 2.226, M4)', () => {
+  it('is dropped for another account, kept for the same one', async () => {
+    const factory = new IDBFactory();
+    const name = 'opened-games-2226';
+    const games = await openIndexedDbOpenedGameStorage(factory, name);
+    const owner = { gameId: game, leagueId: game, accountId: 'account-1' };
+    await games.saveRosters(owner, madeUpRosters, 1);
+    // As the tracker's pages wire it (sign-out-form.tsx): the opened games' store.
+    const forget = () => forgetOpenedGamesOnDevice(factory, name);
+    await markSignedInHere('account-1', forget, factory);
+    await markSignedInHere('ACCOUNT-1', forget, factory);
+    expect((await games.find(game))?.rosters).toEqual(madeUpRosters);
+    await markSignedInHere('account-2', forget, factory);
+    expect(await games.find(game)).toBeUndefined();
   });
 });
 

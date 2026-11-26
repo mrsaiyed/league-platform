@@ -3,9 +3,26 @@
 import type { PGlite } from '@electric-sql/pglite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { freshSchema } from '../schema/schema.test-helper.ts';
-import { checkLoginRole } from './check-login-role.ts';
+import { checkLoginRole as checkEverything } from './check-login-role.ts';
 import { createDatabase } from './create-database.ts';
 import type { DatabaseHandle } from './database-handle.ts';
+
+// The table planted in platform below is also one no migration made, which the fence
+// check (step 2.238, check-fence.test.ts) names for every login. These tests are about
+// the roles, so that one sentence is set aside here and asserted once, on its own. So are
+// the two tables in made_up_later, which a login that may become a superuser can read
+// (T-476), asserted once below, and sign_in.users given another owner, which the fence
+// check names as a relation the migrations made no longer as they made it (T-481).
+const plantedOwner =
+  'sign_in.users is a table the migrations made, but it is now owned by made_up_sign_in_owner, not postgres, so it may not be what they made: alter table sign_in.users owner to postgres';
+const plantedStranger =
+  'platform.made_up_kept is a table that no migration made, so nothing has checked its fence: drop table platform.made_up_kept (or make it in a migration)';
+const laterStranger = /^made_up_later\.(one|two) is a table that no migration made, and /;
+const checkLoginRole = async (...args: Parameters<typeof checkEverything>) =>
+  (await checkEverything(...args)).filter(
+    (problem) =>
+      problem !== plantedStranger && problem !== plantedOwner && !laterStranger.test(problem),
+  );
 
 let pglite: PGlite;
 let db: DatabaseHandle;
@@ -91,6 +108,10 @@ describe('checkLoginRole', () => {
     expect(await checkLoginRole(db, 'made_up_app_login')).toEqual([]);
   });
 
+  it('also reads the fence: the one table planted outside the migrations is named', async () => {
+    expect(await checkEverything(db, 'made_up_app_login')).toEqual([plantedOwner, plantedStranger]);
+  });
+
   it('reports a login that is not app_user, or can become the owner', async () => {
     expect(await checkLoginRole(db, 'made_up_stranger')).toEqual([
       'made_up_stranger is not app_user and cannot become it: grant app_user to made_up_stranger',
@@ -144,6 +165,14 @@ describe('checkLoginRole', () => {
     ]);
     expect(await checkLoginRole(db, 'made_up_later_login')).toEqual([
       'made_up_later_login may become made_up_later_owner, which owns tables (made_up_later.one and 1 more): revoke made_up_later_owner from made_up_later_login',
+    ]);
+    // Its owner has no use of the schema, so the login cannot read them; one that may
+    // become the superuser can, and each is named (T-476).
+    expect(
+      (await checkEverything(db, 'made_up_owner')).filter((problem) => laterStranger.test(problem)),
+    ).toEqual([
+      'made_up_later.one is a table that no migration made, and made_up_owner may become postgres, which may read it, so nothing has checked its fence: drop table made_up_later.one',
+      'made_up_later.two is a table that no migration made, and made_up_owner may become postgres, which may read it, so nothing has checked its fence: drop table made_up_later.two',
     ]);
     expect(await checkLoginRole(db, 'made_up_sign_in_owner')).toEqual([
       'made_up_sign_in_owner owns a table (sign_in.users), so it could switch its fence off: reassign owned by made_up_sign_in_owner to postgres',

@@ -54,6 +54,12 @@ export type DeviceRosters = {
   readonly allowTies?: boolean;
   /** The statistics the season keeps (S-93); missing in rosters an older page stored. */
   readonly statistics?: readonly string[];
+  /**
+   * The names are the scoring screens' rule's (R-33, step 2.226). Missing in rosters a
+   * page stored before, which hold every name as recorded: such a copy is not used again
+   * unless taps of the game wait on the device (T-484).
+   */
+  readonly scoringNames?: true;
 };
 
 /** The game format the scorekeeper is asked to confirm (P7 §1, §5.1). */
@@ -127,11 +133,22 @@ export interface OpenedGameStorage {
   /**
    * Deletes every game `stillKept` says to let go of: another account's or another
    * league's, a final one, or one stored before `olderThan` (device time, ms). The
-   * owner's own game is let go of only if it is another account's or league's.
+   * owner's own game is let go of only if it is another account's or league's. Another
+   * game whose rosters were stored before step 2.226 goes too, unless it is in `withTaps`
+   * (taps of it wait or are set aside on the device): T-484.
    */
-  forgetOthers(owner: OpenedGameOwner, olderThan: number): Promise<void>;
+  forgetOthers(
+    owner: OpenedGameOwner,
+    olderThan: number,
+    withTaps?: ReadonlySet<string>,
+  ): Promise<void>;
   /** Deletes every game kept on the device (signing out). The device id stays. */
   forgetAll(): Promise<void>;
+  /**
+   * Deletes the one game, its rosters with it (step 2.226, the 2.107 audit's M4): once it
+   * is ended and every tap of it saved, so players' names do not stay on the device.
+   */
+  forgetGame(gameId: string): Promise<void>;
   /** Stores the state the server gave; ignored for a game whose rosters are not stored. */
   saveState(gameId: string, state: ServerState): Promise<void>;
   /** Stores the format confirmed; ignored for a game whose rosters are not stored. */
@@ -156,10 +173,20 @@ export interface OpenedGameStorage {
  * account's games in this league, and of those only the ones not final and stored
  * since `olderThan`, so players' names do not stay on the device for good (T-115).
  * Rows stored before the account was kept have no `accountId`, and are let go of.
+ * Neither is another game's copy stored before step 2.226, unless `withTaps` has it.
  */
-export function stillKept(game: OpenedGame, owner: OpenedGameOwner, olderThan: number): boolean {
+export function stillKept(
+  game: OpenedGame,
+  owner: OpenedGameOwner,
+  olderThan: number,
+  withTaps: ReadonlySet<string> = new Set(),
+): boolean {
   if (game.accountId !== owner.accountId || game.leagueId !== owner.leagueId) return false;
   if (game.gameId === owner.gameId) return true;
+  // T-484: a copy stored before step 2.226 holds every name as recorded. It goes at the
+  // first opening after the release unless taps of that game wait (one may name a player
+  // only that copy lists); once they are saved, it goes at the next opening.
+  if (game.rosters.scoringNames !== true && !withTaps.has(game.gameId)) return false;
   return game.state?.state.status !== 'final' && game.rostersSavedAt >= olderThan;
 }
 

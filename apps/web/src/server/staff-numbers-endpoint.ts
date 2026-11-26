@@ -46,6 +46,7 @@ import { teamStatsView, type TeamStatsDrawnView } from '../features/team-pages/t
 import { commandContextOf, type LeagueRequestContext } from './context.ts';
 import { refusalAnswer, type ApiAnswer, type ApiRefusal } from './league-api.ts';
 import { t } from './messages.ts';
+import { publicPlayerKey } from './player-key.ts';
 import type { PublicStatsPorts } from './public-stats.ts';
 import type { TrackerPorts } from './tracker-ports.ts';
 
@@ -218,31 +219,6 @@ async function moreFor(
   });
 }
 
-/**
- * The game's box scores with each player line keyed by its place in its table
- * (`away-player-0`), as the statistics pages key theirs (record 070): no person's id leaves
- * the server in this answer (audit 2.108, finding D-M4).
- */
-function keyedByPlace(
-  page: Parameters<typeof buildBoxScores>[0],
-): ReturnType<typeof buildBoxScores> {
-  const built = buildBoxScores(page);
-  if (built.kind !== 'tables') return built;
-  return {
-    kind: 'tables',
-    tables: built.tables.map((table) => ({
-      ...table,
-      players:
-        table.players === null
-          ? null
-          : table.players.map((player, index) => ({
-              ...player,
-              id: `${table.side}-player-${index}`,
-            })),
-    })),
-  };
-}
-
 async function gameMore(
   league: LeagueRequestContext['league'],
   viewer: Viewer,
@@ -256,10 +232,16 @@ async function gameMore(
       { gameId },
       viewing(publicViewer(league.id)),
       ports.tracker.clock.now(),
+      publicPlayerKey,
     );
     if (!snapshot.ok) return null;
-    const everyone = await readGamePage(store, { gameId }, viewing(publicViewer(league.id)));
-    const staff = await readGamePage(store, { gameId }, viewing(viewer));
+    const everyone = await readGamePage(
+      store,
+      { gameId },
+      viewing(publicViewer(league.id)),
+      publicPlayerKey,
+    );
+    const staff = await readGamePage(store, { gameId }, viewing(viewer), publicPlayerKey);
     if (!everyone.ok || !staff.ok) return null;
     const beyond = staff.value.boxScores.filter(
       (box) =>
@@ -268,7 +250,8 @@ async function gameMore(
           false,
     );
     const sides = new Set(beyond.map((box) => box.side));
-    const boxScores = snapshot.value.status === 'final' ? keyedByPlace(staff.value) : null;
+    // Each player line keyed by its place in its table, never the person's id (step 2.225).
+    const boxScores = snapshot.value.status === 'final' ? buildBoxScores(staff.value) : null;
     // Only a game where the hidden team has a player line or a named play to show.
     const shownMore =
       (boxScores?.kind === 'tables' &&

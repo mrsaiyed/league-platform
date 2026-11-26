@@ -27,7 +27,7 @@ describe('myAccess', () => {
       value: {
         isOwner: false,
         grants: [scorekeeper, editor],
-        leaguePermissions: ['schedule.read', 'games.score'],
+        leaguePermissions: ['games.score'],
       },
     });
   });

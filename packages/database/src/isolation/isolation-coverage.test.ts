@@ -10,6 +10,8 @@ import { fileURLToPath } from 'node:url';
 import { commands, eventHandlers } from '@srleagues/core';
 import { beforeAll, describe, expect, it } from 'vitest';
 import * as databasePackage from '../../index.ts';
+import { reviewedDefiners } from '../db/reviewed-definers.ts';
+import { freshSchema } from '../schema/schema.test-helper.ts';
 import {
   grantFromRow,
   invitationFromRow,
@@ -484,5 +486,32 @@ describe('every query and command is in the two-league harness (T-65)', () => {
       ['../core/src/x.ts', { onRename: { type: 'leagues.name_changed', handle: () => {} } }],
     ]);
     expect(handlersIn(planted)).toEqual(['../core/src/x.ts: onRename']);
+  });
+});
+
+// Step 2.238 (T-469): a SECURITY DEFINER function runs as its owner, past the league
+// fence, so each one the app's role may run is a review. Its reason stands beside it in
+// reviewed-definers.ts, which the start-up guard reads; this holds that list to exactly
+// what the migrations let app_user run (trigger functions aside: no one can call them).
+describe('every security-definer function app_user may run is reviewed (T-469)', () => {
+  it('lists each, with its reason, and nothing the migrations do not make', async () => {
+    const db = await freshSchema();
+    try {
+      const { rows } = await db.query<{ signature: string }>(`
+        select quote_ident(n.nspname) || '.' || quote_ident(p.proname) || '(' ||
+          pg_get_function_identity_arguments(p.oid) || ')' as signature
+        from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+        where p.prosecdef and n.nspname !~ '^pg_' and n.nspname <> 'information_schema'
+          and p.prorettype not in ('trigger'::regtype, 'event_trigger'::regtype)
+          and has_function_privilege('app_user', p.oid, 'EXECUTE')
+        order by 1`);
+      expect([...reviewedDefiners.keys()].sort()).toEqual(rows.map((row) => row.signature));
+      expect(rows.length).toBe(9);
+      for (const [signature, reason] of reviewedDefiners) {
+        expect(reason.length, signature).toBeGreaterThan(40);
+      }
+    } finally {
+      await db.close();
+    }
   });
 });

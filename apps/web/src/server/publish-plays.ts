@@ -20,6 +20,7 @@
 import { leagueScoreFrom } from '@srleagues/contracts';
 import { liveMessageOf, publicViewer, readGameSnapshot } from '@srleagues/core';
 import { LivePublishError } from '@srleagues/providers';
+import { publicPlayerKey } from './player-key.ts';
 import type { PublishPlays } from './tracker-commands-endpoint.ts';
 import type { TrackerPorts } from './tracker-ports.ts';
 
@@ -43,6 +44,7 @@ export function createPlayPublisher(deps: PlayPublisherDeps): PublishPlays {
         { gameId },
         { leagueId, viewer: publicViewer(leagueId), audience, policy },
         deps.clock.now(),
+        publicPlayerKey,
       ),
     );
     if (!read.ok) return;

@@ -3,7 +3,8 @@
 // decides who counts as a child. In a youth league a player whose age is not known counts
 // as one (R-15), a player added at the scorer's table among them, so a watcher's snapshot
 // and the game's page show each by first name and last initial (R-14), and an adult in
-// full; the scorer's device lists everyone in full (T6 §4). With the audience read wrong
+// full; the scorer's device is given the same names (R-33, step 2.226: the league's
+// "Scorekeepers see full names" starts off), as served, the surname nowhere. With the audience read wrong
 // (as "adult"), the unknown-age players show in full and this test fails (tried).
 import {
   applyTrackerCommands,
@@ -16,6 +17,7 @@ import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { gamesWorld, type GamesWorld } from './database-games.test-helper.ts';
 import { gameSnapshot } from './game-snapshot-endpoint.ts';
+import { trackerRostersReply } from './tracker-rosters-reply.ts';
 
 let w: GamesWorld;
 
@@ -34,7 +36,7 @@ const tap = (input: unknown) => {
 };
 
 describe('a youth league on the database ports', () => {
-  it('shows a watcher a child and an unknown-age player by first name and last initial, the scorer everyone in full', async () => {
+  it('shows a watcher a child and an unknown-age player by first name and last initial, the scorer the same', async () => {
     const gameId = w.take(w.live);
     const scorer = w.contextOf('scorekeeper');
     const opened = await openScoringSession(
@@ -127,12 +129,15 @@ describe('a youth league on the database ports', () => {
     // The same one snapshot read the youth league's own audience.
     expect(audienceRead).toBe('youth');
 
-    // The scorer's device lists everyone in full: a staff read.
+    // The scorer's device is given the names the public sees (R-33): a staff read, as served.
     const rosters = await readTrackerRosters(scorer, { gameId }, w.ports.tracker.deps);
     if (!rosters.ok) throw new Error(rosters.error.code);
-    const names = rosters.value.players.map((p) => `${p.firstName} ${p.lastName}`);
+    const names = rosters.value.players.map((p) => `${p.firstName} ${p.lastName}`.trim());
     expect(names).toEqual(
-      expect.arrayContaining(['Player30 Heronfamily', 'Player31 Heronfamily', 'Yusuf Ali']),
+      expect.arrayContaining(['Player30 H.', 'Player31 H.', 'Yusuf A.', 'Player40 Otterfamily']),
     );
+    const served = JSON.stringify(trackerRostersReply(rosters.value));
+    expect(served).not.toContain('Heronfamily');
+    expect(served).not.toContain('Yusuf Ali');
   });
 });

@@ -49,6 +49,7 @@ export const fields = {
   LOCAL_DESIGN: { secret: false },
   LOCAL_NOW: { secret: false },
   LOCAL_NO_CURRENT_SEASON: { secret: false },
+  LOCAL_SCORING_NAMES: { secret: false },
   LOCAL_UNRELEASED: { secret: false },
   SESSION_SECRET: { secret: true },
   SUPABASE_URL: { secret: false },
@@ -112,6 +113,13 @@ const schema = z.object({
     .string()
     .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'must be a short name')
     .optional(),
+  // The short name of a made-up league made a youth league as the world is made, its game
+  // under way given a removed child (#12) and an adult shown as initials (step 2.226): so
+  // a browser test scores that game as R-33 names it. Only the stand-in's world reads it.
+  LOCAL_SCORING_NAMES: z
+    .string()
+    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'must be a short name')
+    .optional(),
   // What local work and tests run on (record 055): 'stand-in', the made-up leagues in
   // this process's memory (the default), or 'made-up-database', the made-up seed
   // leagues in a database in memory with every migration. Only local and test read it.
@@ -160,9 +168,11 @@ const schema = z.object({
   // what a live league shows. Staging and production always hide them; only local and test
   // read it.
   LOCAL_UNRELEASED: z.enum(['shown', 'hidden']).default('shown'),
+  // The public player key's secret (T-465, player-key.ts): optional, because without it
+  // the key's secret is derived from SUPABASE_SECRET_KEY, or made at random on made-up data.
+  SESSION_SECRET: secretText(32).optional(),
   // Nothing uses these yet (R8): each becomes required, where it is used, with the
   // step that first uses it. Given now, they are still checked.
-  SESSION_SECRET: secretText(32).optional(),
   STRIPE_SECRET_KEY: secretText(8).optional(),
   STRIPE_WEBHOOK_SECRET: secretText(8).optional(),
   // The sign-in service (record 018): staging and production only; local work and
@@ -209,6 +219,7 @@ const optional: readonly ConfigName[] = [
   'LOCAL_DESIGN',
   'LOCAL_NOW',
   'LOCAL_NO_CURRENT_SEASON',
+  'LOCAL_SCORING_NAMES',
   'LOCAL_UNRELEASED',
   'SESSION_SECRET',
   'STRIPE_SECRET_KEY',
@@ -249,6 +260,7 @@ const onlyIn: Readonly<Partial<Record<ConfigName, readonly string[]>>> = {
   LOCAL_DESIGN: ['local', 'test'],
   LOCAL_NOW: ['local', 'test'],
   LOCAL_NO_CURRENT_SEASON: ['local', 'test'],
+  LOCAL_SCORING_NAMES: ['local', 'test'],
   LOCAL_UNRELEASED: ['local', 'test'],
 };
 

@@ -524,7 +524,8 @@ async function shortGame(browser, size, face, { afterRenewal = false } = {}) {
         `${at}: three baskets by touch`,
         JSON.stringify(await c.score()) === '{"home":4,"away":3}',
       );
-      await rowFits(page, `${at}, in play`, '+2 #9 Pia');
+      // Pia is a child (the seed): R-33 shows her as "Pia H." on the scoring screens.
+      await rowFits(page, `${at}, in play`, '+2 #9 Pia H.');
       await still(page, `${at}, in play`);
       await accessible(page, `${at}, in play, the pad at rest`);
     });
@@ -545,10 +546,14 @@ async function shortGame(browser, size, face, { afterRenewal = false } = {}) {
         `${at}: one tap on Undo took the basket back and said so`,
         JSON.stringify(await c.score()) === '{"home":4,"away":3}' &&
           (await c.points('away', 7)) === 0 &&
-          (await c.undoButton.getAttribute('aria-label')) === 'Undo #9 Pia Hawkins +2' &&
+          (await c.undoButton.getAttribute('aria-label')) === 'Undo #9 Pia H. +2' &&
           (await c.redoButton.getAttribute('aria-label')) === 'Redo #7 Uma Bearsley +3' &&
           (await c.redoButton.getAttribute('aria-disabled')) === null,
-        JSON.stringify(await c.score()),
+        JSON.stringify({
+          score: await c.score(),
+          undo: await c.undoButton.getAttribute('aria-label'),
+          redo: await c.redoButton.getAttribute('aria-label'),
+        }),
       );
       await still(page, `${at}, a basket undone`);
       await c.recorded(() => c.root.locator('[data-redo]:not([data-resting])').tap());

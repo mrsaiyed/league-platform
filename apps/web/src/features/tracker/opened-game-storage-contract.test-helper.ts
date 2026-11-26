@@ -163,6 +163,15 @@ export function openedGameStorageContract(
       expect(await storage.find(game)).toBeUndefined();
     });
 
+    it('forgets one game alone, its rosters with it (step 2.226)', async () => {
+      const storage = await make();
+      await storage.saveRosters(owner, madeUpRosters, 10);
+      await storage.saveRosters({ ...owner, gameId: other }, madeUpRosters, 10);
+      await storage.forgetGame(game);
+      expect(await storage.find(game)).toBeUndefined();
+      expect((await storage.find(other))?.rosters).toEqual(madeUpRosters);
+    });
+
     it('gives what it holds as a copy', async () => {
       const storage = await make();
       await storage.saveRosters(owner, madeUpRosters, 10);
@@ -177,29 +186,23 @@ export function openedGameStorageContract(
       const id = (n: number) => `00000000-0000-4000-8000-0000000001${String(n).padStart(2, '0')}`;
       const now = 100 * day;
       const keepFrom = now - 14 * day;
+      // Stored since step 2.226, so the copy's age decides (T-484).
+      const current = { ...madeUpRosters, scoringNames: true as const };
       const kept = { ...owner, gameId: id(1) };
-      await storage.saveRosters(owner, madeUpRosters, now);
-      await storage.saveRosters(kept, madeUpRosters, keepFrom);
-      await storage.saveRosters({ ...owner, gameId: id(2) }, madeUpRosters, keepFrom - 1);
-      await storage.saveRosters({ ...owner, gameId: id(3) }, madeUpRosters, now);
+      await storage.saveRosters(owner, current, now);
+      await storage.saveRosters(kept, current, keepFrom);
+      await storage.saveRosters({ ...owner, gameId: id(2) }, current, keepFrom - 1);
+      await storage.saveRosters({ ...owner, gameId: id(3) }, current, now);
       await storage.saveState(id(3), finalState);
-      await storage.saveRosters(
-        { ...owner, gameId: id(4), accountId: otherAccount },
-        madeUpRosters,
-        now,
-      );
-      await storage.saveRosters(
-        { ...owner, gameId: id(5), leagueId: otherLeague },
-        madeUpRosters,
-        now,
-      );
-      await storage.saveRosters({ ...owner, gameId: other }, madeUpRosters, now);
+      await storage.saveRosters({ ...owner, gameId: id(4), accountId: otherAccount }, current, now);
+      await storage.saveRosters({ ...owner, gameId: id(5), leagueId: otherLeague }, current, now);
+      await storage.saveRosters({ ...owner, gameId: other }, current, now);
       await storage.saveState(other, state);
       const device = await storage.deviceId(() => 'device-a');
 
       await storage.forgetOthers(owner, keepFrom);
 
-      expect((await storage.find(game))?.rosters).toEqual(madeUpRosters);
+      expect((await storage.find(game))?.rosters).toEqual(current);
       expect((await storage.find(id(1)))?.rostersSavedAt).toBe(keepFrom);
       expect((await storage.find(other))?.state).toEqual(state);
       // Too old, final, another account's, another league's.
@@ -207,6 +210,27 @@ export function openedGameStorageContract(
         expect(await storage.find(gone)).toBeUndefined();
       }
       expect(await storage.deviceId(() => 'device-b')).toBe(device);
+    });
+
+    it('lets go of another game’s rosters stored before step 2.226 unless taps of it wait (T-484)', async () => {
+      const storage = await make();
+      const id = (n: number) => `00000000-0000-4000-8000-0000000001c${n}`;
+      const current = { ...madeUpRosters, scoringNames: true as const };
+      // madeUpRosters has no mark: a copy stored before the step, names as recorded.
+      await storage.saveRosters({ ...owner, gameId: id(1) }, madeUpRosters, 10);
+      await storage.saveRosters({ ...owner, gameId: id(2) }, madeUpRosters, 10);
+      await storage.saveRosters({ ...owner, gameId: id(3) }, current, 10);
+      await storage.saveRosters(owner, madeUpRosters, 10);
+      await storage.forgetOthers(owner, 0, new Set([id(2)]));
+      expect(await storage.find(id(1))).toBeUndefined();
+      expect((await storage.find(id(2)))?.rosters).toEqual(madeUpRosters);
+      expect((await storage.find(id(3)))?.rosters).toEqual(current);
+      // The game being opened is its own page's to replace (open-tracker-game.ts).
+      expect((await storage.find(game))?.rosters).toEqual(madeUpRosters);
+      // Its taps saved, the next opening lets the old copy go.
+      await storage.forgetOthers(owner, 0, new Set());
+      expect(await storage.find(id(2))).toBeUndefined();
+      expect(await storage.find(id(3))).toBeDefined();
     });
 
     it('keeps the game being opened even if it is old or final, but never another account’s', async () => {

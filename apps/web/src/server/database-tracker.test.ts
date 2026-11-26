@@ -15,6 +15,7 @@ import {
   markNotStarted,
   openScoringSession,
   publicNames,
+  scorekeepersSeeFullNames,
   publicViewer,
   readGamePage,
   readGameSnapshot,
@@ -32,10 +33,12 @@ import {
 import * as database from '@srleagues/database';
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { trackerRostersReply } from './tracker-rosters-reply.ts';
 import { actors, gamesWorld, type Actor, type GamesWorld } from './database-games.test-helper.ts';
 import { commandsSince } from '../features/tracker/commands-since.ts';
 import { databaseTracker, GameNamesOnlyWithSettings } from './database-tracker.ts';
 import { gameSnapshot } from './game-snapshot-endpoint.ts';
+import { publicPlayerKey } from './player-key.ts';
 
 let w: GamesWorld;
 
@@ -250,16 +253,25 @@ describe('a game scored live on the database ports', () => {
             policy: read.policy,
           },
           w.clock.at,
+          publicPlayerKey,
         ),
       }));
       // The settings it read are the league's saved ones, the same the names read alone gives.
       expect(page.policy).toEqual((await w.ports.tracker.namesShownOf(w.leagueId)).policy);
       expect(JSON.stringify(page.snapshot)).not.toContain('Player41');
-      // The scorer's device lists every player in full, whatever the public setting.
+      // R-33 (step 2.226): the scorer's device is given the names the public sees, so
+      // none while the league hides them, as served; "Scorekeepers see full names" on,
+      // every player in full.
       const rosters = await readTrackerRosters(scorer, { gameId }, w.ports.tracker.deps);
-      expect(rosters.ok && rosters.value.players.map((p) => p.firstName)).toContain('Player41');
+      if (!rosters.ok) throw new Error(rosters.error.code);
+      expect(JSON.stringify(trackerRostersReply(rosters.value))).not.toContain('Player41');
+      expect(JSON.stringify(trackerRostersReply(rosters.value))).not.toContain('Otterfamily');
+      await saveSetting(scorekeepersSeeFullNames.key, true);
+      const full = await readTrackerRosters(scorer, { gameId }, w.ports.tracker.deps);
+      expect(full.ok && full.value.players.map((p) => p.firstName)).toContain('Player41');
     } finally {
       await saveSetting(publicNames.key, 'fullName');
+      await saveSetting(scorekeepersSeeFullNames.key, false);
     }
   });
 });
@@ -292,6 +304,7 @@ describe('what a watcher reads, in one snapshot (record 076)', () => {
         { gameId },
         { leagueId: w.leagueId, viewer: publicViewer(w.leagueId), audience, policy },
         w.clock.at,
+        publicPlayerKey,
       ),
     );
     expect(JSON.stringify(read)).toContain('Heronfamily');

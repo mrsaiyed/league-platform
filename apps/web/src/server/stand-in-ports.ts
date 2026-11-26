@@ -85,6 +85,7 @@ import {
 import { madeUpLeagues, standInOwlsTeamId } from './stand-in-world-seed.ts';
 import { madeUpWorld } from './stand-in-world.ts';
 import { binTeamOfFirstLeague } from './stand-in-world-binned-team.ts';
+import { withScoringNames } from './stand-in-world-scoring-names.ts';
 import { leaveWithoutCurrentSeason } from './stand-in-world-no-current-season.ts';
 import { answersOnlyHere, isLocalOrTestHost } from './this-computer.ts';
 import type { TrackerPorts } from './tracker-ports.ts';
@@ -144,8 +145,13 @@ const grants = [
     type: 'team',
     id: standInOwlsTeamId,
   }),
+  // An admin of one program of the draft league (step 2.227, T-474).
+  grantOf(16, standInPeople.programAdmin.accountId, 'admin', standInLeagues.draft.id, {
+    type: 'program',
+    id: standInDraftProgramId,
+  }),
   // The made-up person with no name yet (step 2.128), an admin of the empty league only.
-  grantOf(16, standInPeople.unnamed.accountId, 'admin', standInLeagues.empty.id),
+  grantOf(17, standInPeople.unnamed.accountId, 'admin', standInLeagues.empty.id),
 ];
 
 const leagues: readonly (typeof standInLeagues)[keyof typeof standInLeagues][] =
@@ -239,6 +245,11 @@ export type StandInOptions = {
    * current season as the world is made, its seasons kept.
    */
   readonly noCurrentSeason?: string;
+  /**
+   * LOCAL_SCORING_NAMES (step 2.226): the short name of a made-up league made a youth
+   * league, its game under way given a removed child (#12) and an adult shown as initials.
+   */
+  readonly scoringNames?: string;
   /**
    * The working folder's `.local/captured-email` (kept-emails.ts, step 2.96): once the app
    * has started, a copy of each email to a made-up address is written there for the kept
@@ -496,6 +507,9 @@ export function standInPorts(options: StandInOptions): StandInPorts {
   if (options.binnedTeam !== undefined) binTeamOfFirstLeague(worldLeagues, options.binnedTeam);
   if (options.noCurrentSeason !== undefined) {
     leaveWithoutCurrentSeason(worldLeagues, options.noCurrentSeason);
+  }
+  if (options.scoringNames !== undefined) {
+    withScoringNames(worldLeagues, options.scoringNames, new Date(clock.now()).toISOString());
   }
   const world = madeUpWorld({
     leagues: worldLeagues,

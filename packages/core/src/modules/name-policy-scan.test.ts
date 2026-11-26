@@ -14,6 +14,7 @@ import {
   readGamePage,
   readGameSnapshot,
   type GameSnapshotStore,
+  type PlayerKeyOf,
 } from './games/index.ts';
 import { audiences, type Audience, type StoredSettingRow } from './leagues/index.ts';
 import {
@@ -26,6 +27,20 @@ import {
 } from './people/index.ts';
 import { readStatisticsTable, type StandingsReadStore } from './standings/index.ts';
 import { publicRosterLine } from './teams/index.ts';
+
+/** A stand-in for the server's player key (T-462): a new UUID-shaped key per game and player. */
+function madeUpKeys(): PlayerKeyOf {
+  const keys = new Map<string, string>();
+  return (game, playerId) => {
+    const asked = `${game}|${playerId}`;
+    const made =
+      keys.get(asked) ??
+      `aaaaaaaa-bbbb-8ccc-8ddd-${(keys.size + 1).toString(16).padStart(12, '0')}`;
+    keys.set(asked, made);
+    return made;
+  };
+}
+const keyOf = madeUpKeys();
 
 const leagueId = '01900000-0000-7000-8000-000000000001';
 const seasonId = '01900000-0000-7000-8000-0000000c0001';
@@ -298,11 +313,11 @@ describe('every public surface under each name setting (T-81, R-24, R-25, R-29)'
 
       // A game: its page (box score and plays), its snapshot and the live message.
       const page = await readGamePage(gameStore('final'), { gameId }, viewing);
-      const snapshot = await readGameSnapshot(gameStore('live'), { gameId }, viewing, now);
+      const snapshot = await readGameSnapshot(gameStore('live'), { gameId }, viewing, now, keyOf);
       if (!page.ok || !snapshot.ok) throw new Error('expected the game');
       const message = liveMessageOf(snapshot.value);
       const inSnapshot = new Map(snapshot.value.players.map((p) => [p.playerId, p.name]));
-      expect(people.map((p) => inSnapshot.get(p.id) ?? null)).toEqual(wanted);
+      expect(people.map((p) => inSnapshot.get(keyOf(gameId, p.id)) ?? null)).toEqual(wanted);
       // The latest play is the last person's, and names them only as the settings allow.
       expect(message.latestPlay?.playerName ?? null).toBe(wanted.at(-1) ?? null);
 

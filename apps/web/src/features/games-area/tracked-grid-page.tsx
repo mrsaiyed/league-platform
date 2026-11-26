@@ -19,6 +19,7 @@ import { webPorts } from '../../server/container.ts';
 import { commandContextOf } from '../../server/context.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
 import { t } from '../../server/messages.ts';
+import { scoringNameText } from '../../server/scoring-name-text.ts';
 import { noticeHolderOf, savedNoticesHere } from '../../server/saved-notice.ts';
 import { StaffTrail } from '../staff/index.ts';
 import { statLabel } from '../stats-pages/index.ts';
@@ -32,7 +33,9 @@ import { TrackedGridForm, type TrackedGridTeam } from './tracked-grid-form.tsx';
 const uuidShape = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** "#4 Ada Lionel", or "#12" for a player added at the scorer's table by number only. */
-function headingOf(row: TrackedGridRow, player: GameRosterPlayer | undefined): string {
+function headingOf(row: TrackedGridRow, listed: GameRosterPlayer | undefined): string {
+  // The scoring screens' rule names the player (R-33); a place is worded in (T-483).
+  const player = listed === undefined ? undefined : { ...listed, ...scoringNameText(listed) };
   if (player === undefined) {
     return row.jerseyNumber === null
       ? ''

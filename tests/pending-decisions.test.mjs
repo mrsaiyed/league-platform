@@ -216,8 +216,8 @@ test("every table of DECISIONS.md's full list is kept by ID, T4 once (its rows w
   // 41 when the three copies were made one; 42 since T-284 was folded in (step 2.93 part 5);
   // 43 since T-285 was folded in (step 2.98); 44 since T-298 (step 2.239); 45 since T-299 (step 2.203);
   // 46 since T-287 (step 2.46); 47 since T-291 (step 2.163); 48 since T-288 (step 2.97); 49 since T-294 (step 2.224);
-  // 51 since T-312 (step 2.60); 50 since T-305 (step 2.56); 54 since step 2.223's three (landing next).
-  assert.equal(t4?.ids.length, 54);
+  // 51 since T-312 (step 2.60); 50 since T-305 (step 2.56); 54 since step 2.223; 59 since step 2.225; 63 since step 2.227; 71 since step 2.226's eight (landing next).
+  assert.equal(t4?.ids.length, 71);
 });
 
 test('every pending file in the folder folds into DECISIONS.md under the same rules, formatted', async () => {

@@ -6,6 +6,7 @@ import {
   getSeason,
   setSeasonRosterSettings,
   previewSeasonRules,
+  readLeagueSettings,
   setSeasonRules,
   updateSeason as updateSeasonCommand,
 } from '@srleagues/core';
@@ -41,6 +42,11 @@ registerIsolationCase({
 registerCommandCase(getSeason, harnessTx, {
   name: "see the target's season",
   input: (target) => ({ seasonId: target.seasonId }),
+});
+
+registerCommandCase(readLeagueSettings, harnessTx, {
+  name: "read the scope's league settings",
+  input: () => ({}),
 });
 
 registerCommandCase(updateSeasonCommand, harnessTx, {

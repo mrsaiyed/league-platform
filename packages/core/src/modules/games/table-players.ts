@@ -42,6 +42,7 @@ import { recordActivity } from '../access/index.ts';
 import type { CommandContext } from '../../command/index.ts';
 import { playerKey, teamOfSide } from './live-game.ts';
 import type { GamePlayer, GameRecord, TablePlayer, TrackerTx } from './ports.ts';
+import { scoringNameSettingsOf } from './queries/read-scoring-name-view.ts';
 
 /** A change turned away: why, the log's sentence, and who wears a number already worn. */
 export type TableRefusal = {
@@ -118,7 +119,7 @@ async function wearerOf(
   jersey: string,
   personId: string,
 ): Promise<WornBy | undefined> {
-  const wearer = (await tx.games.listRoster(game.id)).find(
+  const wearer = (await tx.games.listRoster(game.id, await scoringNameSettingsOf(tx))).find(
     (p) =>
       p.teamId === teamId &&
       !p.left &&

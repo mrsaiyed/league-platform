@@ -17,6 +17,7 @@ import { webPorts } from '../../server/container.ts';
 import { isGameIdFormat } from '../../server/league-api.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
 import { t } from '../../server/messages.ts';
+import { publicPlayerKey } from '../../server/player-key.ts';
 import { placeOf } from '../schedule-pages/index.ts';
 import { staffNumbersAddress } from '../staff-numbers/index.ts';
 import { loadTeamCardsOf } from '../team-pages/index.ts';
@@ -57,8 +58,17 @@ export async function GamePage({
       audience,
       policy,
     };
-    const shown = await readGameSnapshot(store, { gameId: game }, viewing, tracker.clock.now());
-    return { snapshot: shown, page: await readGamePage(store, { gameId: game }, viewing) };
+    const shown = await readGameSnapshot(
+      store,
+      { gameId: game },
+      viewing,
+      tracker.clock.now(),
+      publicPlayerKey,
+    );
+    return {
+      snapshot: shown,
+      page: await readGamePage(store, { gameId: game }, viewing, publicPlayerKey),
+    };
   });
   const [{ snapshot, page }, clock] = await Promise.all([
     read,

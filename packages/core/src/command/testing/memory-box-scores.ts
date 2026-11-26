@@ -2,25 +2,32 @@
 // core's tests: a game's lines, the players of its two teams, and whether the tracker
 // has recorded plays for it. The database's own rule (one line per person per game,
 // for a team in the game) is stood in for by a check.
-import type {
-  GameLine,
-  GameRecord,
-  GameRosterPlayer,
-  GamesStore,
+import {
+  namedRoster,
+  type GameLine,
+  type GameRecord,
+  type GamesStore,
+  type RecordedRosterPlayer,
 } from '../../modules/games/index.ts';
+import type { Audience } from '../../modules/leagues/index.ts';
 
 export type BoxScoreData = {
   games: GameRecord[];
   lines: GameLine[];
-  /** Players on teams' rosters, by team. */
-  roster: GameRosterPlayer[];
+  /**
+   * Players on teams' rosters, by team, as recorded: listRoster names them by the scoring
+   * screens' rule (R-33) under the view its caller hands in.
+   */
+  roster: RecordedRosterPlayer[];
+  /** The league's audience leagueAudience gives; an adult league where nothing is said. */
+  audience?: Audience;
   /** Games the tracker has recorded plays for. */
   tracked: string[];
 };
 
 type BoxScoreStores = Pick<
   GamesStore,
-  'listLines' | 'replaceLines' | 'listRoster' | 'inBin' | 'hasPlays'
+  'listLines' | 'replaceLines' | 'listRoster' | 'leagueAudience' | 'inBin' | 'hasPlays'
 >;
 
 export function boxScoreStores(s: BoxScoreData): BoxScoreStores {
@@ -44,10 +51,12 @@ export function boxScoreStores(s: BoxScoreData): BoxScoreStores {
         ...lines.map(({ jerseyNumber: _jersey, ...line }) => line),
       ];
     },
-    listRoster: async (gameId) => {
+    listRoster: async (gameId, names) => {
       const teams = teamsOf(gameId);
-      return s.roster.filter((player) => teams.includes(player.teamId));
+      const players = s.roster.filter((player) => teams.includes(player.teamId));
+      return namedRoster(players, names);
     },
+    leagueAudience: async () => s.audience ?? 'adult',
     // No bin here: a player missing from the roster is purged (the database test tells them apart).
     inBin: async () => false,
     hasPlays: async (gameId) => s.tracked.includes(gameId),

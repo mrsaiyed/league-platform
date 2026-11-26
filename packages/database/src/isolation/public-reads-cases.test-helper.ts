@@ -306,6 +306,8 @@ registerIsolationCase({
       { gameId: target.gameId },
       viewing(target.leagueId),
       Date.parse('2026-12-06T18:10:00Z'),
+      // Any key will do here: the case is about which league's rows are read.
+      () => '00000000-0000-8000-8000-000000000000',
     );
   },
 });

@@ -13,11 +13,11 @@ import {
   editorGrant,
   editorId,
 } from '../memory-games.test-helper.ts';
-import type { GameRosterPlayer } from '../ports.ts';
+import type { RecordedRosterPlayer } from '../ports.ts';
 import { setBoxScore } from './set-box-score.ts';
 
 const person = (n: number) => `01900000-0000-7000-8000-0000000d${String(n).padStart(4, '0')}`;
-const player = (n: number, teamId: string, fields: Partial<GameRosterPlayer> = {}) => ({
+const player = (n: number, teamId: string, fields: Partial<RecordedRosterPlayer> = {}) => ({
   teamId,
   personId: person(n),
   firstName: `First${n}`,

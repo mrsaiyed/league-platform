@@ -1,6 +1,7 @@
 import { GameSnapshot } from '@srleagues/contracts';
 import { describe, expect, it } from 'vitest';
 import { gameSnapshot } from './game-snapshot-endpoint.ts';
+import { publicPlayerKey } from './player-key.ts';
 import { scoringSessionRequest } from './scoring-session-endpoint.ts';
 import { sendTrackerCommands } from './tracker-commands-endpoint.ts';
 import {
@@ -72,6 +73,20 @@ async function play(world: ReturnType<typeof trackerWorld>) {
 }
 
 describe('GET …/games/{game}/snapshot', () => {
+  it("carries each player's key in this game, never a person's id (T-462, step 2.225)", async () => {
+    const world = trackerWorld();
+    await play(world);
+    const answer = await read(world);
+    const shot = GameSnapshot.parse(answer.body);
+    const scorer = shot.players.find((p) => p.points === 2);
+    expect(scorer?.playerId).toBe(publicPlayerKey(games.hawksBears, hawks[0] ?? ''));
+    const served = JSON.stringify(answer.body);
+    for (const id of [...hawks, ...bears]) {
+      expect(served).not.toContain(id);
+      expect(served).not.toContain(id.toUpperCase());
+    }
+  });
+
   it("gives the game as it stands, without a staff-only team's players, cached for 2 seconds", async () => {
     const world = trackerWorld();
     await play(world);
