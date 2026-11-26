@@ -24,15 +24,16 @@ import {
   type OpenTrackerGameOptions,
 } from './open-tracker-game.ts';
 import { madeUpRosters } from './opened-game-storage-contract.test-helper.ts';
+import { tap } from './queue-storage-contract.test-helper.ts';
 import { formatOf, openedGameKeepMs, type OpenedGameStorage } from './opened-game-storage.ts';
-import { QueueError, type QueueStorage } from './queue-storage.ts';
+import { QueueError, type DeviceQueueStorage, type QueueStorage } from './queue-storage.ts';
 import type { TapInput } from './tracker-controller.ts';
 import type { QueueClock } from './tracker-queue.ts';
 import { createManualClock } from './tracker-queue.test-helper.ts';
 
 const gameId = games.hawksBears;
 
-type Device = { readonly queue: QueueStorage; readonly games: OpenedGameStorage };
+type Device = { readonly queue: DeviceQueueStorage; readonly games: OpenedGameStorage };
 const newDevice = (): Device => ({
   queue: createMemoryQueueStorage(),
   games: createMemoryOpenedGameStorage(),
@@ -118,8 +119,10 @@ describe('opening a game on the device (T-115, T-116, P7 §5.1)', () => {
     const scorekeeper = { leagueId: liveLeagueId, accountId: accountOf('scorekeeper') };
     const earlier = '00000000-0000-4000-8000-0000000001a1';
     const recent = '00000000-0000-4000-8000-0000000001a2';
-    await device.games.saveRosters({ ...scorekeeper, gameId: earlier }, madeUpRosters, 0);
-    await device.games.saveRosters({ ...scorekeeper, gameId: recent }, madeUpRosters, 900);
+    // Stored since step 2.226 (T-484): their age decides.
+    const marked = { ...madeUpRosters, scoringNames: true as const };
+    await device.games.saveRosters({ ...scorekeeper, gameId: earlier }, marked, 0);
+    await device.games.saveRosters({ ...scorekeeper, gameId: recent }, marked, 900);
     // Another account's game (someone who used the device before, still signed in).
     await device.games.saveRosters(
       { gameId, leagueId: liveLeagueId, accountId: accountOf('owner') },
@@ -148,6 +151,40 @@ describe('opening a game on the device (T-115, T-116, P7 §5.1)', () => {
     expect(await device.games.find(earlier)).toBeUndefined();
     expect(await device.games.find(gameId)).toBeUndefined();
     expect(await device.games.find(recent)).toBeDefined();
+  });
+
+  it('drops other games’ rosters stored before step 2.226 at opening, unless taps of them wait (T-484)', async () => {
+    const network = endpointNetwork();
+    const device = newDevice();
+    const scorekeeper = { leagueId: liveLeagueId, accountId: accountOf('scorekeeper') };
+    const old = '00000000-0000-4000-8000-0000000001d1';
+    const waiting = '00000000-0000-4000-8000-0000000001d2';
+    const marked = '00000000-0000-4000-8000-0000000001d3';
+    // madeUpRosters has no mark: copies a page stored before the step, names as recorded.
+    await device.games.saveRosters({ ...scorekeeper, gameId: old }, madeUpRosters, 900);
+    await device.games.saveRosters({ ...scorekeeper, gameId: waiting }, madeUpRosters, 900);
+    await device.games.saveRosters(
+      { ...scorekeeper, gameId: marked },
+      { ...madeUpRosters, scoringNames: true },
+      900,
+    );
+    // A tap of that game waits on the device, as one made with no signal does.
+    await device.queue.add(waiting, { protocolVersion: 1, command: tap(1), ...scorekeeper });
+    const first = await open(network, 'scorekeeper', device);
+    expect(await device.games.find(old)).toBeUndefined();
+    expect((await device.games.find(waiting))?.rosters).toEqual(madeUpRosters);
+    expect(await device.games.find(marked)).toBeDefined();
+    await first.controller.leave();
+    // Its tap saved (the server has it: dropped from the queue), the next opening drops
+    // the old copy too.
+    const [held] = await device.queue.list(waiting);
+    if (held === undefined) throw new Error('no tap');
+    await device.queue.settle(waiting, { remove: [held.command.commandId] });
+    expect(await device.queue.list(waiting)).toEqual([]);
+    const second = await open(network, 'scorekeeper', device);
+    expect(await device.games.find(waiting)).toBeUndefined();
+    expect(await device.games.find(marked)).toBeDefined();
+    await second.controller.leave();
   });
 
   it('asks again when the format has changed since it was confirmed', () => {

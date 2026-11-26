@@ -149,13 +149,13 @@ export async function openIndexedDbOpenedGameStorage(
         };
       });
     },
-    forgetOthers(owner, olderThan) {
+    forgetOthers(owner, olderThan, withTaps) {
       return run(gamesStore, 'readwrite', undefined, (store) => {
         const walk = store.openCursor();
         walk.onsuccess = () => {
           const cursor = walk.result;
           if (cursor === null) return;
-          if (!stillKept(cursor.value as OpenedGame, owner, olderThan)) cursor.delete();
+          if (!stillKept(cursor.value as OpenedGame, owner, olderThan, withTaps)) cursor.delete();
           cursor.continue();
         };
       });

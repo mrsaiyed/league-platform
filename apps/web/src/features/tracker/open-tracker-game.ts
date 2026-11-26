@@ -19,7 +19,12 @@
 //    picks the device up next does not find the players' names on it (T-115).
 import type { SignedInCheck } from './fetch-signed-in.ts';
 import type { QueueErrorCode } from './queue-storage.ts';
-import { inLeague, QueueError, type QueueStorage } from './queue-storage.ts';
+import {
+  inLeague,
+  QueueError,
+  type DeviceQueueStorage,
+  type QueueStorage,
+} from './queue-storage.ts';
 import type { CommandTransport } from './command-transport.ts';
 import type { GameDoors } from './game-doors.ts';
 import {
@@ -85,9 +90,12 @@ export type OpenTrackerGameOptions = {
   /** The signed-in account opening the game, from the server's session. */
   readonly accountId: string;
   readonly rosters: DeviceRosters;
-  /** Opens the device's storage: in the browser, IndexedDB. */
+  /**
+   * Opens the device's storage: in the browser, IndexedDB. Its queue is read across games
+   * too, so another game's old rosters stay while taps of it wait (T-484).
+   */
   readonly openStorage: () => Promise<{
-    readonly queue: QueueStorage;
+    readonly queue: DeviceQueueStorage;
     readonly games: OpenedGameStorage;
   }>;
   readonly transport: CommandTransport;
@@ -203,7 +211,10 @@ export async function openTrackerGame(
     storage = await options.openStorage();
     const openedAt = now();
     if (letGo()) return letGoOf;
-    await storage.games.forgetOthers(owner, openedAt - openedGameKeepMs);
+    // Every game with a tap waiting or set aside keeps an old copy of its rosters (T-484).
+    const withTaps = new Set((await storage.queue.listAll()).map((tap) => tap.gameId));
+    if (letGo()) return letGoOf;
+    await storage.games.forgetOthers(owner, openedAt - openedGameKeepMs, withTaps);
     if (letGo()) return letGoOf;
     // The rosters kept before this opening (a fetch may have had more than the page's
     // copy, which a worker kept earlier): started from when opening gets no answer.
