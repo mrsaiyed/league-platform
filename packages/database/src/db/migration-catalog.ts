@@ -933,442 +933,379 @@ export const migrationCatalog: MigrationCatalog = {
     {
       table: 'platform.activity_log',
       name: 'platform_activity_log_is_history',
-      definition:
-        'CREATE TRIGGER platform_activity_log_is_history BEFORE DELETE OR UPDATE ON platform.activity_log FOR EACH ROW EXECUTE FUNCTION public.refuse_history_change()',
+      definition: 'ec06fe30e665caf44cf55681ab86119a4c75961cd807979b6215a6693bc3030e',
       enabled: 'O',
     },
     {
       table: 'public.accounts',
       name: 'accounts_on_update',
-      definition:
-        'CREATE TRIGGER accounts_on_update BEFORE UPDATE ON public.accounts FOR EACH ROW EXECUTE FUNCTION public.on_row_update()',
+      definition: '69e83f095c2dd84830c1aefdaaf831d213326b3b0588303dd1c093ca2475edd2',
       enabled: 'O',
     },
     {
       table: 'public.activity_log',
       name: 'activity_log_is_history',
-      definition:
-        'CREATE TRIGGER activity_log_is_history BEFORE DELETE OR UPDATE ON public.activity_log FOR EACH ROW EXECUTE FUNCTION public.refuse_history_change()',
+      definition: 'c55227eeb24a8a96b6c403beecdfc55f55ae5de73852cbdb0abb6ad6f7ecd7c8',
       enabled: 'O',
     },
     {
       table: 'public.command_receipts',
       name: 'command_receipts_is_history',
-      definition:
-        'CREATE TRIGGER command_receipts_is_history BEFORE DELETE OR UPDATE ON public.command_receipts FOR EACH ROW EXECUTE FUNCTION public.refuse_history_change()',
+      definition: '2ae13726f90f0a6a2390bcaa592defbf831c143b818ee446772be4c12e044f90',
       enabled: 'O',
     },
     {
       table: 'public.courts',
       name: 'courts_on_update',
-      definition:
-        "CREATE TRIGGER courts_on_update BEFORE UPDATE ON public.courts FOR EACH ROW EXECUTE FUNCTION public.on_row_update('venue_id')",
+      definition: '03f04f84f7dcd5a391230d8bc10f22f74880f9323b6ea7db5f6da0b5550c889e',
       enabled: 'O',
     },
     {
       table: 'public.divisions',
       name: 'divisions_on_update',
-      definition:
-        "CREATE TRIGGER divisions_on_update BEFORE UPDATE ON public.divisions FOR EACH ROW EXECUTE FUNCTION public.on_row_update('season_id')",
+      definition: '5bc6bed5af2ba7dfbff1946f1476d92edd998dff70e0779329b2af7d0c086ed8',
       enabled: 'O',
     },
     {
       table: 'public.divisions',
       name: 'divisions_parent_chain',
-      definition:
-        'CREATE TRIGGER divisions_parent_chain BEFORE INSERT OR UPDATE OF parent_division_id ON public.divisions FOR EACH ROW EXECUTE FUNCTION public.check_division_parent_chain()',
+      definition: 'a4a7bfc48061b90c44634cd0ea0d916047c686f7ae20c23966c75313a77a8da6',
       enabled: 'O',
     },
     {
       table: 'public.game_assignments',
       name: 'game_assignments_on_update',
-      definition:
-        "CREATE TRIGGER game_assignments_on_update BEFORE UPDATE ON public.game_assignments FOR EACH ROW EXECUTE FUNCTION public.on_row_update('game_id', 'account_id')",
+      definition: 'a7da705c7dec62ce97aaeced22d1b1031404e9d75ee18d0b36db069137b0307d',
       enabled: 'O',
     },
     {
       table: 'public.game_corrections',
       name: 'game_corrections_at_now',
-      definition:
-        'CREATE TRIGGER game_corrections_at_now BEFORE INSERT ON public.game_corrections FOR EACH ROW EXECUTE FUNCTION public.stamp_game_correction()',
+      definition: '9344a9adfca09cb7db407001a8cc497e2c0f23d52c09e2a8733373dccedc9713',
       enabled: 'O',
     },
     {
       table: 'public.game_corrections',
       name: 'game_corrections_is_history',
-      definition:
-        'CREATE TRIGGER game_corrections_is_history BEFORE DELETE OR UPDATE ON public.game_corrections FOR EACH ROW EXECUTE FUNCTION public.refuse_history_change()',
+      definition: '919467c2be1d2448a001014ea92e9ada476047187e2c8277509073c6ea07b9be',
       enabled: 'O',
     },
     {
       table: 'public.game_events',
       name: 'game_events_in_order',
-      definition:
-        'CREATE TRIGGER game_events_in_order BEFORE INSERT ON public.game_events FOR EACH ROW EXECUTE FUNCTION public.check_game_event_in_order()',
+      definition: '1d47a6e3dd6e1940f3fda7f2612758ddd941a480c4ceeec43e40511911a692d0',
       enabled: 'O',
     },
     {
       table: 'public.game_events',
       name: 'game_events_is_history',
-      definition:
-        'CREATE TRIGGER game_events_is_history BEFORE DELETE OR UPDATE ON public.game_events FOR EACH ROW EXECUTE FUNCTION public.refuse_history_change()',
+      definition: 'c67dee8899255e366fba07d2070733a90de7571e15808501b10e131fc082beb5',
       enabled: 'O',
     },
     {
       table: 'public.game_states',
       name: 'game_states_on_update',
-      definition:
-        "CREATE TRIGGER game_states_on_update BEFORE UPDATE ON public.game_states FOR EACH ROW EXECUTE FUNCTION public.on_row_update('game_id')",
+      definition: 'e7b0fb8b79c8d6fd123d43cbbf2c3514e27d1ca1aaae0952b0e78db4af759e40',
       enabled: 'O',
     },
     {
       table: 'public.games',
       name: 'games_format_fixed_once_started',
-      definition:
-        'CREATE TRIGGER games_format_fixed_once_started BEFORE UPDATE OF format ON public.games FOR EACH ROW EXECUTE FUNCTION public.check_game_format_fixed()',
+      definition: 'e68cae500b497c366cc09d8d858c7217e70f91f6f622d02214924ca4cca782da',
       enabled: 'O',
     },
     {
       table: 'public.games',
       name: 'games_given_format_fixed_once_started',
-      definition:
-        'CREATE TRIGGER games_given_format_fixed_once_started BEFORE UPDATE OF given_format ON public.games FOR EACH ROW EXECUTE FUNCTION public.check_game_given_format()',
+      definition: '11d05c986e5eda2f435808d48afd293cb8792733c3ff175b2b9d999087c789fe',
       enabled: 'O',
     },
     {
       table: 'public.games',
       name: 'games_on_update',
-      definition:
-        "CREATE TRIGGER games_on_update BEFORE UPDATE ON public.games FOR EACH ROW EXECUTE FUNCTION public.on_row_update('season_id')",
+      definition: 'ba66b74e4adef6ba3f966572cc7840f435c421ec9262161612b2ef393ccb7a89',
       enabled: 'O',
     },
     {
       table: 'public.games',
       name: 'games_result_change_needs_correction',
-      definition:
-        "CREATE CONSTRAINT TRIGGER games_result_change_needs_correction AFTER UPDATE ON public.games DEFERRABLE INITIALLY DEFERRED FOR EACH ROW WHEN (((old.status = ANY (ARRAY['final'::text, 'forfeit'::text])) AND ((new.status IS DISTINCT FROM old.status) OR (new.home_score IS DISTINCT FROM old.home_score) OR (new.away_score IS DISTINCT FROM old.away_score) OR (new.overtime_periods IS DISTINCT FROM old.overtime_periods) OR (new.home_team_id IS DISTINCT FROM old.home_team_id) OR (new.away_team_id IS DISTINCT FROM old.away_team_id) OR (new.division_id IS DISTINCT FROM old.division_id) OR (new.stage_id IS DISTINCT FROM old.stage_id) OR (new.finalized_at IS DISTINCT FROM old.finalized_at) OR ((old.deleted_at IS NULL) <> (new.deleted_at IS NULL))))) EXECUTE FUNCTION public.check_game_result_corrected()",
+      definition: '2cf36a7f17f8e5a2f6d46dbcbc59b29baeb7448d5e9d56a28a06f016b4004460',
       enabled: 'O',
     },
     {
       table: 'public.games',
       name: 'games_scored_not_binned',
-      definition:
-        'CREATE TRIGGER games_scored_not_binned BEFORE UPDATE OF deleted_at ON public.games FOR EACH ROW WHEN (((old.deleted_at IS NULL) AND (new.deleted_at IS NOT NULL))) EXECUTE FUNCTION public.check_game_bin_unscored()',
+      definition: 'f09f85011da4b7eed149b4f44ee2f3da6ff46c9ae5c4d84e825e97e26512a4e1',
       enabled: 'O',
     },
     {
       table: 'public.games',
       name: 'games_stamp_format_fixed',
-      definition:
-        'CREATE TRIGGER games_stamp_format_fixed BEFORE INSERT OR UPDATE ON public.games FOR EACH ROW EXECUTE FUNCTION public.stamp_game_format_fixed()',
+      definition: '84d280ba7e37d9e9af61d070ecd0dd9bceaa5b8476920350ced389adb43ec8e3',
       enabled: 'O',
     },
     {
       table: 'public.imports',
       name: 'imports_on_update',
-      definition:
-        "CREATE TRIGGER imports_on_update BEFORE UPDATE ON public.imports FOR EACH ROW EXECUTE FUNCTION public.on_row_update('season_id', 'kind', 'account_id')",
+      definition: '3750446beb855b3787792071e7325dfa292a5650594c8b37c5a12cedc97be22d',
       enabled: 'O',
     },
     {
       table: 'public.invitations',
       name: 'invitations_email_fixed',
-      definition:
-        'CREATE TRIGGER invitations_email_fixed BEFORE UPDATE ON public.invitations FOR EACH ROW EXECUTE FUNCTION public.check_invitation_email_fixed()',
+      definition: 'f0cdf2c243dc73d7369cf60c524f592bf78db869c41a7fd8b251f9e4178c8da1',
       enabled: 'O',
     },
     {
       table: 'public.invitations',
       name: 'invitations_on_update',
-      definition:
-        "CREATE TRIGGER invitations_on_update BEFORE UPDATE ON public.invitations FOR EACH ROW EXECUTE FUNCTION public.on_row_update('role', 'scope_type', 'scope_id')",
+      definition: '914d7d9c3ce11eb02192435848290443c2baa5395a3926b13e2dc667cc9a9ab2',
       enabled: 'O',
     },
     {
       table: 'public.jobs',
       name: 'jobs_on_update',
-      definition:
-        "CREATE TRIGGER jobs_on_update BEFORE UPDATE ON public.jobs FOR EACH ROW EXECUTE FUNCTION public.on_row_update('type', 'ids', 'dedupe_key', 'max_attempts')",
+      definition: '2501f61c1e29e1184cb90efb4dd6403b3e96033aec840b7e0963427b5d749949',
       enabled: 'O',
     },
     {
       table: 'public.league_features',
       name: 'league_features_on_update',
-      definition:
-        'CREATE TRIGGER league_features_on_update BEFORE UPDATE ON public.league_features FOR EACH ROW EXECUTE FUNCTION public.on_row_update()',
+      definition: '7fdc34440bbb4999f5f4c41382999c82f64840c4d5eff6a94c03645807f74c84',
       enabled: 'O',
     },
     {
       table: 'public.league_slug_history',
       name: 'league_slug_history_on_update',
-      definition:
-        'CREATE TRIGGER league_slug_history_on_update BEFORE UPDATE ON public.league_slug_history FOR EACH ROW EXECUTE FUNCTION public.on_row_update()',
+      definition: 'ff3dcf3038577b9d6c19263986292a31b1fde40459dc35f8b64952c3fcc11931',
       enabled: 'O',
     },
     {
       table: 'public.league_slug_history',
       name: 'league_slug_history_slug_free',
-      definition:
-        'CREATE TRIGGER league_slug_history_slug_free BEFORE INSERT OR UPDATE ON public.league_slug_history FOR EACH ROW EXECUTE FUNCTION public.check_old_slug_free()',
+      definition: 'bacc022b23d75e23777164b0179961ca782741d83d6a370f0023303ceafca55a',
       enabled: 'O',
     },
     {
       table: 'public.leagues',
       name: 'leagues_have_default_program',
-      definition:
-        'CREATE CONSTRAINT TRIGGER leagues_have_default_program AFTER INSERT ON public.leagues DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.check_league_has_default_program()',
+      definition: 'd36f1562fef975eafa4ad1eab48d12aedca943fc0f048634cb6e1232dd94d498',
       enabled: 'O',
     },
     {
       table: 'public.leagues',
       name: 'leagues_on_update',
-      definition:
-        'CREATE TRIGGER leagues_on_update BEFORE UPDATE ON public.leagues FOR EACH ROW EXECUTE FUNCTION public.on_row_update()',
+      definition: 'b496862f068c5a4f3b8244f9f7ef7da86449166ca3f19dcd3074101e1c21848a',
       enabled: 'O',
     },
     {
       table: 'public.leagues',
       name: 'leagues_slug_free',
-      definition:
-        'CREATE TRIGGER leagues_slug_free BEFORE INSERT OR UPDATE OF slug ON public.leagues FOR EACH ROW EXECUTE FUNCTION public.check_league_slug_free()',
+      definition: 'e587d66d77334330b1708a22a354b76ece36e525c6796f589edf0ecd59882b4a',
       enabled: 'O',
     },
     {
       table: 'public.people',
       name: 'people_birth_date_not_future',
-      definition:
-        'CREATE TRIGGER people_birth_date_not_future BEFORE INSERT OR UPDATE OF birth_date ON public.people FOR EACH ROW EXECUTE FUNCTION public.check_person_birth_date()',
+      definition: 'd4b3cd04da86e338da4aeb54b2e36f4b7f6e1f426fdf762060f88a7af5d41ba9',
       enabled: 'O',
     },
     {
       table: 'public.people',
       name: 'people_on_update',
-      definition:
-        'CREATE TRIGGER people_on_update BEFORE UPDATE ON public.people FOR EACH ROW EXECUTE FUNCTION public.on_row_update()',
+      definition: '43a83615fb8ee56460cc6129439772923a08e99a1492b935fcc7475e021829a7',
       enabled: 'O',
     },
     {
       table: 'public.player_game_stats',
       name: 'player_game_stats_on_update',
-      definition:
-        "CREATE TRIGGER player_game_stats_on_update BEFORE UPDATE ON public.player_game_stats FOR EACH ROW EXECUTE FUNCTION public.on_row_update('game_id', 'person_id')",
+      definition: 'a575ee9b0a9a21b502be04ffe7e69911e14beafe075b9dd24c835c886426202d',
       enabled: 'O',
     },
     {
       table: 'public.player_game_stats',
       name: 'player_game_stats_team_in_game',
-      definition:
-        'CREATE TRIGGER player_game_stats_team_in_game BEFORE INSERT OR UPDATE OF game_id, team_id ON public.player_game_stats FOR EACH ROW EXECUTE FUNCTION public.check_player_game_team()',
+      definition: '73608d249ce34a28683af82020352d95e0439868a2a2172540fe8c1c21420ba8',
       enabled: 'O',
     },
     {
       table: 'public.profile_access',
       name: 'profile_access_on_update',
-      definition:
-        'CREATE TRIGGER profile_access_on_update BEFORE UPDATE ON public.profile_access FOR EACH ROW EXECUTE FUNCTION public.on_row_update()',
+      definition: '4526eb8c8700438a7a3114988ddbfc6d31dcfd140c7d275e770c8e1422f4bc8d',
       enabled: 'O',
     },
     {
       table: 'public.profiles',
       name: 'profiles_on_update',
-      definition:
-        'CREATE TRIGGER profiles_on_update BEFORE UPDATE ON public.profiles FOR EACH ROW EXECUTE FUNCTION public.on_row_update()',
+      definition: 'e75d7e108b7505854c0cdc526cc91d1bf9088859059219cc33d9cdb830b8192e',
       enabled: 'O',
     },
     {
       table: 'public.programs',
       name: 'programs_keep_default_program',
-      definition:
-        'CREATE CONSTRAINT TRIGGER programs_keep_default_program AFTER DELETE OR UPDATE ON public.programs DEFERRABLE INITIALLY DEFERRED FOR EACH ROW WHEN (old.is_default) EXECUTE FUNCTION public.check_league_has_default_program()',
+      definition: 'fabc3f80407dfd3d113ae37fd4354282aa6a370c17dca2142f2c536679e0a96e',
       enabled: 'O',
     },
     {
       table: 'public.programs',
       name: 'programs_on_update',
-      definition:
-        'CREATE TRIGGER programs_on_update BEFORE UPDATE ON public.programs FOR EACH ROW EXECUTE FUNCTION public.on_row_update()',
+      definition: '6eb3b9d257298d035a6879f728506e29e5c8bb480371de4f91303556ee14655f',
       enabled: 'O',
     },
     {
       table: 'public.role_grants',
       name: 'role_grants_on_update',
-      definition:
-        "CREATE TRIGGER role_grants_on_update BEFORE UPDATE ON public.role_grants FOR EACH ROW EXECUTE FUNCTION public.on_row_update('account_id', 'role', 'scope_type', 'scope_id')",
+      definition: '228dd822f9b18f1bf344cbf7a93f76811290342dd7acfb9cdd2d4be97ac7093e',
       enabled: 'O',
     },
     {
       table: 'public.roster_entries',
       name: 'roster_entries_added_at_game_team',
-      definition:
-        'CREATE TRIGGER roster_entries_added_at_game_team BEFORE INSERT ON public.roster_entries FOR EACH ROW EXECUTE FUNCTION public.check_roster_added_at_game()',
+      definition: 'b37f6e81332e5cc35d933f0ff3465bfa1cf625da2d08efd5dd7e885f3e7e6189',
       enabled: 'O',
     },
     {
       table: 'public.roster_entries',
       name: 'roster_entries_on_update',
-      definition:
-        "CREATE TRIGGER roster_entries_on_update BEFORE UPDATE ON public.roster_entries FOR EACH ROW EXECUTE FUNCTION public.on_row_update('team_id', 'person_id', 'added_at_game_id')",
+      definition: '1ccc2d4f45137ade022605219f21de8957c8afc567e8d2a26687ef0c02a7f937',
       enabled: 'O',
     },
     {
       table: 'public.roster_entries',
       name: 'roster_entries_unique_jersey',
-      definition:
-        'CREATE TRIGGER roster_entries_unique_jersey BEFORE INSERT OR UPDATE OF jersey_number, left_on, team_id, needs_review ON public.roster_entries FOR EACH ROW EXECUTE FUNCTION public.check_roster_jersey()',
+      definition: 'ed06f46afec8e627b2d584665b30eae65b1376ab765b1ab7dd1118a49f6960a4',
       enabled: 'O',
     },
     {
       table: 'public.rounds',
       name: 'rounds_on_update',
-      definition:
-        "CREATE TRIGGER rounds_on_update BEFORE UPDATE ON public.rounds FOR EACH ROW EXECUTE FUNCTION public.on_row_update('season_id')",
+      definition: '383e33b0584422e8cd4ecf842008600fa36a4863711a4f8de97c2349b1f9e9d2',
       enabled: 'O',
     },
     {
       table: 'public.schedule_drafts',
       name: 'schedule_drafts_on_update',
-      definition:
-        "CREATE TRIGGER schedule_drafts_on_update BEFORE UPDATE ON public.schedule_drafts FOR EACH ROW EXECUTE FUNCTION public.on_row_update('season_id')",
+      definition: '541f9665b991d95846a5c95d4ff021b28a0aefb1232b7745d392d287e99119bb',
       enabled: 'O',
     },
     {
       table: 'public.schedule_revisions',
       name: 'schedule_revisions_in_order',
-      definition:
-        'CREATE TRIGGER schedule_revisions_in_order BEFORE INSERT ON public.schedule_revisions FOR EACH ROW EXECUTE FUNCTION public.check_schedule_revision_in_order()',
+      definition: '62ac89d407b757b0edcb4c3f5052963df4782d966102785a05b11146317bcbae',
       enabled: 'O',
     },
     {
       table: 'public.schedule_revisions',
       name: 'schedule_revisions_is_history',
-      definition:
-        'CREATE TRIGGER schedule_revisions_is_history BEFORE DELETE OR UPDATE ON public.schedule_revisions FOR EACH ROW EXECUTE FUNCTION public.refuse_history_change()',
+      definition: '393f0d672d18eac5cf4c47694a8509420f35a8fb09c3e8358d5d452be1c55a75',
       enabled: 'O',
     },
     {
       table: 'public.scoring_sessions',
       name: 'scoring_sessions_on_update',
-      definition:
-        "CREATE TRIGGER scoring_sessions_on_update BEFORE UPDATE ON public.scoring_sessions FOR EACH ROW EXECUTE FUNCTION public.on_row_update('game_id', 'account_id', 'device_id')",
+      definition: 'ddcab3b77b6364caaa254b907be0648406220b7c31debe22f1ea2ab8f06cca67',
       enabled: 'O',
     },
     {
       table: 'public.season_player_totals',
       name: 'season_player_totals_on_update',
-      definition:
-        "CREATE TRIGGER season_player_totals_on_update BEFORE UPDATE ON public.season_player_totals FOR EACH ROW EXECUTE FUNCTION public.on_row_update('season_id', 'person_id')",
+      definition: '462e5deee98da6d8783a20522a68e3f3c546deab34d7116c50cba58e42734db9',
       enabled: 'O',
     },
     {
       table: 'public.seasons',
       name: 'seasons_on_update',
-      definition:
-        'CREATE TRIGGER seasons_on_update BEFORE UPDATE ON public.seasons FOR EACH ROW EXECUTE FUNCTION public.on_row_update()',
+      definition: 'cf0495e52dab78a15179608f81015d8e7ba558b9c4776751bd9e1bd8e21d9a0f',
       enabled: 'O',
     },
     {
       table: 'public.seasons',
       name: 'seasons_unique_jerseys_on',
-      definition:
-        'CREATE TRIGGER seasons_unique_jerseys_on AFTER UPDATE OF rules ON public.seasons FOR EACH ROW WHEN ((new.unique_jerseys AND (NOT old.unique_jerseys))) EXECUTE FUNCTION public.check_season_unique_jerseys()',
+      definition: '4544b2474e7e4bff875aa65fbf6021ced0a182b3e76be7a67fa83bb22da9e5fa',
       enabled: 'O',
     },
     {
       table: 'public.setting_values',
       name: 'setting_values_on_update',
-      definition:
-        "CREATE TRIGGER setting_values_on_update BEFORE UPDATE ON public.setting_values FOR EACH ROW EXECUTE FUNCTION public.on_row_update('level', 'program_id', 'season_id', 'key')",
+      definition: '569edba2ecb2d3bafe775b158ea6a4285b99578a2a2238450356f5ded72dd1c2',
       enabled: 'O',
     },
     {
       table: 'public.site_releases',
       name: 'site_releases_is_history',
-      definition:
-        'CREATE TRIGGER site_releases_is_history BEFORE DELETE OR UPDATE ON public.site_releases FOR EACH ROW EXECUTE FUNCTION public.refuse_history_change()',
+      definition: '57439ca5c58699285f28746c99884c8a5f93fea4aef4cca2e5f539ca6d64538f',
       enabled: 'O',
     },
     {
       table: 'public.sites',
       name: 'sites_on_update',
-      definition:
-        'CREATE TRIGGER sites_on_update BEFORE UPDATE ON public.sites FOR EACH ROW EXECUTE FUNCTION public.on_row_update()',
+      definition: '202f0e675ae1ca971bcdc38b9e0dc76a84933a27d05dd4650daad74a9353dc21',
       enabled: 'O',
     },
     {
       table: 'public.stages',
       name: 'stages_on_update',
-      definition:
-        "CREATE TRIGGER stages_on_update BEFORE UPDATE ON public.stages FOR EACH ROW EXECUTE FUNCTION public.on_row_update('season_id', 'type')",
+      definition: '840f655115f9ec21bbb13a439c0cde5e21516488048c32255a98450173a42802',
       enabled: 'O',
     },
     {
       table: 'public.standings_adjustments',
       name: 'standings_adjustments_on_update',
-      definition:
-        "CREATE TRIGGER standings_adjustments_on_update BEFORE UPDATE ON public.standings_adjustments FOR EACH ROW EXECUTE FUNCTION public.on_row_update('season_id', 'team_id', 'account_id', 'paired_with', 'games_played', 'game_id')",
+      definition: '721f962b1cfbc5ec3ab3aa408ec3b0f54eedf3e0d972168e6cf0b15024a91f35',
       enabled: 'O',
     },
     {
       table: 'public.standings_coin_flips',
       name: 'standings_coin_flips_on_update',
-      definition:
-        "CREATE TRIGGER standings_coin_flips_on_update BEFORE UPDATE ON public.standings_coin_flips FOR EACH ROW EXECUTE FUNCTION public.on_row_update('season_id', 'team_ids', 'method', 'note', 'account_id')",
+      definition: '9ab048df903d9a7004bf1636ffcf431a0160f7ef44fbb402b0a8f934c8bb4c84',
       enabled: 'O',
     },
     {
       table: 'public.standings_coin_flips',
       name: 'standings_coin_flips_teams',
-      definition:
-        'CREATE TRIGGER standings_coin_flips_teams BEFORE INSERT ON public.standings_coin_flips FOR EACH ROW EXECUTE FUNCTION public.standings_coin_flip_teams()',
+      definition: 'bf69472cdc47184a6168fe8e248054b2a7314b144ed495bf9215f7cabd86f49d',
       enabled: 'O',
     },
     {
       table: 'public.standings_rows',
       name: 'standings_rows_on_update',
-      definition:
-        "CREATE TRIGGER standings_rows_on_update BEFORE UPDATE ON public.standings_rows FOR EACH ROW EXECUTE FUNCTION public.on_row_update('season_id', 'team_id')",
+      definition: '636d9eb42e8065fdcf7b47245d9d5e1d44f403a1e9386d53ed13a00ecce92783',
       enabled: 'O',
     },
     {
       table: 'public.standings_rows',
       name: 'standings_rows_team_division',
-      definition:
-        'CREATE TRIGGER standings_rows_team_division BEFORE INSERT OR UPDATE OF team_id, division_id ON public.standings_rows FOR EACH ROW EXECUTE FUNCTION public.check_standings_row_division()',
+      definition: '4ed8e7a9021e2b577907f63023e73c8edc09630d53507d5ac1b150b2fe07d898',
       enabled: 'O',
     },
     {
       table: 'public.support_access_log',
       name: 'support_access_log_end_early',
-      definition:
-        'CREATE TRIGGER support_access_log_end_early BEFORE UPDATE ON public.support_access_log FOR EACH ROW EXECUTE FUNCTION public.check_support_access_update()',
+      definition: '221f192a692b8cc789353b7c28d653afcba92a41638dd49aa829731000fc7912',
       enabled: 'O',
     },
     {
       table: 'public.support_access_log',
       name: 'support_access_log_is_history',
-      definition:
-        'CREATE TRIGGER support_access_log_is_history BEFORE DELETE ON public.support_access_log FOR EACH ROW EXECUTE FUNCTION public.refuse_history_change()',
+      definition: '96facbe76be4e24ba3ce332c48385f1d2e16e3721b7c2d975a63e843eec3870c',
       enabled: 'O',
     },
     {
       table: 'public.support_access_log',
       name: 'support_access_log_starts_now',
-      definition:
-        'CREATE TRIGGER support_access_log_starts_now BEFORE INSERT ON public.support_access_log FOR EACH ROW EXECUTE FUNCTION public.start_support_access()',
+      definition: '2d7f0457d073bf818c95c5a1b45b86cdf51944e61ec116321384dd1697f3ac4b',
       enabled: 'O',
     },
     {
       table: 'public.teams',
       name: 'teams_on_update',
-      definition:
-        "CREATE TRIGGER teams_on_update BEFORE UPDATE ON public.teams FOR EACH ROW EXECUTE FUNCTION public.on_row_update('season_id')",
+      definition: '31dfe817b2f1dd0c713f407cba91c2f097c77114b86146e3678a297ae0561c0c',
       enabled: 'O',
     },
     {
       table: 'public.venues',
       name: 'venues_on_update',
-      definition:
-        'CREATE TRIGGER venues_on_update BEFORE UPDATE ON public.venues FOR EACH ROW EXECUTE FUNCTION public.on_row_update()',
+      definition: '1eeabdc7bc18d9bf43d6c78e2daa06f47e983e3c78c2d8ccb8ba67fe0b97d1c0',
       enabled: 'O',
     },
   ],

@@ -520,7 +520,8 @@ describe('the start-up guard reads the league fence (step 2.238)', () => {
     const made = migrationCatalog.triggers.find(
       (trigger) => trigger.table === 'public.programs' && trigger.name === 'programs_on_update',
     );
-    expect(made?.definition).toMatch(/^CREATE TRIGGER programs_on_update BEFORE UPDATE/);
+    // The catalog holds a hash of the definition, not its text (so it names no column).
+    expect(made?.definition).toMatch(/^[0-9a-f]{64}$/);
     await pglite.exec(`
       drop trigger programs_on_update on public.programs;
       create trigger programs_on_update after update on public.programs
@@ -529,10 +530,11 @@ describe('the start-up guard reads the league fence (step 2.238)', () => {
     expect(said).toEqual([
       "public.programs has its trigger programs_on_update changed from the migrations', so what it does on each change may cross the league fence: drop trigger programs_on_update on public.programs, then run the migrations' own definition again",
     ]);
-    // The migrations' own definition, as the catalog holds it, puts it right.
-    await pglite.exec(
-      `drop trigger programs_on_update on public.programs; ${made?.definition ?? ''}`,
-    );
+    // The migrations' own definition, made again, matches the catalog's hash and puts it right.
+    await pglite.exec(`
+      drop trigger programs_on_update on public.programs;
+      create trigger programs_on_update before update on public.programs
+        for each row execute function public.on_row_update();`);
     expect(await checkLoginRole(db, login)).toEqual([]);
   });
 

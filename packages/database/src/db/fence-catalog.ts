@@ -67,7 +67,11 @@ export type CatalogTrigger = {
   readonly table: string;
   /** Its name, quoted as PostgreSQL would need. */
   readonly name: string;
-  /** pg_get_triggerdef, read with an empty search path: function, timing, events. */
+  /**
+   * sha256 of pg_get_triggerdef, read with an empty search path (function, timing, events):
+   * a hash, as a rule's and a function's body, so the generated catalog names no column a
+   * trigger fires on (R-28's scan reads it).
+   */
   readonly definition: string;
   /** pg_trigger.tgenabled: O (as made), D (disabled), R (replica only) or A (always). */
   readonly enabled: string;
@@ -280,7 +284,7 @@ export async function readTriggers(
         select pg_catalog.jsonb_array_elements_text(${JSON.stringify(schemas)}::jsonb))
       and ${notOfAnExtension('pg_catalog.pg_class', sql`c.oid`)}
     order by 1, 2`.execute(database);
-  return rows.map((row) => ({ ...row, definition: rule(row.definition) ?? '' }));
+  return rows.map((row) => ({ ...row, definition: sha256(rule(row.definition) ?? '') }));
 }
 
 /** Every rewrite rule on a relation in `schemas`, but a view's own `_RETURN` (T-486). */
