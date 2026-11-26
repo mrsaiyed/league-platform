@@ -16,7 +16,14 @@
 // made app_user (the tables' owner, as Supabase's `postgres`) is a member of it with
 // ADMIN only, and may not switch to it, so every transaction would be refused. PGlite
 // runs everything as a superuser, which may.
+//
+// Since step 2.238 it also reads the fence itself (check-fence.ts): every league table's
+// row-level security on and forced, every policy on one the migrations' own, every
+// security-definer function the login may run a reviewed one, and no table the
+// migrations did not make. The website, the worker and `npm run test:real-postgres` all
+// run this one function.
 import { sql } from 'kysely';
+import { checkFence } from './check-fence.ts';
 import { kyselyOf, type DatabaseHandle } from './database-handle.ts';
 
 /** One role the login is or reaches, by the best way there (the login itself first). */
@@ -163,5 +170,18 @@ export async function checkLoginRole(
       );
     }
   }
+  // Step 2.238: and the fence the login cannot step past must be whole (check-fence.ts).
+  const name = (reached: ReachedRole) => reached.path.at(-1) ?? '';
+  problems.push(
+    ...(await checkFence(db, {
+      login,
+      mayBecome: rows
+        .slice(1)
+        .filter((reached) => reached.may_become)
+        .map(name),
+      reached: rows.map(name),
+      databaseOwner: self.database_owner,
+    })),
+  );
   return problems;
 }

@@ -3,9 +3,17 @@
 import type { PGlite } from '@electric-sql/pglite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { freshSchema } from '../schema/schema.test-helper.ts';
-import { checkLoginRole } from './check-login-role.ts';
+import { checkLoginRole as checkEverything } from './check-login-role.ts';
 import { createDatabase } from './create-database.ts';
 import type { DatabaseHandle } from './database-handle.ts';
+
+// The table planted in platform below is also one no migration made, which the fence
+// check (step 2.238, check-fence.test.ts) names for every login. These tests are about
+// the roles, so that one sentence is set aside here and asserted once, on its own.
+const plantedStranger =
+  'platform.made_up_kept is a table that no migration made, so nothing has checked its fence: drop table platform.made_up_kept (or make it in a migration)';
+const checkLoginRole = async (...args: Parameters<typeof checkEverything>) =>
+  (await checkEverything(...args)).filter((problem) => problem !== plantedStranger);
 
 let pglite: PGlite;
 let db: DatabaseHandle;
@@ -89,6 +97,10 @@ describe('checkLoginRole', () => {
     // The memberships the product gives its login on purpose (record 052, T-60).
     expect(await checkLoginRole(db, 'app_user')).toEqual([]);
     expect(await checkLoginRole(db, 'made_up_app_login')).toEqual([]);
+  });
+
+  it('also reads the fence: the one table planted outside the migrations is named', async () => {
+    expect(await checkEverything(db, 'made_up_app_login')).toEqual([plantedStranger]);
   });
 
   it('reports a login that is not app_user, or can become the owner', async () => {
