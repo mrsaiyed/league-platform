@@ -167,7 +167,6 @@ describe('players at the scorer’s table (version 2, record 058)', () => {
           personId: id(50),
           firstName: '',
           lastName: '',
-          ordinal: null,
           jerseyNumber: '12',
           left: false,
           addedAtGameId: id(1),
@@ -178,7 +177,6 @@ describe('players at the scorer’s table (version 2, record 058)', () => {
           personId: id(51),
           firstName: 'Ada',
           lastName: 'Lionel',
-          ordinal: 1,
           jerseyNumber: null,
           left: true,
           addedAtGameId: null,
@@ -199,11 +197,6 @@ describe('players at the scorer’s table (version 2, record 058)', () => {
     expect(TrackerRosters.safeParse(noTieRule).success).toBe(false);
     const { toReview: _t, ...noMark } = rosters.players[0] ?? {};
     expect(TrackerRosters.safeParse({ ...rosters, players: [noMark] }).success).toBe(false);
-    // The place the scoring screens' rule gives (R-33): always said, a whole number from 1.
-    const { ordinal: _o, ...noPlace } = rosters.players[0] ?? {};
-    expect(TrackerRosters.safeParse({ ...rosters, players: [noPlace] }).success).toBe(false);
-    const placeZero = { ...rosters, players: [{ ...rosters.players[0], ordinal: 0 }] };
-    expect(TrackerRosters.safeParse(placeZero).success).toBe(false);
   });
 });
 

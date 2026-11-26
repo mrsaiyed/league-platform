@@ -559,11 +559,6 @@ export const TrackerRosterPlayer = z.strictObject({
   /** Up to 100 characters, as the database keeps them: 200 UTF-16 units at most. */
   firstName: z.string().max(200),
   lastName: z.string().max(200),
-  /**
-   * The player's place among those of their team the number and name do not tell apart,
-   * from 1 in roster order ("Player 1"), or null (R-33).
-   */
-  ordinal: z.number().int().min(1).max(1000).nullable(),
   jerseyNumber: Jersey.min(1).nullable(),
   left: z.boolean(),
   /** The game at whose scorer's table they were added (S-6), or null for the team's own roster. */
