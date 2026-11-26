@@ -90,8 +90,14 @@ async function lostLeagueColumns(
        where a.attrelid = c.oid and a.attnum = l.place and not a.attisdropped) as now_named
     from pg_catalog.jsonb_to_recordset(${JSON.stringify(catalog.leagueTables)}::jsonb)
       as l("table" text, "column" text, place int)
-    left join pg_catalog.pg_class c
-      on c.oid = pg_catalog.to_regclass(l."table") and c.relkind in ('r', 'p')
+    left join lateral (
+      -- By name from the catalog, not to_regclass, which needs the use of the schema.
+      select k.oid from pg_catalog.pg_class k
+      join pg_catalog.pg_namespace n on n.oid = k.relnamespace
+      where pg_catalog.quote_ident(n.nspname) || '.' || pg_catalog.quote_ident(k.relname) =
+          l."table"
+        and k.relkind in ('r', 'p')
+    ) c on true
     where c.oid is null or not exists (
       select 1 from pg_catalog.pg_attribute a
       where a.attrelid = c.oid and a.attname = l."column" and a.attnum > 0
@@ -163,10 +169,10 @@ async function widePolicies(
         `${found.command === 'all' ? '' : `for ${found.command} `}${policyText(found)}): ${remedy}`,
     );
   }
+  // Read from the catalog by name, not to_regclass, which needs the use of the schema.
   const { rows: present } = await sql<{ table: string }>`
-    select l.name as "table"
-    from pg_catalog.jsonb_array_elements_text(${JSON.stringify(listed)}::jsonb) as l(name)
-    where pg_catalog.to_regclass(l.name) is not null`.execute(database);
+    with league_tables as (${leagueTables(listed)})
+    select table_name as "table" from league_tables`.execute(database);
   const there = new Set(present.map((row) => row.table));
   for (const made of catalog.policies) {
     if (seen.has(`${made.table} ${made.name}`) || !there.has(made.table)) continue;
