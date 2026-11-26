@@ -91,9 +91,9 @@ describe('the scorer’s rosters as served (T-483)', () => {
       ['12', '', ''],
       [null, 'Sam L.', ''],
       [null, 'Player 1', ''],
-      [null, 'Ana B. (player 1)', ''],
-      [null, 'Ana B. (player 2)', ''],
-      [null, 'Jordan Ellis (player 2)', ''],
+      [null, 'Player 1 · Ana B.', ''],
+      [null, 'Player 2 · Ana B.', ''],
+      [null, 'Player 2 · Jordan Ellis', ''],
     ]);
   });
 });

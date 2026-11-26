@@ -33,14 +33,17 @@ import {
   deviceAccountOf,
   gamesHoldingBack,
   keptAddressOf,
+  mayForgetGamePage,
   mayKeepAnswer,
   mayReplaceStored,
   mayServeKeptPage,
   pageAnswerPlan,
+  pageCodeOf,
   signedInFrom,
   trackerAccountMetaName,
   trackerKeptPrefix,
   trackerNetworkWaitMs,
+  trackerWorkerForgetGameMessage,
   trackerWorkerForgetMessage,
   trackerWorkerKeepMessage,
   trackerWorkerReleaseMessage,
@@ -190,6 +193,40 @@ async function forgetPagesNotOf(signedIn) {
   }
 }
 
+// A page fetched fresh replaces the kept one (T-487), the names its rosters carry with it,
+// once every code file it names is kept too (a reload with no signal starts from it);
+// a file that cannot be fetched leaves the kept page as it was, for the next fetch.
+async function replaceKeptPage(key, answer) {
+  try {
+    for (const href of pageCodeOf(await answer.clone().text(), key)) {
+      const what = keptAddressOf({ url: href, method: 'GET', mode: 'no-cors' }, scope);
+      if (what === null || what.kind !== 'code' || (await keptIn(what.key))) continue;
+      const code = await fetch(what.key);
+      if (!mayKeepAnswer(code)) return;
+      await keep(what.key, code);
+    }
+    await keep(key, answer);
+    for (const name of (await caches.keys()).filter((n) => n.startsWith(prefix) && n !== current)) {
+      await (await caches.open(name)).delete(key);
+    }
+  } catch (error) {
+    // Not replaced this time: the next page fetched fresh replaces it.
+  }
+}
+
+// A game ended and saved, forgotten by the device (T-488): its kept page goes too, never
+// while a tap of it waits or is set aside here.
+async function forgetGamePage(page) {
+  const what = keptAddressOf({ url: page, method: 'GET', mode: 'navigate' }, scope);
+  if (what === null || what.kind !== 'page') return;
+  const game = what.key.slice(what.key.lastIndexOf('/') + 1);
+  if (!mayForgetGamePage(game, await readAll(names.queueDatabase, names.queue))) return;
+  await writing;
+  for (const name of (await caches.keys()).filter((n) => n.startsWith(prefix))) {
+    await (await caches.open(name)).delete(what.key);
+  }
+}
+
 async function answerPage(request, key, event) {
   const open = await gamesOpen();
   let kept = await keptIn(key);
@@ -218,7 +255,14 @@ async function answerPage(request, key, event) {
             { status: late.status, type: late.type, redirected: late.redirected },
             await accountOf(late),
           );
-          if (now === undefined || mayServeKeptPage(shownMark, now, null)) return;
+          if (now === undefined) return;
+          if (mayServeKeptPage(shownMark, now, null)) {
+            // The same account: the page fetched fresh replaces the kept one (T-487).
+            if (mayKeepAnswer(late) && (await accountOf(late)) === shownMark) {
+              await replaceKeptPage(key, late.clone());
+            }
+            return;
+          }
           await forgetPagesNotOf(now);
           const client = await self.clients.get(event.resultingClientId);
           if (client) await client.navigate(client.url);
@@ -228,7 +272,13 @@ async function answerPage(request, key, event) {
   }
   if (kept && !mayServeKeptPage(await accountOf(kept), signedIn, await deviceAccount())) kept = undefined;
   const plan = pageAnswerPlan(open, kept !== undefined);
-  if (plan.first === 'kept' && kept) return kept;
+  if (plan.first === 'kept' && kept) {
+    // Shown kept, replaced by the page fetched fresh for the same account (T-487).
+    if (answer && mayKeepAnswer(answer) && (await accountOf(answer)) === (await accountOf(kept))) {
+      event.waitUntil(replaceKeptPage(key, answer.clone()));
+    }
+    return kept;
+  }
   if (!answer) return kept || Response.error();
   if (plan.keepNetworkAnswer && mayKeepAnswer(answer)) {
     await keep(key, answer.clone());
@@ -293,6 +343,10 @@ self.addEventListener('message', (event) => {
     );
     return;
   }
+  if (event.data && event.data.type === names.forgetGameMessage) {
+    event.waitUntil(forgetGamePage(String(event.data.page)).catch(() => undefined));
+    return;
+  }
   if (event.data && event.data.type === names.releaseMessage) {
     const port = event.ports && event.ports[0];
     event.waitUntil(
@@ -327,6 +381,7 @@ export function trackerWorkerScript(): string {
     updateMessage: trackerWorkerUpdateMessage,
     keepMessage: trackerWorkerKeepMessage,
     forgetMessage: trackerWorkerForgetMessage,
+    forgetGameMessage: trackerWorkerForgetGameMessage,
     releaseMessage: trackerWorkerReleaseMessage,
     accountDatabase: deviceAccountDatabaseName,
     accountStore: deviceAccountStoreName,
@@ -339,10 +394,12 @@ export function trackerWorkerScript(): string {
     deviceAccountOf,
     gamesHoldingBack,
     keptAddressOf,
+    mayForgetGamePage,
     mayKeepAnswer,
     mayReplaceStored,
     mayServeKeptPage,
     pageAnswerPlan,
+    pageCodeOf,
     signedInFrom,
   };
   return [

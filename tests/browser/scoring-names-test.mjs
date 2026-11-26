@@ -14,9 +14,21 @@
 // - The owner switches "Scorekeepers see full names" on (its wording drawn on the
 //   settings page from the message files): the score page then reads everyone else in
 //   full, those two still not.
+// - Switched off again, a reload: within 15 seconds neither the device's storage nor the
+//   worker's kept page holds a surname it showed while on (T-487: a fresh answer wins).
+// - Three table players who read the same and wear no number are told apart before the
+//   tile's ellipsis at 390 wide: "Player 1 · …", "Player 2 · …" (R-33, the place first).
 // - Admin → Teams shows the recorded name, and the person's page beside it the "Show as".
 // `--no-build` serves the build already here.
-import { court, league, liveGame, owner, scorekeeper, trackerPath } from './tracker-driver.mjs';
+import {
+  addPlayers,
+  court,
+  league,
+  liveGame,
+  owner,
+  scorekeeper,
+  trackerPath,
+} from './tracker-driver.mjs';
 import {
   buildNext,
   freePort,
@@ -41,7 +53,8 @@ const step = async (name, run) => {
   }
 };
 
-const surnames = /Zabrowskiyy|Quillfeatherz/;
+// Searched without regard to case: a lowercased search key would hold them too.
+const surnames = /Zabrowskiyy|Quillfeatherz/i;
 const holdsNeither = (label, text) => {
   const found = surnames.exec(text);
   note(`${label}: neither surname`, found === null, found?.[0]);
@@ -68,6 +81,15 @@ if (built) {
   });
   await step('starting the server and the browser', async () => {
     await waitFor(`${origin}/`, server);
+    // Three table players who read the same, with no number (the place tells them apart).
+    await addPlayers(origin, {
+      home: [
+        ['', 'Samantha Leeworth'],
+        ['', 'Samantha Leeworth'],
+        ['', 'Samantha Leeworth'],
+      ],
+      away: [],
+    });
     browser = await launch();
   });
 }
@@ -135,6 +157,37 @@ if (browser) {
   await step('the scorekeeper scores the first quarter, picking players by number', async () => {
     await page.goto(`${origin}${trackerPath()}`);
     await c.open();
+    // What each same-named tile shows before its ellipsis, measured in the tile's own font.
+    const seen = await page
+      .locator('[data-teams] [data-side="home"][data-player] .court-tile-name')
+      .evaluateAll((names) => {
+        const pen = document.createElement('canvas').getContext('2d');
+        return names
+          .filter((name) => /Samantha/.test(name.textContent ?? ''))
+          .map((name) => {
+            const text = name.textContent ?? '';
+            if (pen === null || name.scrollWidth <= name.clientWidth) return text;
+            pen.font = getComputedStyle(name).font;
+            const room = name.clientWidth - pen.measureText('…').width;
+            let shown = '';
+            for (const letter of text) {
+              if (pen.measureText(shown + letter).width > room) break;
+              shown += letter;
+            }
+            return shown;
+          });
+      });
+    note('three same-named tiles', seen.length === 3, JSON.stringify(seen));
+    note(
+      'each worded "Player N" first',
+      seen.every((shown, at) => shown.startsWith(`Player ${at + 1}`)),
+      JSON.stringify(seen),
+    );
+    note(
+      'they read differently before the ellipsis',
+      new Set(seen).size === 3,
+      JSON.stringify(seen),
+    );
     const homeTile = await c.tile('home', 12).innerText();
     const awayTile = await c.tile('away', 3).innerText();
     note(
@@ -170,9 +223,10 @@ if (browser) {
   });
 
   await step("the device's storage", async () => {
-    // The page refreshes its stored copy after it is drawn: 15 seconds at most.
+    // The page stores its copy after it is drawn: 15 seconds at most.
+    const stored = (text) => text.includes(liveGame) && text.includes('R. Q.');
     let kept = JSON.stringify(await deviceStorage(page));
-    for (let i = 0; i < 30 && !/Hawkins/.test(kept); i += 1) {
+    for (let i = 0; i < 30 && !stored(kept); i += 1) {
       await page.waitForTimeout(500);
       kept = JSON.stringify(await deviceStorage(page));
     }
@@ -234,6 +288,55 @@ if (browser) {
       drawn.includes('#12') && drawn.includes('R. Q.'),
     );
     holdsNeither('on: the box score sheet', drawn);
+  });
+
+  await step('switched off again: a reload holds the full names no longer (T-487)', async () => {
+    await ownerPage.goto(`${origin}/${league}/admin/settings`);
+    const section = ownerPage.locator(fullNames);
+    const asSelect = section.locator('select[name="value"]');
+    if ((await asSelect.count()) > 0) await asSelect.selectOption('false');
+    else await section.locator('input[name="value"][value="false"]').check();
+    const answer = await settingAnswer(
+      ownerPage,
+      fullNames,
+      section.locator('button[type=submit]').first(),
+    );
+    note('off: the setting is saved', answer.saved, answer.text);
+    note(
+      'off: the score page as served holds no "Hawkins"',
+      !/Hawkins/.test((await served()).text),
+    );
+    await page.reload();
+    await c.root.waitFor();
+    // The device's copy and the worker's kept page are replaced by the fresh answers.
+    let kept = JSON.stringify(await deviceStorage(page));
+    for (let i = 0; i < 30 && /Hawkins|Bearsley/.test(kept); i += 1) {
+      await page.waitForTimeout(500);
+      kept = JSON.stringify(await deviceStorage(page));
+    }
+    const found = /Hawkins|Bearsley/.exec(kept);
+    // Where it is still kept, to say so.
+    const all = JSON.parse(kept);
+    const where = [
+      ...Object.entries(all.databases).flatMap(([name, stores]) =>
+        Object.entries(stores)
+          .filter(([, rows]) => /Hawkins|Bearsley/.test(JSON.stringify(rows)))
+          .map(
+            ([store, rows]) =>
+              `${name}/${store} (${rows
+                .flatMap((row) =>
+                  Object.entries(row)
+                    .filter(([, value]) => /Hawkins|Bearsley/.test(JSON.stringify(value)))
+                    .map(([field]) => field),
+                )
+                .join(' ')})`,
+          ),
+      ),
+      ...all.pages.filter((p) => /Hawkins|Bearsley/.test(p.text)).map((p) => p.url),
+    ];
+    note('off: within 15 s the device keeps no full name', found === null, where.join(', '));
+    note('off: the device still keeps the game', kept.includes(liveGame));
+    holdsNeither('off: the device storage after a reload', kept);
   });
 
   await step('Admin → Teams keeps the recorded name beside its Show as', async () => {

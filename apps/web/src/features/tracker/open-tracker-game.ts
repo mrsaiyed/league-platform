@@ -130,6 +130,8 @@ export type OpenTrackerGameOptions = {
   readonly now?: () => number;
   /** The device could not store the state it loaded (the game can still be scored). */
   readonly onStoreFailed?: (code: QueueErrorCode) => void;
+  /** Drops the worker's kept page of the game, once the device forgot the game (T-488). */
+  readonly forgetPage?: () => void;
   /** Passed on to the controller (tests). */
   readonly controller?: Pick<
     TrackerControllerOptions,
@@ -177,6 +179,14 @@ function markingOnAnswer(
   let marked = false;
   return {
     session: (request, signal) => server.session(request, signal),
+    // The rosters go through too (T-487): without them the device never fetched the
+    // rosters fresh, and a kept copy's names stayed until the game was opened afresh.
+    ...(server.loadRosters === undefined
+      ? {}
+      : {
+          loadRosters: (signal: AbortSignal) =>
+            server.loadRosters?.(signal) ?? Promise.resolve({ kind: 'unanswered' as const }),
+        }),
     async loadState(signal) {
       const outcome = await server.loadState(signal);
       if (outcome.kind === 'answer' && !marked) {
@@ -286,10 +296,14 @@ export async function openTrackerGame(
   // state go from the device once it is final with no tap of it waiting or set aside.
   // Never while it is live or a tap waits; the taps themselves are the queue's.
   controller.subscribe(({ game, waiting, notSaved }) => {
+    // Reopened by an admin: its rosters are kept again from the next fetch.
+    if (letGoOfGame && game?.status !== undefined && game.status !== 'final') letGoOfGame = false;
     if (letGoOfGame || game?.status !== 'final' || waiting.length > 0 || notSaved.length > 0)
       return;
     letGoOfGame = true;
     games.forgetGame(gameId).catch((error: unknown) => options.onStoreFailed?.(codeOf(error)));
+    // Its page kept by the worker, which carries the rosters too (T-488).
+    options.forgetPage?.();
   });
   controller.subscribe(({ mode }) => {
     if (forgotten || mode.kind !== 'read-only' || mode.reason !== 'signed-out') return;

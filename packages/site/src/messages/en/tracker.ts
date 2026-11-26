@@ -546,7 +546,7 @@ export const enTracker = {
   'tracker.player.fullName': '{first} {last}',
   'tracker.player.name': '{name}',
   // R-33: one the number and name do not tell apart, by their place on the team's roster.
-  'tracker.player.namePlace': '{name} (player {place})',
+  'tracker.player.namePlace': 'Player {place} · {name}',
   'tracker.player.number': '#{jersey}',
   'tracker.player.numberName': '#{jersey} {name}',
   'tracker.player.place': 'Player {place}',

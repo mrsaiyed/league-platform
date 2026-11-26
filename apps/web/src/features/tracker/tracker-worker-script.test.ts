@@ -7,6 +7,9 @@ import {
   mayServeKeptPage,
   pageAnswerPlan,
   signedInFrom,
+  mayForgetGamePage,
+  pageCodeOf,
+  trackerWorkerForgetGameMessage,
   trackerWorkerForgetMessage,
   trackerWorkerKeepMessage,
   trackerWorkerReleaseMessage,
@@ -191,5 +194,179 @@ describe("the tracker worker's script (step 2.38)", () => {
     expect(tookOver).toBe(true);
     // Only this scope's kept copies go; another league's stay.
     expect([...boxes.keys()]).toEqual(['srleagues-tracker https://site.test/south/score/ xyz']);
+  });
+});
+
+/** A stand-in for the browser's answers, caches and stores, for the worker's own text. */
+type Answer = {
+  readonly status: number;
+  readonly type: string;
+  readonly redirected: boolean;
+  clone: () => Answer;
+  text: () => Promise<string>;
+};
+const answerOf = (text: string, status = 200): Answer => ({
+  status,
+  type: 'basic',
+  redirected: false,
+  clone: () => answerOf(text, status),
+  text: () => Promise.resolve(text),
+});
+const scope = 'https://site.test/north/score/';
+const current = `srleagues-tracker ${scope} abc`;
+const pageOf = (game: string) => `${scope}${game}`;
+const html = (account: string, body: string, script: string) =>
+  `<meta name="srleagues-account" content="${account}"><script src="${script}"></script>${body}`;
+
+function browserStandIn(
+  kept: Record<string, Answer>,
+  network: (url: string) => Answer,
+  queued: readonly unknown[],
+) {
+  const boxes = new Map<string, Map<string, Answer>>([[current, new Map(Object.entries(kept))]]);
+  const keyOf = (key: string | { url: string }) => (typeof key === 'string' ? key : key.url);
+  const box = (name: string) => {
+    const found = boxes.get(name) ?? new Map<string, Answer>();
+    boxes.set(name, found);
+    return {
+      put: (key: string, value: Answer) => Promise.resolve(void found.set(keyOf(key), value)),
+      match: (key: string | { url: string }) => Promise.resolve(found.get(keyOf(key))),
+      keys: () => Promise.resolve([...found.keys()].map((url) => ({ url }))),
+      delete: (key: string | { url: string }) => Promise.resolve(found.delete(keyOf(key))),
+    };
+  };
+  const caches = {
+    open: (name: string) => Promise.resolve(box(name)),
+    keys: () => Promise.resolve([...boxes.keys()]),
+    delete: (name: string) => Promise.resolve(boxes.delete(name)),
+  };
+  // Only the queue's store has records; every other store reads as empty.
+  const indexedDB = {
+    open: (database: string) => {
+      const rows = database === 'srleagues-tracker-queue' ? queued : [];
+      const asking: { result?: unknown; onsuccess?: () => void } = {};
+      setTimeout(() => {
+        const reading: { result?: unknown; onsuccess?: () => void } = {};
+        asking.result = {
+          objectStoreNames: { contains: () => true },
+          close: () => undefined,
+          transaction: () => ({
+            objectStore: () => ({
+              getAll: () => {
+                setTimeout(() => {
+                  reading.result = rows;
+                  reading.onsuccess?.();
+                }, 0);
+                return reading;
+              },
+            }),
+          }),
+        };
+        asking.onsuccess?.();
+      }, 0);
+      return asking;
+    },
+  };
+  const handlers = new Map<string, (event: unknown) => void>();
+  const self = {
+    registration: { scope },
+    location: { href: `${scope}tracker-worker.js?code=abc` },
+    // Which pages are open cannot be read: every open page holds a release back.
+    clients: { matchAll: () => Promise.reject(new Error('not read here')) },
+    addEventListener: (type: string, handler: (event: unknown) => void) =>
+      handlers.set(type, handler),
+  };
+  const fetch = (url: string | { url: string }) => Promise.resolve(network(keyOf(url)));
+  new Function('self', 'caches', 'indexedDB', 'fetch', trackerWorkerScript())(
+    self,
+    caches,
+    indexedDB,
+    fetch,
+  );
+  const pending: Promise<unknown>[] = [];
+  const settled = async () => {
+    for (let i = 0; i < pending.length; i += 1) await pending[i];
+  };
+  return {
+    keptNow: (key: string) => boxes.get(current)?.get(key),
+    async open(game: string) {
+      const answered: { shown?: Promise<Answer> } = {};
+      handlers.get('fetch')?.({
+        request: { url: pageOf(game), method: 'GET', mode: 'navigate' },
+        resultingClientId: 'tab',
+        respondWith: (answer: Promise<Answer>) => (answered.shown = answer),
+        waitUntil: (p: Promise<unknown>) => pending.push(p),
+      });
+      if (answered.shown === undefined) throw new Error('not answered');
+      const text = await (await answered.shown).text();
+      await settled();
+      return text;
+    },
+    async message(data: unknown) {
+      handlers.get('message')?.({
+        data,
+        ports: [],
+        waitUntil: (p: Promise<unknown>) => pending.push(p),
+      });
+      await settled();
+    },
+  };
+}
+
+describe("the tracker worker's kept page of a game (T-487, T-488)", () => {
+  const newCode = 'https://site.test/_next/static/chunks/new.js';
+
+  it('names the code a page starts with, made whole', () => {
+    expect(
+      pageCodeOf(
+        '<script src="/_next/static/a.js?x=1&amp;y=2"></script><link rel="stylesheet" href="/display.css"><link rel="icon" href="/i.png">',
+        pageOf('g-1'),
+      ),
+    ).toEqual(['https://site.test/_next/static/a.js?x=1&y=2', 'https://site.test/display.css']);
+  });
+
+  it('a page fetched fresh replaces the kept one, its code kept first', async () => {
+    const world = browserStandIn(
+      { [pageOf('g-1')]: answerOf(html('acc-1', 'Ned Hawkins', '/_next/static/chunks/old.js')) },
+      (url) => (url === newCode ? answerOf('code') : answerOf(html('acc-1', 'Ned H.', newCode))),
+      [],
+    );
+    // Shown kept (a game is open), then replaced by the fresh page.
+    expect(await world.open('g-1')).toContain('Hawkins');
+    expect(await world.keptNow(pageOf('g-1'))?.text()).toContain('Ned H.');
+    expect(world.keptNow(newCode)).toBeDefined();
+  });
+
+  it('keeps the kept page when the fresh one names code that cannot be fetched', async () => {
+    const missing = browserStandIn(
+      { [pageOf('g-1')]: answerOf(html('acc-1', 'Ned Hawkins', '/_next/static/chunks/old.js')) },
+      (url) => (url === newCode ? answerOf('', 404) : answerOf(html('acc-1', 'Ned H.', newCode))),
+      [],
+    );
+    await missing.open('g-1');
+    expect(await missing.keptNow(pageOf('g-1'))?.text()).toContain('Hawkins');
+  });
+
+  it("drops a forgotten game's page, and only its (T-488)", async () => {
+    const world = browserStandIn(
+      { [pageOf('g-1')]: answerOf('one'), [pageOf('g-2')]: answerOf('two') },
+      () => answerOf('', 404),
+      [{ gameId: 'G-2', state: 'waiting' }],
+    );
+    await world.message({ type: trackerWorkerForgetGameMessage, page: pageOf('g-1') });
+    expect(world.keptNow(pageOf('g-1'))).toBeUndefined();
+    expect(world.keptNow(pageOf('g-2'))).toBeDefined();
+  });
+
+  it('never drops it while a tap of the game waits or is set aside (T-488)', async () => {
+    for (const state of ['waiting', 'not-saved']) {
+      const world = browserStandIn({ [pageOf('g-1')]: answerOf('one') }, () => answerOf('', 404), [
+        { gameId: 'G-1', state },
+      ]);
+      await world.message({ type: trackerWorkerForgetGameMessage, page: pageOf('g-1') });
+      expect(world.keptNow(pageOf('g-1'))).toBeDefined();
+    }
+    expect(mayForgetGamePage('g-1', null)).toBe(false);
+    expect(mayForgetGamePage('g-1', [{ gameId: 'g-2', state: 'waiting' }])).toBe(true);
   });
 });

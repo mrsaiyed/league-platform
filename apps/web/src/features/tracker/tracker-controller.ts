@@ -67,7 +67,7 @@ import { basketball } from '@srleagues/sports';
 import { againCommandId } from './again-command-id.ts';
 import type { CommandTransport } from './command-transport.ts';
 import { commandsSince } from './commands-since.ts';
-import { refreshedRosters } from './device-rosters.ts';
+import { freshOverKept, refreshedRosters } from './device-rosters.ts';
 import type { GameDoors } from './game-doors.ts';
 import { mayEnterAgain } from './kept-plays.ts';
 import { sameData } from '../game-format/index.ts';
@@ -978,8 +978,20 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     keptSession = scoring.sessionId;
     // The rosters this device last kept for this account, not the page's copy, which a
     // worker may have kept from before a fetch (step 2.118).
+    // A fresh answer since opening wins for names (T-487): the kept copy only adds a
+    // player the server does not know yet, one added at the table whose change waits.
     const keptRosters = options.rosters?.kept;
-    if (keptRosters !== undefined && keptRosters !== null) keepRosters(keptRosters);
+    if (keptRosters !== undefined && keptRosters !== null) {
+      if (rostersFetched && storedRosters !== null) {
+        const adds = new Set(
+          waiting
+            .filter(isTablePlayerCommand)
+            .filter((c) => c.input.type === 'add-player')
+            .map((c) => c.input.playerId.toLowerCase()),
+        );
+        keepRosters(freshOverKept(storedRosters, keptRosters, adds));
+      } else keepRosters(keptRosters);
+    }
     showGame();
     update({ mode: { kind: 'scoring' } });
   };
@@ -1207,6 +1219,8 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
 
   /** The rosters the device keeps: the page's, a fetched one, with changes taken since. */
   let storedRosters: DeviceRosters | null = options.rosters?.page ?? null;
+  /** The server has answered a fetch of the rosters since opening (T-487). */
+  let rostersFetched = false;
   /** Fetches of the rosters begun so far: a change taken is laid on those begun before. */
   let rosterAsks = 0;
   /** Changes the server took, each with the fetches begun when it was taken. */
@@ -1262,6 +1276,7 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
         const outcome = await ask((signal) => load(signal));
         if (outcome.kind !== 'answer' || storedRosters === null || stopped) continue;
         fetched = refreshedRosters(storedRosters, outcome.value);
+        rostersFetched = true;
         takenSince = takenSince.filter((t) => t.asks >= asks);
         keepRosters(
           withChanges(
@@ -1692,6 +1707,9 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
       return later(open);
     }
     failures = 0;
+    // Scored from the device's copy with no fetch of the rosters answered: fetched now
+    // that the server answers, so the names are the server's (T-487).
+    if (!rostersFetched && fetchingRosters === null) void refreshRosters();
     if (opened.kind === 'rejected') return readOnly(await refusedReason(opened));
     const reply = opened.value;
     if (reply.status !== 'held-by-you') return notHeld(reply);

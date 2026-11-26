@@ -60,8 +60,13 @@ function device(
     kept,
     keepScoring,
     rosters,
+    keptRosters,
+    keepRosters,
     newPlayerId,
   }: {
+    /** The rosters the device kept before this opening, and where each is stored (T-487). */
+    keptRosters?: DeviceRosters;
+    keepRosters?: (rosters: DeviceRosters) => Promise<void>;
     /** The ids the device gives the players it adds (step 2.242: one already in use). */
     newPlayerId?: () => string;
     /** The rosters the page brought, for changes of players (step 2.118). */
@@ -106,7 +111,15 @@ function device(
     }),
     ...(kept === undefined ? {} : { kept }),
     ...(keepScoring === undefined ? {} : { keepScoring }),
-    ...(rosters === undefined ? {} : { rosters: { page: rosters } }),
+    ...(rosters === undefined
+      ? {}
+      : {
+          rosters: {
+            page: rosters,
+            ...(keptRosters === undefined ? {} : { kept: keptRosters }),
+            ...(keepRosters === undefined ? {} : { keep: keepRosters }),
+          },
+        }),
     ...(newPlayerId === undefined ? {} : { newPlayerId }),
     ...(whoIsSignedIn === undefined ? {} : { signedIn: whoIsSignedIn }),
   });
@@ -3066,5 +3079,154 @@ describe('tracker controller: its own commands told by their IDs (step 2.242)', 
     // second found somebody else's play.
     expect(status.sendNotSaved).toBe('none');
     expect(status.cannotTell).toBe(false);
+  });
+});
+
+describe('tracker controller: a fresh answer wins for names (T-487)', () => {
+  /** The copy kept before: the home team's first player under the name once recorded. */
+  const recorded = (rosters: DeviceRosters): DeviceRosters => ({
+    ...rosters,
+    home: {
+      ...rosters.home,
+      players: rosters.home.players.map((p, i) =>
+        i === 0 ? { ...p, firstName: 'Ned', lastName: 'Hawkinsrecorded' } : p,
+      ),
+    },
+  });
+  const urlOf = (input: Parameters<typeof globalThis.fetch>[0]) =>
+    typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+  /** The rosters answer first; the session is asked after and gets no answer. */
+  const rostersFirst = (ask: typeof globalThis.fetch): typeof globalThis.fetch => {
+    let answered = () => {};
+    const rostersIn = new Promise<void>((done) => (answered = done));
+    return async (input, init) => {
+      if (urlOf(input).includes('/rosters')) {
+        const answer = await ask(input, init);
+        answered();
+        return answer;
+      }
+      if (urlOf(input).includes('/session')) {
+        await rostersIn;
+        // The device has laid the answer on its rosters before opening is unanswered.
+        await new Promise((done) => setTimeout(done, 0));
+        throw new TypeError('Failed to fetch');
+      }
+      return ask(input, init);
+    };
+  };
+
+  /** A game the device scored and kept, then left: what a reload finds. */
+  async function keptGame(network: EndpointNetwork, storage: QueueStorage, rosters: DeviceRosters) {
+    let scoring: DeviceScoring | null = null;
+    const first = device(network, {
+      storage,
+      rosters,
+      keepScoring: (kept) => {
+        scoring = kept;
+        return Promise.resolve();
+      },
+    });
+    await first.controller.start();
+    await tapAll(first.controller, tipOff);
+    await first.controller.idle();
+    const state: ServerState = await serverGame(network);
+    return { first, state, scoring: (): DeviceScoring | null => scoring };
+  }
+
+  it('replaces the kept names of every player the server knows, shown and stored, though opening gets no answer', async () => {
+    const network = endpointNetwork();
+    const storage = createMemoryQueueStorage();
+    const fresh = await serverRosters(network);
+    const { first, state, scoring } = await keptGame(network, storage, fresh);
+    await first.controller.leave();
+    const kept = scoring();
+    if (kept === null) throw new Error('nothing kept');
+    const stored: DeviceRosters[] = [];
+    const again = device(network, {
+      storage,
+      rosters: recorded(fresh),
+      keptRosters: recorded(fresh),
+      kept: { state, scoring: kept },
+      askServer: rostersFirst,
+      keepRosters: (r) => {
+        stored.push(r);
+        return Promise.resolve();
+      },
+    });
+    await again.controller.start();
+    await again.controller.idle();
+    const status = again.controller.status();
+    // Scored from the device's copy, the names the server's.
+    expect(status.mode).toEqual({ kind: 'scoring' });
+    expect(status.rosters?.home.players[0]).toMatchObject({
+      firstName: fresh.home.players[0]?.firstName,
+      lastName: fresh.home.players[0]?.lastName,
+    });
+    expect(JSON.stringify(status.rosters)).not.toContain('Hawkinsrecorded');
+    expect(stored.length).toBeGreaterThan(0);
+    expect(JSON.stringify(stored.at(-1))).not.toContain('Hawkinsrecorded');
+  });
+
+  it('keeps a player added at the table whose change waits, with its taps; no waiting tap changes', async () => {
+    const network = endpointNetwork();
+    const storage = createMemoryQueueStorage();
+    const fresh = await serverRosters(network);
+    const { first, state, scoring } = await keptGame(network, storage, fresh);
+    network.mode = 'down';
+    const added = await first.controller.changePlayers([
+      { type: 'add-player', side: 'away', jersey: '41', name: '' },
+    ]);
+    if (!added.ok) throw new Error('not added');
+    const newId = added.playerIds[0] ?? '';
+    await tapAll(first.controller, [basket('home', hawks[0] ?? '')]);
+    await first.controller.leave();
+    network.mode = 'up';
+    const before = (await storage.list(gameId)).map((e) => [e.command.commandId, e.state]);
+    expect(before).toHaveLength(2);
+    const kept = scoring();
+    if (kept === null) throw new Error('nothing kept');
+    const old = recorded(fresh);
+    const withAdded: DeviceRosters = {
+      ...old,
+      away: {
+        ...old.away,
+        players: [
+          ...old.away.players,
+          {
+            personId: newId,
+            firstName: '',
+            lastName: '',
+            jerseyNumber: '41',
+            left: false,
+            addedAtGameId: gameId,
+            toReview: true,
+          },
+        ],
+      },
+    };
+    const stored: DeviceRosters[] = [];
+    const again = device(network, {
+      storage,
+      rosters: old,
+      keptRosters: withAdded,
+      kept: { state, scoring: kept },
+      askServer: rostersFirst,
+      // Nothing is sent: the add and the tap wait.
+      sendTaps: () => () => Promise.reject(new TypeError('Failed to fetch')),
+      keepRosters: (r) => {
+        stored.push(r);
+        return Promise.resolve();
+      },
+    });
+    await again.controller.start();
+    await again.controller.idle();
+    const status = again.controller.status();
+    expect(status.queue.waiting).toBe(2);
+    expect((await storage.list(gameId)).map((e) => [e.command.commandId, e.state])).toEqual(before);
+    expect(status.rosters?.away.players.map((p) => p.jerseyNumber)).toContain('41');
+    // Stored with the player the server does not know yet, and the server's names.
+    expect(stored.at(-1)?.away.players.map((p) => p.personId)).toContain(newId);
+    expect(JSON.stringify(stored.at(-1))).not.toContain('Hawkinsrecorded');
+    expect(JSON.stringify(status.rosters)).not.toContain('Hawkinsrecorded');
   });
 });

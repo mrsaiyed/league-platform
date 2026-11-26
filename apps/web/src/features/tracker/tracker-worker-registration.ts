@@ -4,6 +4,7 @@ import {
   codeMarkOf,
   trackerKeptPrefix,
   trackerScopeOf,
+  trackerWorkerForgetGameMessage,
   trackerWorkerForgetMessage,
   trackerWorkerKeepMessage,
   trackerWorkerReleaseMessage,
@@ -142,5 +143,22 @@ export async function takeNewRelease(
   } catch {
     // The reload goes ahead: the worker keeps no page once the network answers with
     // another release's (no game open) or the scorer closes the game.
+  }
+}
+
+/**
+ * Asks the worker to drop its kept page of the game at `page` (T-488): the game was ended
+ * and saved, and the device forgot its rosters. The worker keeps it while a tap of the
+ * game waits or is set aside. Never fails.
+ */
+export async function forgetTrackerPageOfGame(page: string): Promise<void> {
+  try {
+    if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return;
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    for (const registration of registrations) {
+      registration.active?.postMessage({ type: trackerWorkerForgetGameMessage, page });
+    }
+  } catch {
+    // No worker: no page of the game was kept by one.
   }
 }

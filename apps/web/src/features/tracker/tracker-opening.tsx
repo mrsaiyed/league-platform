@@ -21,7 +21,11 @@ import { openIndexedDbQueueStorage } from './indexeddb-queue-storage.ts';
 import { keptRows, notAppliedRows, type KeptRow } from './kept-plays.ts';
 import { openTrackerGame, screenOf, type OpenedTrackerGame } from './open-tracker-game.ts';
 import { readDeviceAccount, writeDeviceAccount } from './device-account.ts';
-import { registerTrackerWorker, takeNewRelease } from './tracker-worker-registration.ts';
+import {
+  forgetTrackerPageOfGame,
+  registerTrackerWorker,
+  takeNewRelease,
+} from './tracker-worker-registration.ts';
 import type { DeviceRosters, GameFormat } from './opened-game-storage.ts';
 import {
   isOffline,
@@ -196,6 +200,7 @@ export function TrackerOpening({
         doors: createFetchGameDoors({ leagueId, gameId }),
         newDeviceId: () => globalThis.crypto.randomUUID(),
         onStoreFailed: () => setStoreFailed(true),
+        forgetPage: () => void forgetTrackerPageOfGame(window.location.href),
         // Signed out or left while opening: nothing more is kept and no session taken.
         letGo: () => gone || leaving.current,
         // With no signal, what the device kept is scored from only for the one marked

@@ -2,7 +2,8 @@
 // (core's `scoringNames`, which the games store applies) gives each player the name the
 // rule allows and, for one the number and name do not tell apart, a place on the team's
 // roster. The server words that place here, from the message files, into the name
-// itself ("Player 1", "Sam L. (player 2)"), so the scorer's rosters keep the shape they
+// itself ("Player 1", "Player 2 · Sam L.": the place first, so a tile cut short still
+// tells them apart), so the scorer's rosters keep the shape they
 // had before step 2.226 and a page opened before it still reads them.
 import { t } from './messages.ts';
 
