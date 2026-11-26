@@ -52,8 +52,8 @@ const valid: Record<ConfigName, string> = {
 const names = Object.keys(fields) as ConfigName[];
 /**
  * Every setting, for staging and production: LOCAL_BINNED_TEAM, LOCAL_BOT_CHECK, LOCAL_DATA,
- * LOCAL_DEMO_LEAGUE, LOCAL_DESIGN, LOCAL_NOW, LOCAL_NO_CURRENT_SEASON and LOCAL_UNRELEASED
- * are for local work and tests only.
+ * LOCAL_DEMO_LEAGUE, LOCAL_DESIGN, LOCAL_NOW, LOCAL_NO_CURRENT_SEASON, LOCAL_SCORING_NAMES
+ * and LOCAL_UNRELEASED are for local work and tests only.
  */
 const hosted = {
   ...valid,
@@ -65,6 +65,7 @@ const hosted = {
   LOCAL_DESIGN: undefined,
   LOCAL_NOW: undefined,
   LOCAL_NO_CURRENT_SEASON: undefined,
+  LOCAL_SCORING_NAMES: undefined,
   LOCAL_UNRELEASED: undefined,
 };
 /** Required in every environment. */
@@ -524,6 +525,18 @@ describe('loadConfig', () => {
     expect(failure({ ...localOnly, [name]: 'Harbor City' }).invalid.join()).toContain(name);
     for (const appEnv of ['staging', 'production']) {
       expect(failure({ ...production, APP_ENV: appEnv, [name]: 'harbor-city' }).invalid).toEqual([
+        `${name}: invalid, may be set only when APP_ENV is local or test`,
+      ]);
+    }
+  });
+
+  it('takes LOCAL_SCORING_NAMES in local work and tests only, and only a short name (step 2.226)', () => {
+    const name = 'LOCAL_SCORING_NAMES';
+    expect(loadConfig(localOnly)[name]).toBeUndefined();
+    expect(loadConfig({ ...localOnly, [name]: 'north-valley' })[name]).toBe('north-valley');
+    expect(failure({ ...localOnly, [name]: 'North Valley' }).invalid.join()).toContain(name);
+    for (const appEnv of ['staging', 'production']) {
+      expect(failure({ ...production, APP_ENV: appEnv, [name]: 'north-valley' }).invalid).toEqual([
         `${name}: invalid, may be set only when APP_ENV is local or test`,
       ]);
     }
