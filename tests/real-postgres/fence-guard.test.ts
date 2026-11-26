@@ -541,3 +541,131 @@ describe('(c) a reviewed security-definer function changed by hand (T-477)', () 
     );
   });
 });
+
+/** The real accounts table back from `hidden`, the plant in its place dropped: once only. */
+const putAccountsBack = (hidden: string, plant: 'view' | 'table') => `
+  do $$ begin
+    if pg_catalog.to_regclass('${hidden}.accounts') is not null then
+      drop ${plant} public.accounts;
+      alter table ${hidden}.accounts set schema public;
+    end if;
+    drop schema if exists ${hidden};
+  end $$`;
+
+describe('(d) a relation the migrations made, replaced by hand (T-481)', () => {
+  it('a table moved away and a view of the programs put in its place: refused', async () => {
+    // The confirming look's plant: the names matched, and the login read both leagues.
+    const hidden = `p_hide_${fresh()}`;
+    const putBack = [putAccountsBack(hidden, 'view')];
+    await plantedAndMended(
+      [
+        `create schema ${hidden}`,
+        `alter table public.accounts set schema ${hidden}`,
+        'create view public.accounts as select * from public.programs',
+        'grant select on public.accounts to app_login',
+      ],
+      [
+        "public.accounts is a table the migrations made, but it is now a view, so it may hold rows of any league: drop view public.accounts, then run the migrations' own definition again",
+      ],
+      putBack,
+      async () => {
+        expect(await asLogin(a, (login) => leaguesSeen(login, 'public.accounts'))).toEqual(both());
+      },
+      putBack,
+    );
+  });
+
+  it('a table replaced by one of the same name another role owns: refused', async () => {
+    const hidden = `p_hide_${fresh()}`;
+    const role = `p_other_${fresh()}`;
+    const putBack = [putAccountsBack(hidden, 'table')];
+    await plantedAndMended(
+      [
+        `create schema ${hidden}`,
+        `alter table public.accounts set schema ${hidden}`,
+        `create role ${role} nologin`,
+        `grant ${role} to postgres`,
+        `grant create on schema public to ${role}`,
+        'create table public.accounts as select id, league_id as lg, name from public.programs',
+        `alter table public.accounts owner to ${role}`,
+        'grant select on public.accounts to app_login',
+      ],
+      [
+        `public.accounts is a table the migrations made, but it is now owned by ${role}, not postgres, so it may not be what they made: alter table public.accounts owner to postgres`,
+      ],
+      [...putBack, `revoke create on schema public from ${role}`, `drop role if exists ${role}`],
+      async () => {
+        expect(await asLogin(a, (login) => leaguesSeen(login, 'public.accounts', 'lg'))).toEqual(
+          both(),
+        );
+      },
+      putBack,
+    );
+  });
+});
+
+describe('(c) the fence’s own functions changed by hand (T-477, widened)', () => {
+  const said = (signature: string) => [
+    `${signature} is a function the migrations made whose body changed since the migrations made it, so the fence or the command that calls it may no longer hold: run the migrations' own definition again`,
+  ];
+  async function original(signature: string): Promise<string> {
+    const { rows } = await owner.query<{ d: string }>(
+      `select pg_catalog.pg_get_functiondef('${signature}'::regprocedure) as d`,
+    );
+    return rows[0]?.d ?? '';
+  }
+
+  it('current_league_id made to name the other league: refused, and the login sees it', async () => {
+    const putBack = [await original('public.current_league_id()')];
+    await plantedAndMended(
+      [
+        `create or replace function public.current_league_id() returns uuid language sql
+           stable parallel safe set search_path = pg_catalog, pg_temp
+           as $$ select '${b}'::uuid $$`,
+      ],
+      said('public.current_league_id()'),
+      putBack,
+      async () => {
+        // Set to league A, the login reads league B's programs.
+        expect(await asLogin(a, (login) => leaguesSeen(login, 'public.programs'))).toEqual([b]);
+      },
+      putBack,
+    );
+  });
+
+  it('current_account_id and require_view_of_every_league: each refused by name', async () => {
+    for (const [signature, plant] of [
+      [
+        'public.current_account_id()',
+        `create or replace function public.current_account_id() returns uuid language sql
+           stable parallel safe set search_path = pg_catalog, pg_temp
+           as $$ select '${b}'::uuid $$`,
+      ],
+      [
+        'public.require_view_of_every_league()',
+        `create or replace function public.require_view_of_every_league() returns void
+           language plpgsql stable set search_path = pg_catalog, pg_temp as $$ begin end $$`,
+      ],
+    ] as const) {
+      const putBack = [await original(signature)];
+      await plantedAndMended([plant], said(signature), putBack, async () => {}, putBack);
+    }
+  });
+});
+
+describe('(b) a fence policy the migrations made, dropped', () => {
+  it('is named, and the create statement the sentence gives puts it back', async () => {
+    const made = migrationCatalog.policies.find(
+      (policy) => policy.table === 'public.courts' && policy.name === 'courts_league_fence',
+    );
+    expect(made).toBeDefined();
+    const fence = made?.using ?? '';
+    await plantedAndMended(
+      ['drop policy courts_league_fence on public.courts'],
+      [
+        `public.courts is missing its policy courts_league_fence, which the migrations made, so its rows are not fenced as they meant: create policy courts_league_fence on public.courts as permissive for all to public using (${fence}) with check (${made?.check ?? ''})`,
+      ],
+      [],
+    );
+  });
+});

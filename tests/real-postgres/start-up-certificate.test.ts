@@ -19,7 +19,7 @@ import { loadConfig } from '../../apps/web/src/server/config-schema.ts';
 import { startWebApp, type DatabasePackage } from '../../apps/web/src/server/startup.ts';
 import { loadWorkerConfig } from '../../apps/worker/src/config-schema.ts';
 import { startWorker } from '../../apps/worker/src/start-worker.ts';
-import { ca, server } from './server.ts';
+import { appDatabase, ca, ownerSession, server } from './server.ts';
 
 const notOurs = readFileSync(
   new URL(
@@ -211,5 +211,61 @@ describe('the worker in staging, on a real PostgreSQL (step 2.203)', () => {
     const gone = await workerSays(nobodyThere, ca);
     expect(gone).toContain(worker.notReached);
     nothingPrivate(gone);
+  });
+});
+
+// Step 2.238's second fix round (T-482): the release shape of record 053, as it stands
+// today. pg-boss's schema is a reviewed library schema, so its own tables are let be by
+// the fence check and nothing ever says to drop them. What still refuses every start after
+// the first is the older T-60 check, unchanged: pg-boss makes its tables as the worker's
+// login, which then owns tables (or, reassigned, may become the role that owns them).
+// Step 2.112 is where that is solved; this test asserts what T-60 says today.
+describe('the release shape of record 053 (T-482, step 2.238)', () => {
+  it('starts the worker once; then only T-60 refuses, and nothing says to drop pg-boss’s tables', async () => {
+    const owner = await ownerSession();
+    const db = appDatabase(1);
+    const release = [
+      'create role queue_owner nologin nosuperuser nocreatedb nocreaterole noreplication nobypassrls',
+      'grant queue_owner to current_user',
+      'create schema pgboss authorization queue_owner',
+      'revoke all on schema pgboss from public',
+      'grant queue_owner to app_login',
+    ];
+    const ownsTables =
+      /^app_login owns tables \(pgboss\.\w+ and \d+ more\), so it could switch their fence off: reassign owned by app_login to postgres$/;
+    const mayBecomeOwner =
+      /^app_login may become queue_owner, which owns tables \(pgboss\.\w+ and \d+ more\): revoke queue_owner from app_login$/;
+    try {
+      for (const statement of release) await owner.exec(statement);
+      expect(await workerSays(server.appUrl, ca)).toMatch(/^started\n/);
+      const after = await databasePackage.checkLoginRole(db);
+      expect(after).toEqual([expect.stringMatching(ownsTables)]);
+      for (const said of [
+        await workerSays(server.appUrl, ca),
+        await webSays(server.appUrl, ca),
+        after.join('\n'),
+      ]) {
+        expect(said).toContain('app_login owns tables (pgboss.');
+        expect(said).not.toMatch(/drop (table|view) pgboss/);
+      }
+      // Reassigned to the schema's owner, as a release might try: T-60 still refuses.
+      const login = await databasePackage.connectPostgresDriver(server.appUrl, { ca });
+      try {
+        await login.exec('reassign owned by app_login to queue_owner');
+      } finally {
+        await login.close();
+      }
+      const reassigned = await databasePackage.checkLoginRole(db);
+      expect(reassigned).toEqual([expect.stringMatching(mayBecomeOwner)]);
+    } finally {
+      await db.close();
+      for (const statement of [
+        'drop schema if exists pgboss cascade',
+        'revoke queue_owner from app_login',
+        'drop role if exists queue_owner',
+      ])
+        await owner.exec(statement);
+      await owner.close();
+    }
   });
 });
