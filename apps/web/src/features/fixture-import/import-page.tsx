@@ -272,7 +272,7 @@ export async function ImportPage({
   const names =
     shown === undefined ? undefined : await fixtureImport.namesOf(addressee.id, shown.seasonId);
   const draftCount =
-    season === undefined ? 0 : await fixtureImport.draftChangeCount(addressee.id, season.id);
+    season === undefined ? 0 : await fixtureImport.draftChangeCount(context, season.id);
 
   return (
     <main className="admin-import">

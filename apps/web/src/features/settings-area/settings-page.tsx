@@ -2,13 +2,12 @@
 // product declares at the league level, drawn from the declarations (T-98).
 import {
   leagueUrl,
-  listLeagueSettings,
+  listAccess,
   mayChangeLeagueSettings,
   mayEditLeague,
+  readLeagueSettings,
   readNamePolicy,
-  readPrivacyFacts,
-  readPublishChecks,
-  readYouthResets,
+  type LeagueSettingsView,
 } from '@srleagues/core';
 import { EmptyPanel, PageHead } from '@srleagues/ui';
 import { commandContextOf } from '../../server/context.ts';
@@ -44,24 +43,37 @@ export async function SettingsPage({
   readonly query: Readonly<Record<string, string | string[] | undefined>>;
 }) {
   const view = await loadLeaguePage(league, 'admin', 'settings');
-  const { adminSettings, publicSchedule } = await webPorts();
+  const { adminAccess, adminSettings, publicSchedule } = await webPorts();
   const context = commandContextOf(view.context);
-  const { rows, facts, policy, current, checks, mayPublish, profile, resets, mayEdit } =
-    await adminSettings.deps.transaction(context, async (tx) => ({
-      rows: await listLeagueSettings(tx),
-      facts: await readPrivacyFacts(tx),
-      policy: await readNamePolicy(tx.leagues),
-      // The Publish part (step 2.240): the league's state and version, and the checks.
-      current: await tx.leagues.currentLeague(),
-      checks: await readPublishChecks(tx),
-      mayPublish: await mayChangeLeagueSettings(context, tx),
-      // League settings → Profile (step 2.125).
-      profile: await tx.leagues.leagueProfile(),
-      resets: await readYouthResets(tx),
-      mayEdit: await mayEditLeague(context, tx),
-    }));
-  const { timeZone } = await publicSchedule.clockOf(view.context.league.id);
-  const notes = privacyNotes({ facts, policy, rows, timeZone, locale });
+  // What the page draws is one read in core (step 2.227, T-474): it needs `league.settings`
+  // for the whole league. An admin limited to one program is refused it and sees only the
+  // head; nothing league-wide is read for them.
+  const read = await readLeagueSettings(context, {}, adminSettings.deps);
+  // The Admins row is drawn only for whoever the Admins page answers (step 2.97: the
+  // league's whole list, `list_access` for the whole league), never as a dead link (S-131).
+  const mayOpenAdmins = (await listAccess(context, {}, adminAccess.deps)).ok;
+  const shown = read.ok
+    ? await adminSettings.deps.transaction(context, async (tx) => ({
+        ...read.value,
+        policy: await readNamePolicy(tx.leagues),
+        mayPublish: await mayChangeLeagueSettings(context, tx),
+        mayEdit: await mayEditLeague(context, tx),
+      }))
+    : undefined;
+  // The league's clock, for the privacy notes: read only when the settings read answered.
+  const clock =
+    shown === undefined ? undefined : await publicSchedule.clockOf(view.context.league.id);
+  const rows: LeagueSettingsView['rows'] = shown?.rows ?? [];
+  const notes =
+    shown === undefined || clock === undefined
+      ? undefined
+      : privacyNotes({
+          facts: shown.facts,
+          policy: shown.policy,
+          rows,
+          timeZone: clock.timeZone,
+          locale,
+        });
   // A Profile form's or a setting's "Saved" (step 2.155 parts 3 and 4): taken once, so a
   // reload says nothing old.
   const notice = takeNotice(context, 'settings');
@@ -78,23 +90,26 @@ export async function SettingsPage({
   return (
     <main className="admin-settings">
       <PageHead title={t('admin.area.settings')} sub={t('adminSettings.intro')} />
-      {/* Who helps run the league (step 2.97): its own page, one row that leads to it. */}
-      <ul className="staff-rows settings-admins">
-        <li className="staff-row">
-          <span className="staff-row-words">
-            <a
-              className="staff-row-link"
-              href={leagueUrl(view.context.league, 'admin-area', {
-                area: 'settings',
-                subpath: ['admins'],
-              })}
-            >
-              {t('adminAccess.title')}
-            </a>
-            <span className="staff-row-facts">{t('adminAccess.fromSettings')}</span>
-          </span>
-        </li>
-      </ul>
+      {/* Who helps run the league (step 2.97): its own page, one row that leads to it,
+          drawn only for whoever that page answers (S-131). */}
+      {mayOpenAdmins ? (
+        <ul className="staff-rows settings-admins">
+          <li className="staff-row">
+            <span className="staff-row-words">
+              <a
+                className="staff-row-link"
+                href={leagueUrl(view.context.league, 'admin-area', {
+                  area: 'settings',
+                  subpath: ['admins'],
+                })}
+              >
+                {t('adminAccess.title')}
+              </a>
+              <span className="staff-row-facts">{t('adminAccess.fromSettings')}</span>
+            </span>
+          </li>
+        </ul>
+      ) : null}
       {/* Said at the top as before; with scripts on the page is drawn again where it was,
           so the answer brings itself into view (T-437). */}
       {problem === undefined ? null : (
@@ -115,32 +130,32 @@ export async function SettingsPage({
       ) : null}
       {/* Profile (step 2.125) is the first thing in League settings (T-352); the page-step
           checks find each settings form by the setting it names, not by its place. */}
-      {current === undefined || profile === undefined ? null : (
+      {shown?.league === undefined || shown.profile === undefined ? null : (
         <ProfilePanel
           league={view.context.league.slug}
           address={address}
           saved={saved}
-          name={current.name}
-          slug={current.slug}
-          version={current.version}
-          profile={profile}
-          resets={resets}
-          mayChange={mayEdit}
+          name={shown.league.name}
+          slug={shown.league.slug}
+          version={shown.league.version}
+          profile={shown.profile}
+          resets={shown.resets}
+          mayChange={shown.mayEdit}
         />
       )}
-      {current === undefined ? null : (
+      {shown?.league === undefined ? null : (
         <PublishPanel
           league={view.context.league.slug}
           address={address}
-          status={current.status}
-          version={current.version}
-          checks={checks}
-          mayPublish={mayPublish}
+          status={shown.league.status}
+          version={shown.league.version}
+          checks={shown.checks}
+          mayPublish={shown.mayPublish}
           asking={query[publishAsk.name] === publishAsk.value}
           askingArchive={query[archiveAsk.name] === archiveAsk.value}
         />
       )}
-      {rows.length === 0 ? (
+      {shown === undefined || notes === undefined ? null : rows.length === 0 ? (
         <EmptyPanel text={t('adminSettings.none')} />
       ) : (
         <>

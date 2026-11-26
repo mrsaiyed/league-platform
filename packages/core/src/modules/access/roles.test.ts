@@ -36,7 +36,7 @@ const p4 = {
   // "Site, news, media, awards, sponsors"
   editor: ['site.edit', 'site.publish', 'content.edit'],
   // "Score games"; a scorekeeper sees a list of their games
-  scorekeeper: ['schedule.read', 'games.score'],
+  scorekeeper: ['games.score'],
   // "Their own club's teams, rosters and registrations. Reads the schedule."
   club_admin: ['teams.manage', 'rosters.manage', 'registration.manage', 'schedule.read'],
   // "Their own team: roster changes the league allows, lineup, messaging the team"
@@ -89,8 +89,8 @@ describe('the fixed roles (A-3, O-7, P4 §4)', () => {
     }
   });
 
-  it('give a scorekeeper scoring only: no results, corrections or changes to the schedule', () => {
-    expect([...rolePermissions.scorekeeper].sort()).toEqual(['games.score', 'schedule.read']);
+  it('give a scorekeeper scoring only: no results, corrections, schedule or its draft (T-472)', () => {
+    expect([...rolePermissions.scorekeeper].sort()).toEqual(['games.score']);
   });
 
   it('name no permission twice', () => {

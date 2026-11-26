@@ -13,7 +13,10 @@
 //    DATABASE_URL, R8), over SSL with the server's certificate checked unless the
 //    database is on this computer (PLATFORM_DATABASE_SSL, record 082), and check the
 //    login role it uses (checkLoginRole, T-60): a superuser, a role that bypasses
-//    row-level security, or the tables' owner stops the start; so does a login that
+//    row-level security, or the tables' owner stops the start, and so does a hole in
+//    the league fence itself (step 2.238: a league table not forced, a policy no
+//    migration made, an unreviewed security-definer function, a table no migration
+//    made); so does a login that
 //    cannot act as sign_in_store, the sign-in store's role (record 052). They then make
 //    the real sign-in service, Supabase's adapter with the store in our own database,
 //    and ask it first whether it confirms email addresses: the start stops unless it

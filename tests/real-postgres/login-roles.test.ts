@@ -134,6 +134,8 @@ describe('a fault planted in what app_login may become', () => {
       'may-act-as-platform-owner',
       (w) => [
         `app_login may act as p_own_${w}, which owns a table (platform.p_own_${w}_kept): revoke p_own_${w} from app_login`,
+        // Step 2.238: the planted table is also one no migration made (the fence check's (d)).
+        `platform.p_own_${w}_kept is a table that no migration made, so nothing has checked its fence: drop table platform.p_own_${w}_kept (or make it in a migration)`,
       ],
     ],
     ['may-create-roles', () => ['app_login may create roles: alter role app_login nocreaterole']],

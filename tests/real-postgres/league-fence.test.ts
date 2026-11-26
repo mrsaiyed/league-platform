@@ -19,6 +19,15 @@ const db = appDatabase(2);
 let a: string;
 let b: string;
 beforeAll(async () => {
+  // planted-fault.test.ts makes its two leagues before it plants, since the league-making
+  // tool's start-up guard (step 2.238) rightly refuses a database whose fence is off.
+  const given = (process.env.REAL_POSTGRES_MADE_UP_LEAGUES ?? '').split(',').filter(Boolean);
+  const [givenA, givenB] = given;
+  if (given.length === 2 && givenA !== undefined && givenB !== undefined) {
+    a = givenA;
+    b = givenB;
+    return;
+  }
   a = await makeMadeUpLeague(`alpha-${fresh()}`);
   b = await makeMadeUpLeague(`bravo-${fresh()}`);
 });

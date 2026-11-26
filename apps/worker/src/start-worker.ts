@@ -9,7 +9,8 @@
 //    PLATFORM_DATABASE_CA when it is given (step 2.203). A connection that fails is told
 //    in fixed words by the driver's code: the certificate, the login, or not reached.
 // 3. The login role is checked (checkLoginRole, T-60): a superuser, a role that
-//    bypasses row-level security, or the tables' owner stops the start.
+//    bypasses row-level security, or the tables' owner stops the start, and so does a
+//    hole in the league fence itself (step 2.238, check-fence.ts in the database package).
 // 4. With pg-boss on a hosted database, its schema is checked (checkQueueSchema,
 //    T-257): the release makes it, the worker never does (record 053).
 // 5. The health check starts listening (WORKER_HEALTH_PORT). It answers 503 until
