@@ -11,15 +11,15 @@
 import { readFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import * as databasePackage from '@srleagues/database';
-import type { DatabaseHandle, DatabaseSource } from '@srleagues/database';
+import type { DatabaseHandle, DatabaseSource, PostgresDriver } from '@srleagues/database';
 import { createLogger, memorySink } from '@srleagues/observability';
 import type { EmailConfirmationQuestion, SignInService } from '@srleagues/providers';
-import { afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { loadConfig } from '../../apps/web/src/server/config-schema.ts';
 import { startWebApp, type DatabasePackage } from '../../apps/web/src/server/startup.ts';
 import { loadWorkerConfig } from '../../apps/worker/src/config-schema.ts';
 import { startWorker } from '../../apps/worker/src/start-worker.ts';
-import { appDatabase, ca, ownerSession, server } from './server.ts';
+import { ca, dropLogin, fresh, makeLogin, ownerSession, server } from './server.ts';
 
 const notOurs = readFileSync(
   new URL(
@@ -194,11 +194,11 @@ describe('the worker in staging, on a real PostgreSQL (step 2.203)', () => {
     for (const certificate of [ca, server.caFile]) {
       const said = await workerSays(server.appUrl, certificate);
       for (const sentence of Object.values(worker)) expect(said).not.toContain(sentence);
-      // The connection is made and the login role read; what may still stop it is the
-      // next check, pg-boss's schema, which the release makes and 2.202's server does not
-      // have yet (record 053). Once it does, the worker starts.
+      // The connection is made and the login role read; what stops it is the next check,
+      // pg-boss's schema: 0031 made it on this server, and app_login, the website's login,
+      // does not hold queue_owner (T-490). A worker login of its own starts (below).
       expect(said).toMatch(
-        /^(started|WorkerStartError: The worker cannot start: the database login role is not fit for the worker \(T-60, T-257\): the pgboss schema)/,
+        /^WorkerStartError: The worker cannot start: the database login role is not fit for the worker \(T-60, T-257\): the login role may not use the pgboss schema \(grant it queue_owner\)/,
       );
       nothingPrivate(said);
     }
@@ -214,58 +214,190 @@ describe('the worker in staging, on a real PostgreSQL (step 2.203)', () => {
   });
 });
 
-// Step 2.238's second fix round (T-482): the release shape of record 053, as it stands
-// today. pg-boss's schema is a reviewed library schema, so its own tables are let be by
-// the fence check and nothing ever says to drop them. What still refuses every start after
-// the first is the older T-60 check, unchanged: pg-boss makes its tables as the worker's
-// login, which then owns tables (or, reassigned, may become the role that owns them).
-// Step 2.112 is where that is solved; this test asserts what T-60 says today.
-describe('the release shape of record 053 (T-482, step 2.238)', () => {
-  it('starts the worker once; then only T-60 refuses, and nothing says to drop pg-boss’s tables', async () => {
-    const owner = await ownerSession();
-    const db = appDatabase(1);
-    const release = [
-      'create role queue_owner nologin nosuperuser nocreatedb nocreaterole noreplication nobypassrls',
-      'grant queue_owner to current_user',
-      'create schema pgboss authorization queue_owner',
-      'revoke all on schema pgboss from public',
-      'grant queue_owner to app_login',
-    ];
-    const ownsTables =
-      /^app_login owns tables \(pgboss\.\w+ and \d+ more\), so it could switch their fence off: reassign owned by app_login to postgres$/;
-    const mayBecomeOwner =
-      /^app_login may become queue_owner, which owns tables \(pgboss\.\w+ and \d+ more\): revoke queue_owner from app_login$/;
+// Step 2.112 (T-490, record 053 as built): the job queue has its own owner. Migration 0031
+// made the role queue_owner and the empty schema pgboss owned by it when this server
+// started, applied by an owner made as Supabase's postgres is (not a superuser, may make
+// roles), and it runs here again. The worker's login and the website's are made here as a
+// hosted set-up makes them (docs/operations/new-test-copy.md): the worker's holds app_user
+// and queue_owner, the website's app_user and sign_in_store (record 052), never queue_owner. pg-boss makes its tables at the worker's
+// real start (startWorker, pg-boss's own start), as the worker's login.
+const migration0031 = readFileSync(
+  new URL('../../supabase/migrations/0031_the_job_queue_has_its_own_owner.sql', import.meta.url),
+  'utf8',
+);
+
+describe('the job queue’s own owner, on a real PostgreSQL (T-490, step 2.112)', () => {
+  const word = fresh();
+  const names = {
+    worker: `made_up_worker_${word}`,
+    web: `made_up_web_${word}`,
+    middle: `made_up_middle_${word}`,
+    side: `made_up_side_${word}`,
+  };
+  const urls = { worker: '', web: '' };
+  let owner: PostgresDriver;
+  beforeAll(async () => {
+    owner = await ownerSession();
+    urls.worker = await makeLogin(owner, names.worker, ['app_user', 'queue_owner']);
+    urls.web = await makeLogin(owner, names.web, ['app_user', 'sign_in_store']);
+  });
+  afterAll(async () => {
+    // The schema's owner drops it with what is in it, whoever owns that; then each login
+    // drops what it owns (pg-boss's tables) and is dropped.
+    await owner.exec(`drop schema if exists ${names.side} cascade`);
+    await dropLogin(owner, names.worker, urls.worker);
+    await dropLogin(owner, names.web, urls.web);
+    await owner.exec(`drop role if exists ${names.middle}`);
+    await owner.close();
+  });
+
+  const tablesInQueue = async () =>
+    (
+      await owner.query<{ name: string; owner: string }>(
+        `select c.relname as name, pg_catalog.pg_get_userbyid(c.relowner) as owner
+           from pg_catalog.pg_class c join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+          where n.nspname = 'pgboss' and c.relkind in ('r', 'p') order by 1`,
+      )
+    ).rows;
+
+  /** What a statement run as `url`'s login says: 'done' or the server's code and message. */
+  async function asLogin(url: string, statement: string): Promise<string> {
+    const login = await databasePackage.connectPostgresDriver(url, { ca });
     try {
-      for (const statement of release) await owner.exec(statement);
-      expect(await workerSays(server.appUrl, ca)).toMatch(/^started\n/);
-      const after = await databasePackage.checkLoginRole(db);
-      expect(after).toEqual([expect.stringMatching(ownsTables)]);
-      for (const said of [
-        await workerSays(server.appUrl, ca),
-        await webSays(server.appUrl, ca),
-        after.join('\n'),
-      ]) {
-        expect(said).toContain('app_login owns tables (pgboss.');
-        expect(said).not.toMatch(/drop (table|view) pgboss/);
-      }
-      // Reassigned to the schema's owner, as a release might try: T-60 still refuses.
-      const login = await databasePackage.connectPostgresDriver(server.appUrl, { ca });
-      try {
-        await login.exec('reassign owned by app_login to queue_owner');
-      } finally {
-        await login.close();
-      }
-      const reassigned = await databasePackage.checkLoginRole(db);
-      expect(reassigned).toEqual([expect.stringMatching(mayBecomeOwner)]);
+      await login.exec(statement);
+      return 'done';
+    } catch (error) {
+      const code = (error as { code?: unknown }).code;
+      return `${String(code)} ${error instanceof Error ? error.message : String(error)}`;
     } finally {
-      await db.close();
-      for (const statement of [
-        'drop schema if exists pgboss cascade',
-        'revoke queue_owner from app_login',
-        'drop role if exists queue_owner',
-      ])
-        await owner.exec(statement);
-      await owner.close();
+      await login.close();
     }
+  }
+
+  /** The mending statement a refusal ends a sentence with, run as the tables' owner. */
+  async function mendWith(said: string, statement: RegExp): Promise<void> {
+    const found = statement.exec(said)?.[0];
+    expect(found).toBeDefined();
+    await owner.exec(String(found));
+  }
+
+  it('0031 runs again as the owner made like Supabase’s, which then may not act as queue_owner', async () => {
+    await owner.exec(migration0031);
+    const { rows: held } = await owner.query<{
+      admin: boolean;
+      inherit: boolean;
+      set: boolean;
+      by_itself: boolean;
+    }>(
+      `select m.admin_option as admin, m.inherit_option as inherit, m.set_option as set,
+              m.grantor = m.member as by_itself
+         from pg_catalog.pg_auth_members m
+        where m.roleid = 'queue_owner'::regrole and m.member = current_user::regrole`,
+    );
+    // PostgreSQL 16 gives a role's maker ADMIN of it, from the server itself; 0031's own
+    // grant to itself (SET, no INHERIT) is revoked at its end.
+    expect(held).toEqual([{ admin: true, inherit: false, set: false, by_itself: false }]);
+    const { rows: may } = await owner.query<{ usage: boolean; set: boolean }>(
+      `select pg_catalog.pg_has_role(current_user, 'queue_owner', 'USAGE') as usage,
+              pg_catalog.pg_has_role(current_user, 'queue_owner', 'SET') as set`,
+    );
+    expect(may).toEqual([{ usage: false, set: false }]);
+    const { rows: schema } = await owner.query<{ owner: string; acl: string }>(
+      `select pg_catalog.pg_get_userbyid(nspowner) as owner, nspacl::text as acl
+         from pg_catalog.pg_namespace where nspname = 'pgboss'`,
+    );
+    expect(schema).toEqual([{ owner: 'queue_owner', acl: '{queue_owner=UC/queue_owner}' }]);
+    await expect(owner.exec('create table pgboss.made_up_owners (id uuid)')).rejects.toMatchObject({
+      code: '42501',
+    });
+    // No login but this file's worker holds queue_owner.
+    const { rows: members } = await owner.query<{ name: string }>(
+      `select pg_catalog.pg_get_userbyid(member) as name from pg_catalog.pg_auth_members
+        where roleid = 'queue_owner'::regrole and member <> current_user::regrole`,
+    );
+    expect(members).toEqual([{ name: names.worker }]);
+  });
+
+  it('the website starts; the worker makes pg-boss’s tables and starts three times; the website starts again and cannot read them', async () => {
+    expect(await tablesInQueue()).toEqual([]);
+    expect(await webSays(urls.web, ca)).toBe('started');
+    for (let start = 1; start <= 3; start += 1) {
+      expect(await workerSays(urls.worker, ca)).toMatch(/^started\n/);
+    }
+    const tables = await tablesInQueue();
+    expect(tables.map((table) => table.name)).toContain('job');
+    expect(new Set(tables.map((table) => table.owner))).toEqual(new Set([names.worker]));
+    // 0031 runs again with pg-boss's tables in its schema, and both still start.
+    await owner.exec(migration0031);
+    expect(await workerSays(urls.worker, ca)).toMatch(/^started\n/);
+    expect(await webSays(urls.web, ca)).toBe('started');
+    expect(await asLogin(urls.web, 'select count(*) from pgboss.job')).toBe(
+      '42501 permission denied for schema pgboss',
+    );
+    expect(await asLogin(urls.web, 'create table pgboss.made_up_web (id uuid)')).toBe(
+      '42501 permission denied for schema pgboss',
+    );
+    expect(await asLogin(urls.worker, 'select count(*) from pgboss.job')).toBe('done');
+  });
+
+  it('one login for both: the website refuses the worker’s, the worker the website’s', async () => {
+    const asWebsite = await webSays(urls.worker, ca);
+    expect(asWebsite).toContain(
+      `${names.worker} is a member of queue_owner, which owns the job queue (the pgboss schema), and the website must never read or change a queued job: revoke queue_owner from ${names.worker}`,
+    );
+    expect(asWebsite).not.toMatch(/drop (table|view) pgboss/);
+    expect(await workerSays(urls.web, ca)).toMatch(
+      /^WorkerStartError: The worker cannot start: the database login role is not fit for the worker \(T-60, T-257\): the login role may not use the pgboss schema \(grant it queue_owner\)/,
+    );
+  });
+
+  it('a website login holding queue_owner, directly or through a role between, is refused, and its statement mends it', async () => {
+    const revoke = /revoke queue_owner from \w+/;
+    try {
+      await owner.exec(`grant queue_owner to ${names.web}`);
+      const direct = await webSays(urls.web, ca);
+      expect(direct).toContain(
+        `${names.web} is a member of queue_owner, which owns the job queue (the pgboss schema), and the website must never read or change a queued job: revoke queue_owner from ${names.web}`,
+      );
+      await mendWith(direct, revoke);
+      expect(await webSays(urls.web, ca)).toBe('started');
+
+      await owner.exec(`create role ${names.middle} nologin`);
+      await owner.exec(`grant queue_owner to ${names.middle}`);
+      await owner.exec(`grant ${names.middle} to ${names.web}`);
+      const through = await webSays(urls.web, ca);
+      expect(through).toContain(
+        `${names.web} is a member of queue_owner through ${names.middle}, which owns the job queue (the pgboss schema), and the website must never read or change a queued job: revoke queue_owner from ${names.middle}`,
+      );
+      await mendWith(through, revoke);
+      expect(await webSays(urls.web, ca)).toBe('started');
+    } finally {
+      await owner.exec(`revoke queue_owner from ${names.web}`);
+      await owner.exec(`drop role if exists ${names.middle}`);
+    }
+  });
+
+  it('the worker is refused while it or queue_owner owns a table outside pgboss', async () => {
+    await owner.exec(`create schema ${names.side}`);
+    await owner.exec(`grant usage, create on schema ${names.side} to ${names.worker}, queue_owner`);
+    const own = `${names.side}.made_up_kept`;
+    const queues = `${names.side}.made_up_queue_kept`;
+    expect(await asLogin(urls.worker, `create table ${own} (id uuid)`)).toBe('done');
+    const itself = await workerSays(urls.worker, ca);
+    expect(itself).toMatch(/^WorkerStartError: /);
+    expect(itself).toContain(`${names.worker} owns a table (${own})`);
+    expect(await asLogin(urls.worker, `drop table ${own}`)).toBe('done');
+    expect(await workerSays(urls.worker, ca)).toMatch(/^started\n/);
+
+    const made = await asLogin(
+      urls.worker,
+      `set role queue_owner; create table ${queues} (id uuid); reset role`,
+    );
+    expect(made).toBe('done');
+    const through = await workerSays(urls.worker, ca);
+    expect(through).toMatch(/^WorkerStartError: /);
+    expect(through).toContain(`may become queue_owner, which owns a table (${queues})`);
+    expect(await asLogin(urls.worker, `set role queue_owner; drop table ${queues}`)).toBe('done');
+    expect(await workerSays(urls.worker, ca)).toMatch(/^started\n/);
   });
 });

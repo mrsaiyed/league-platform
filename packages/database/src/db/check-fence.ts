@@ -40,6 +40,7 @@ import {
   type FunctionShape,
   type MigrationCatalog,
 } from './fence-catalog.ts';
+import { queueSchema } from './check-queue-schema.ts';
 import { librarySchemas } from './library-schemas.ts';
 import { migrationCatalog } from './migration-catalog.ts';
 import { reviewedDefiners } from './reviewed-definers.ts';
@@ -412,6 +413,8 @@ type Stranger = {
   reader: string | null;
   holders: string[];
   library: boolean;
+  /** In pg-boss's schema, whoever is judged: its tables are never dropped (T-490). */
+  queue: boolean;
 };
 
 /**
@@ -432,7 +435,7 @@ async function strangers(
   const listed = catalog.leagueTables.map((table) => table.table);
   const { rows } = await sql<Stranger>`
     with league_tables as (${leagueTables(listed)})
-    select name, kind, ours and not library as ours, reader, holders, library from (
+    select name, kind, ours and not library as ours, reader, holders, library, queue from (
       select pg_catalog.quote_ident(n.nspname) || '.' || pg_catalog.quote_ident(c.relname)
           as name,
         c.relkind::text as kind,
@@ -456,6 +459,7 @@ async function strangers(
           where e.privilege_type = 'SELECT' order by 1) as holders,
         n.nspname::text in (select pg_catalog.jsonb_array_elements_text(${libraries}::jsonb))
           as library,
+        n.nspname::text = ${queueSchema} as queue,
         exists (
           select 1 from pg_catalog.pg_attribute a
           where a.attrelid = c.oid and a.attname = 'league_id' and a.attnum > 0
@@ -481,7 +485,7 @@ async function strangers(
     where (ours or reader is not null) and not (library and kind in ('r', 'p') and not leagueish)
     order by name`.execute(database);
   const reached = new Set(['public', ...roles.reached]);
-  return rows.map(({ name, kind, ours, reader, holders, library }) => {
+  return rows.map(({ name, kind, ours, reader, holders, library, queue }) => {
     const what = kindWords[kind] ?? 'table';
     if (ours)
       return (
@@ -489,11 +493,13 @@ async function strangers(
         `drop ${what} ${name} (or make it in a migration)`
       );
     const from = holders.filter((holder) => reached.has(holder));
-    // In a library's schema the library's own tables are never dropped (T-482).
+    // In a library's schema the library's own tables are never dropped (T-482), nor
+    // pg-boss's in its schema, even where the website is judged (T-490): a login that reads
+    // them is the worker's, and the queue sentence (revoke queue_owner) says so.
     const statement =
       from.length > 0
         ? `revoke select on table ${name} from ${from.join(', ')}`
-        : library && (kind === 'r' || kind === 'p')
+        : (library || queue) && (kind === 'r' || kind === 'p')
           ? `revoke select on table ${name} from ${String(reader)}`
           : `drop ${what} ${name}`;
     const who =

@@ -9,11 +9,26 @@
 //
 // What the login itself sees is read AS app_login (no `set role`), not only as app_user:
 // a wide plant is shown to be real by the login seeing both leagues' rows.
-import { checkLoginRole, connectPostgresDriver, type PostgresDriver } from '@srleagues/database';
+import {
+  checkLoginRole,
+  checkWorkerLoginRole,
+  connectPostgresDriver,
+  createDatabase,
+  type PostgresDriver,
+} from '@srleagues/database';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { rule } from '../../packages/database/src/db/fence-catalog.ts';
 import { migrationCatalog } from '../../packages/database/src/db/migration-catalog.ts';
-import { appDatabase, ca, fresh, makeMadeUpLeague, ownerSession, server } from './server.ts';
+import {
+  appDatabase,
+  ca,
+  dropLogin,
+  fresh,
+  makeLogin,
+  makeMadeUpLeague,
+  ownerSession,
+  server,
+} from './server.ts';
 
 const db = appDatabase(1);
 let owner: PostgresDriver;
@@ -763,27 +778,19 @@ describe('(b) a policy calling a function found first on the login’s search pa
 });
 
 describe('(e) a rule or trigger on a league table the migrations made (T-486)', () => {
-  // The copy sits in pg-boss's schema without a league column, which T-482 lets be (its
-  // stated limit, closed by step 2.112): the rule or trigger that fills it is what is refused.
-  let madeQueueSchema = false;
+  // Until step 2.112 the copy sat in pg-boss's schema, where T-482 let a table without a
+  // league column be for every login. Since T-490 the website's login has no such place:
+  // the copy, in a schema of its own, is refused by name beside the rule or trigger that
+  // fills it, and each is mended by its own statement.
   const copy = [
-    'create table pgboss.c4 (id uuid, lid text)',
-    'grant select on pgboss.c4 to app_login',
+    'create schema made_up_copies',
+    'grant usage on schema made_up_copies to app_login',
+    'create table made_up_copies.c4 (id uuid, lid text)',
+    'grant select on made_up_copies.c4 to app_login',
   ];
-  // The schema itself is dropped after the last of these, if this file made it.
-  const undoCopy = () => ['drop table if exists pgboss.c4'];
-  beforeAll(async () => {
-    const { rows } = await owner.query<{ there: boolean }>(
-      `select exists (select 1 from pg_catalog.pg_namespace where nspname = 'pgboss') as there`,
-    );
-    madeQueueSchema = rows[0]?.there !== true;
-    if (madeQueueSchema) await owner.exec('create schema pgboss');
-    await owner.exec('grant usage on schema pgboss to app_login');
-  });
-  afterAll(async () => {
-    await owner.exec('revoke usage on schema pgboss from app_login');
-    if (madeQueueSchema) await owner.exec('drop schema if exists pgboss');
-  });
+  const copyRefused =
+    'made_up_copies.c4 is a table that no migration made, and app_login may read it, so nothing has checked its fence: revoke select on table made_up_copies.c4 from app_login';
+  const undoCopy = () => ['drop schema if exists made_up_copies cascade'];
   async function leagueBCopied(): Promise<void> {
     // League B updates its programs; the login, set to league A, reads B's rows in the copy.
     const login = await connectPostgresDriver(server.appUrl, { ca });
@@ -795,7 +802,9 @@ describe('(e) a rule or trigger on a league table the migrations made (T-486)', 
     } finally {
       await login.close();
     }
-    const seen = await asLogin(a, (reader) => leaguesSeen(reader, 'pgboss.c4', 'lid::uuid'));
+    const seen = await asLogin(a, (reader) =>
+      leaguesSeen(reader, 'made_up_copies.c4', 'lid::uuid'),
+    );
     expect(seen).toEqual([b]);
   }
 
@@ -804,10 +813,11 @@ describe('(e) a rule or trigger on a league table the migrations made (T-486)', 
       [
         ...copy,
         `create rule made_up_copy as on update to public.programs do also
-           insert into pgboss.c4 (id, lid) values (new.id, new.league_id::text)`,
+           insert into made_up_copies.c4 (id, lid) values (new.id, new.league_id::text)`,
       ],
       [
         'public.programs has a rule made_up_copy that no migration made, so what it puts in place of each change is not known to keep to the league fence: drop rule made_up_copy on public.programs',
+        copyRefused,
       ],
       ['drop rule if exists made_up_copy on public.programs', ...undoCopy()],
       leagueBCopied,
@@ -820,12 +830,13 @@ describe('(e) a rule or trigger on a league table the migrations made (T-486)', 
         ...copy,
         'create schema made_up_hooks',
         `create function made_up_hooks.copy() returns trigger language plpgsql security definer
-           as $$ begin insert into pgboss.c4 values (new.id, new.league_id::text); return new; end $$`,
+           as $$ begin insert into made_up_copies.c4 values (new.id, new.league_id::text); return new; end $$`,
         `create trigger made_up_copy after update on public.programs
            for each row execute function made_up_hooks.copy()`,
       ],
       [
         'public.programs has a trigger made_up_copy that no migration made, so what it does on each change is not known to keep to the league fence: drop trigger made_up_copy on public.programs',
+        copyRefused,
       ],
       [
         'drop trigger if exists made_up_copy on public.programs',
@@ -847,33 +858,40 @@ describe('(e) a rule or trigger on a league table the migrations made (T-486)', 
   });
 });
 
-describe('(d) a view in a library’s schema, whatever its columns (T-482, tightened)', () => {
-  it('is refused with a revoke, never a drop of the library’s tables', async () => {
-    const { rows } = await owner.query<{ there: boolean }>(
-      `select exists (select 1 from pg_catalog.pg_namespace where nspname = 'pgboss') as there`,
-    );
-    const made = rows[0]?.there !== true;
-    const said = [
-      'pgboss.made_up_names is a view that no migration made, and app_login may read it, so nothing has checked its fence: revoke select on table pgboss.made_up_names from app_login',
-    ];
-    await plantedAndMended(
-      [
-        ...(made ? ['create schema pgboss'] : []),
-        'grant usage on schema pgboss to app_login',
-        'create table pgboss.made_up_job (id uuid, name text)',
-        'grant select on pgboss.made_up_job to app_login',
-        // No league column, reading no league table: a view there is refused all the same.
+describe('(d) a view in pg-boss’s schema, whatever its columns (T-482, tightened; T-490)', () => {
+  // Since T-490 pg-boss's schema is the worker's alone: its login (app_user and
+  // queue_owner, made here as a hosted set-up makes it) may have an ordinary table there
+  // without a league column, but a view there is refused by name; what is mended is the view, never pg-boss's tables.
+  it('is refused for the worker, and its sentence never drops a table', async () => {
+    const name = `made_up_queue_${fresh()}`;
+    const url = await makeLogin(owner, name, ['app_user', 'queue_owner']);
+    const worker = createDatabase({ kind: 'postgres', url, ca, maxConnections: 1 });
+    const login = await connectPostgresDriver(url, { ca });
+    try {
+      expect(await checkWorkerLoginRole(worker)).toEqual([]);
+      await login.exec('create table pgboss.made_up_job (id uuid, name text)');
+      expect(await checkWorkerLoginRole(worker)).toEqual([]);
+      // No league column, reading no league table: a view there is refused all the same.
+      await login.exec(
         'create view pgboss.made_up_names as select name as lid from pgboss.made_up_job',
-        'grant select on pgboss.made_up_names to app_login',
-      ],
-      said,
-      [
-        'drop view if exists pgboss.made_up_names',
-        'drop table if exists pgboss.made_up_job',
-        'revoke usage on schema pgboss from app_login',
-        ...(made ? ['drop schema if exists pgboss'] : []),
-      ],
-    );
-    expect(said.join(' ')).not.toMatch(/drop table/);
+      );
+      const said = await checkWorkerLoginRole(worker);
+      // The worker made the view, so the sentence drops it; pg-boss's own table is let be.
+      expect(said).toEqual([
+        `pgboss.made_up_names is a view that no migration made, and ${name} may read it, so nothing has checked its fence: drop view pgboss.made_up_names`,
+      ]);
+      expect(said.join(' ')).not.toMatch(/drop table/);
+      // The website's login cannot reach the schema at all, so its guard has nothing to say.
+      expect(await checkLoginRole(db)).toEqual([]);
+      for (const sentence of said) await login.exec(statementOf(sentence));
+      expect(await checkWorkerLoginRole(worker)).toEqual([]);
+    } finally {
+      await login.exec('drop view if exists pgboss.made_up_names');
+      await login.exec('drop table if exists pgboss.made_up_job');
+      await login.close();
+      await worker.close();
+      await dropLogin(owner, name, url);
+    }
+    expect(await checkLoginRole(db)).toEqual([]);
   });
 });

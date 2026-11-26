@@ -36,6 +36,36 @@ export const ownerSession = (): Promise<PostgresDriver> =>
 /** A word no earlier run used: the server may be one already running. */
 export const fresh = () => randomBytes(4).toString('hex');
 
+/**
+ * A made-up login of its own, made by the tables' owner as a hosted set-up makes the
+ * worker's and the website's (T-490, docs/operations/new-test-copy.md): `create role …
+ * login`, then a plain grant of `roles`. Returns its address on this server.
+ */
+export async function makeLogin(
+  owner: PostgresDriver,
+  name: string,
+  roles: readonly string[],
+): Promise<string> {
+  const password = randomBytes(18).toString('hex');
+  await owner.exec(`create role ${name} with login password '${password}'`);
+  if (roles.length > 0) await owner.exec(`grant ${roles.join(', ')} to ${name}`);
+  const url = new URL(server.appUrl);
+  url.username = name;
+  url.password = password;
+  return url.toString();
+}
+
+/** Drops what a made-up login owns, as itself (pg-boss's tables), then the login. */
+export async function dropLogin(owner: PostgresDriver, name: string, url: string): Promise<void> {
+  const login = await connectPostgresDriver(url, { ca });
+  try {
+    await login.exec('drop owned by current_user cascade');
+  } finally {
+    await login.close();
+  }
+  await owner.exec(`drop role if exists ${name}`);
+}
+
 /** Makes a made-up league through the league-making tool's hosted path; returns its id. */
 export async function makeMadeUpLeague(word: string): Promise<string> {
   const opened = await openLeagueMakingTarget({
