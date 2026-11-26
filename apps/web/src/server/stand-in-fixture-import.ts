@@ -5,7 +5,7 @@
 // and the league's own venues, and an applied import fills the same schedule draft that
 // Admin → Schedule publishes. The worker's part, reading an uploaded file once
 // (`imports.run`), is done by the world right after the upload's transaction is kept.
-import { parseDraftDocument } from '@srleagues/core';
+import { getScheduleDraft } from '@srleagues/core';
 import type { FixtureImportPorts, ImportNames } from './fixture-import-ports.ts';
 import type { World } from './stand-in-world.ts';
 
@@ -30,9 +30,10 @@ export function standInFixtureImport(world: World): FixtureImportPorts {
         venues: Object.fromEntries(s.venues.map((v) => [v.id, v.name])),
       };
     },
-    draftChangeCount: async (leagueId, seasonId) => {
-      const draft = (await world.read(leagueId))?.drafts.find((d) => d.seasonId === seasonId);
-      return draft === undefined ? 0 : (parseDraftDocument(draft.changes)?.changes.length ?? 0);
+    // The draft read itself (step 2.227): its own rule decides who is told the count.
+    draftChangeCount: async (context, seasonId) => {
+      const read = await getScheduleDraft(context, { seasonId }, world.deps);
+      return read.ok ? (read.value.draft?.savedEdits ?? 0) : 0;
     },
   };
 }

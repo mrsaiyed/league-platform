@@ -2,13 +2,11 @@
 // product declares at the league level, drawn from the declarations (T-98).
 import {
   leagueUrl,
-  listLeagueSettings,
   mayChangeLeagueSettings,
   mayEditLeague,
+  readLeagueSettings,
   readNamePolicy,
-  readPrivacyFacts,
-  readPublishChecks,
-  readYouthResets,
+  type LeagueSettingsView,
 } from '@srleagues/core';
 import { EmptyPanel, PageHead } from '@srleagues/ui';
 import { commandContextOf } from '../../server/context.ts';
@@ -46,22 +44,32 @@ export async function SettingsPage({
   const view = await loadLeaguePage(league, 'admin', 'settings');
   const { adminSettings, publicSchedule } = await webPorts();
   const context = commandContextOf(view.context);
-  const { rows, facts, policy, current, checks, mayPublish, profile, resets, mayEdit } =
-    await adminSettings.deps.transaction(context, async (tx) => ({
-      rows: await listLeagueSettings(tx),
-      facts: await readPrivacyFacts(tx),
-      policy: await readNamePolicy(tx.leagues),
-      // The Publish part (step 2.240): the league's state and version, and the checks.
-      current: await tx.leagues.currentLeague(),
-      checks: await readPublishChecks(tx),
-      mayPublish: await mayChangeLeagueSettings(context, tx),
-      // League settings → Profile (step 2.125).
-      profile: await tx.leagues.leagueProfile(),
-      resets: await readYouthResets(tx),
-      mayEdit: await mayEditLeague(context, tx),
-    }));
-  const { timeZone } = await publicSchedule.clockOf(view.context.league.id);
-  const notes = privacyNotes({ facts, policy, rows, timeZone, locale });
+  // What the page draws is one read in core (step 2.227, T-474): it needs `league.settings`
+  // for the whole league. An admin limited to one program is refused it and sees only the
+  // head and the Admins row (step 2.97); nothing league-wide is read for them.
+  const read = await readLeagueSettings(context, {}, adminSettings.deps);
+  const shown = read.ok
+    ? await adminSettings.deps.transaction(context, async (tx) => ({
+        ...read.value,
+        policy: await readNamePolicy(tx.leagues),
+        mayPublish: await mayChangeLeagueSettings(context, tx),
+        mayEdit: await mayEditLeague(context, tx),
+      }))
+    : undefined;
+  // The league's clock, for the privacy notes: read only when the settings read answered.
+  const clock =
+    shown === undefined ? undefined : await publicSchedule.clockOf(view.context.league.id);
+  const rows: LeagueSettingsView['rows'] = shown?.rows ?? [];
+  const notes =
+    shown === undefined || clock === undefined
+      ? undefined
+      : privacyNotes({
+          facts: shown.facts,
+          policy: shown.policy,
+          rows,
+          timeZone: clock.timeZone,
+          locale,
+        });
   // A Profile form's or a setting's "Saved" (step 2.155 parts 3 and 4): taken once, so a
   // reload says nothing old.
   const notice = takeNotice(context, 'settings');
@@ -115,32 +123,32 @@ export async function SettingsPage({
       ) : null}
       {/* Profile (step 2.125) is the first thing in League settings (T-352); the page-step
           checks find each settings form by the setting it names, not by its place. */}
-      {current === undefined || profile === undefined ? null : (
+      {shown?.league === undefined || shown.profile === undefined ? null : (
         <ProfilePanel
           league={view.context.league.slug}
           address={address}
           saved={saved}
-          name={current.name}
-          slug={current.slug}
-          version={current.version}
-          profile={profile}
-          resets={resets}
-          mayChange={mayEdit}
+          name={shown.league.name}
+          slug={shown.league.slug}
+          version={shown.league.version}
+          profile={shown.profile}
+          resets={shown.resets}
+          mayChange={shown.mayEdit}
         />
       )}
-      {current === undefined ? null : (
+      {shown?.league === undefined ? null : (
         <PublishPanel
           league={view.context.league.slug}
           address={address}
-          status={current.status}
-          version={current.version}
-          checks={checks}
-          mayPublish={mayPublish}
+          status={shown.league.status}
+          version={shown.league.version}
+          checks={shown.checks}
+          mayPublish={shown.mayPublish}
           asking={query[publishAsk.name] === publishAsk.value}
           askingArchive={query[archiveAsk.name] === archiveAsk.value}
         />
       )}
-      {rows.length === 0 ? (
+      {shown === undefined || notes === undefined ? null : rows.length === 0 ? (
         <EmptyPanel text={t('adminSettings.none')} />
       ) : (
         <>

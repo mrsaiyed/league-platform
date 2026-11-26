@@ -3,7 +3,7 @@
 // beside the ids an import's report holds. The league comes from each call's context,
 // never from the request body. Today only the made-up stand-in fills it; the
 // database-backed one comes in its own part of step 2.93 (record 055).
-import type { CommandDeps, ImportsTx } from '@srleagues/core';
+import type { CommandContext, CommandDeps, ImportsTx } from '@srleagues/core';
 
 /** The season a league's fixtures are imported into: its current one. */
 export type ImportSeason = { readonly id: string; readonly name: string };
@@ -20,6 +20,11 @@ export type FixtureImportPorts = {
   /** The league's current season, or undefined when it has none yet. */
   readonly currentSeasonOf: (leagueId: string) => Promise<ImportSeason | undefined>;
   readonly namesOf: (leagueId: string, seasonId: string) => Promise<ImportNames>;
-  /** How many unpublished changes the season's schedule draft holds (0 with no draft). */
-  readonly draftChangeCount: (leagueId: string, seasonId: string) => Promise<number>;
+  /**
+   * How many unpublished changes the season's schedule draft holds (0 with no draft), for
+   * this person: the count applies the role itself (step 2.227, as Admin → Teams since step
+   * 2.93 part 5), being the draft read's own `savedEdits`, so someone who may not read the
+   * season's draft (`schedule.read` at its program) is told 0, on any implementation.
+   */
+  readonly draftChangeCount: (context: CommandContext, seasonId: string) => Promise<number>;
 };
