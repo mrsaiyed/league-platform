@@ -132,10 +132,12 @@ export type OpenTrackerGameOptions = {
   readonly onStoreFailed?: (code: QueueErrorCode) => void;
   /** Drops the worker's kept page of the game, once the device forgot the game (T-488). */
   readonly forgetPage?: () => void;
+  /** Asks the worker to replace its kept page of the game with a fresh one (T-489). */
+  readonly renewPage?: () => void;
   /** Passed on to the controller (tests). */
   readonly controller?: Pick<
     TrackerControllerOptions,
-    'clock' | 'newCommandId' | 'random' | 'retry' | 'queue' | 'renewEveryMs'
+    'clock' | 'newCommandId' | 'random' | 'retry' | 'queue' | 'renewEveryMs' | 'rostersEveryMs'
   >;
 };
 
@@ -277,6 +279,10 @@ export async function openTrackerGame(
       // Not stored again once the game was let go of, ended and saved (below).
       keep: (fetched) =>
         letGoOfGame ? Promise.resolve() : games.saveRosters(owner, fetched, now()),
+    },
+    // Not once the game was let go of: its kept page is gone, and stays gone (T-488).
+    renewKeptPage: () => {
+      if (!letGoOfGame) options.renewPage?.();
     },
     transport: options.transport,
     ...(options.doors === undefined ? {} : { doors: options.doors }),

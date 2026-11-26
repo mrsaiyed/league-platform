@@ -24,7 +24,7 @@ import { createFetchTrackerServer } from './fetch-tracker-server.ts';
 import { createMemoryQueueStorage } from './memory-queue-storage.ts';
 import type { DeviceRosters, DeviceScoring } from './opened-game-storage.ts';
 import type { KeptTap, QueueStorage } from './queue-storage.ts';
-import { createTrackerController, type TapInput } from './tracker-controller.ts';
+import { createTrackerController, rostersAgainMs, type TapInput } from './tracker-controller.ts';
 import { trackerNotices } from './tracker-notice.ts';
 import {
   createFakeServer,
@@ -62,11 +62,14 @@ function device(
     rosters,
     keptRosters,
     keepRosters,
+    renewKeptPage,
     newPlayerId,
   }: {
     /** The rosters the device kept before this opening, and where each is stored (T-487). */
     keptRosters?: DeviceRosters;
     keepRosters?: (rosters: DeviceRosters) => Promise<void>;
+    /** Asks the worker to replace its kept page of the game (T-489). */
+    renewKeptPage?: () => void;
     /** The ids the device gives the players it adds (step 2.242: one already in use). */
     newPlayerId?: () => string;
     /** The rosters the page brought, for changes of players (step 2.118). */
@@ -121,6 +124,7 @@ function device(
           },
         }),
     ...(newPlayerId === undefined ? {} : { newPlayerId }),
+    ...(renewKeptPage === undefined ? {} : { renewKeptPage }),
     ...(whoIsSignedIn === undefined ? {} : { signedIn: whoIsSignedIn }),
   });
   return { controller, storage, clock };
@@ -3228,5 +3232,160 @@ describe('tracker controller: a fresh answer wins for names (T-487)', () => {
     expect(stored.at(-1)?.away.players.map((p) => p.personId)).toContain(newId);
     expect(JSON.stringify(stored.at(-1))).not.toContain('Hawkinsrecorded');
     expect(JSON.stringify(status.rosters)).not.toContain('Hawkinsrecorded');
+  });
+});
+
+describe('tracker controller: an open game asks for its rosters again (T-489)', () => {
+  const urlOf = (input: Parameters<typeof globalThis.fetch>[0]) =>
+    typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+  /** Counts the rosters asked for; while `failing()`, they get no answer. */
+  function rostersAsked(failing: () => boolean = () => false) {
+    let asked = 0;
+    const wrap =
+      (ask: typeof globalThis.fetch): typeof globalThis.fetch =>
+      async (input, init) => {
+        if (urlOf(input).includes('/rosters')) {
+          asked += 1;
+          if (failing()) throw new TypeError('Failed to fetch');
+        }
+        return ask(input, init);
+      };
+    return { wrap, asked: () => asked };
+  }
+  /** The page's copy: the home team's first player under the name once recorded. */
+  const recorded = (rosters: DeviceRosters): DeviceRosters => ({
+    ...rosters,
+    home: {
+      ...rosters.home,
+      players: rosters.home.players.map((p, i) =>
+        i === 0 ? { ...p, firstName: 'Ned', lastName: 'Hawkinsrecorded' } : p,
+      ),
+    },
+  });
+
+  it('asks when the page is shown again, when the network is back, and every five minutes on the renewal', async () => {
+    const network = endpointNetwork();
+    const fresh = await serverRosters(network);
+    const counter = rostersAsked();
+    const { controller, clock } = device(network, { rosters: fresh, askServer: counter.wrap });
+    await controller.start();
+    await controller.idle();
+    const opened = counter.asked();
+    expect(opened).toBeGreaterThanOrEqual(1);
+    controller.hidden();
+    controller.awake();
+    await controller.idle();
+    expect(counter.asked()).toBe(opened + 1);
+    controller.online();
+    await controller.idle();
+    expect(counter.asked()).toBe(opened + 2);
+    // Renewed every 30 s: not asked again within five minutes, then once.
+    await clock.advance(rostersAgainMs - 31_000);
+    await controller.idle();
+    expect(counter.asked()).toBe(opened + 2);
+    await clock.advance(62_000);
+    await controller.idle();
+    expect(counter.asked()).toBe(opened + 3);
+    expect(controller.status().mode).toEqual({ kind: 'scoring' });
+    await controller.leave();
+  });
+
+  it('a fetch with no answer changes nothing: the rosters shown and stored, the kept page', async () => {
+    const network = endpointNetwork();
+    const fresh = await serverRosters(network);
+    let failing = false;
+    const counter = rostersAsked(() => failing);
+    const stored: DeviceRosters[] = [];
+    let renewed = 0;
+    const { controller, clock } = device(network, {
+      rosters: recorded(fresh),
+      askServer: counter.wrap,
+      keepRosters: (r) => {
+        stored.push(r);
+        return Promise.resolve();
+      },
+      renewKeptPage: () => {
+        renewed += 1;
+      },
+    });
+    await controller.start();
+    await controller.idle();
+    failing = true;
+    const shown = JSON.stringify(controller.status().rosters);
+    const [keptNow, renewedNow, asked] = [stored.length, renewed, counter.asked()];
+    controller.hidden();
+    controller.awake();
+    await clock.advance(rostersAgainMs + 31_000);
+    await controller.idle();
+    expect(counter.asked()).toBeGreaterThanOrEqual(asked + 2);
+    expect(JSON.stringify(controller.status().rosters)).toBe(shown);
+    expect(stored).toHaveLength(keptNow);
+    expect(renewed).toBe(renewedNow);
+    await controller.leave();
+  });
+
+  it('never delays, reorders or resends a waiting tap', async () => {
+    const network = endpointNetwork();
+    const fresh = await serverRosters(network);
+    const storage = createMemoryQueueStorage();
+    let down = true;
+    const sent: string[] = [];
+    const { controller, clock } = device(network, {
+      storage,
+      rosters: recorded(fresh),
+      sendTaps: (send) => async (input, init) => {
+        if (down) throw new TypeError('Failed to fetch');
+        sent.push(String(init?.body));
+        return send(input, init);
+      },
+    });
+    await controller.start();
+    await tapAll(controller, [...tipOff, basket('home', hawks[0] ?? '')]);
+    await controller.idle();
+    const before = (await storage.list(gameId)).map((e) => [e.command.commandId, e.state]);
+    expect(before.length).toBeGreaterThan(0);
+    controller.online();
+    await clock.advance(rostersAgainMs + 31_000);
+    await controller.idle();
+    // The rosters were fetched fresh meanwhile; the taps wait as they were, in order.
+    expect(JSON.stringify(controller.status().rosters)).not.toContain('Hawkinsrecorded');
+    expect((await storage.list(gameId)).map((e) => [e.command.commandId, e.state])).toEqual(before);
+    expect(controller.status().queue.waiting).toBe(before.length);
+    down = false;
+    controller.online();
+    await clock.advance(5_000);
+    await controller.idle();
+    expect(controller.status().queue.waiting).toBe(0);
+    // Each sent once, in the order made.
+    const ids = sent.flatMap((body) =>
+      (JSON.parse(body) as { commands: { commandId: string }[] }).commands.map((c) => c.commandId),
+    );
+    expect(ids).toEqual(before.map(([id]) => id));
+    await controller.leave();
+  });
+
+  it("replaces the worker's kept page when a fresh answer changed what is stored, and when the network is back", async () => {
+    const network = endpointNetwork();
+    const fresh = await serverRosters(network);
+    let renewed = 0;
+    const { controller, clock } = device(network, {
+      rosters: recorded(fresh),
+      renewKeptPage: () => {
+        renewed += 1;
+      },
+    });
+    await controller.start();
+    await controller.idle();
+    // The page's copy held the recorded name: the fresh answer changed it.
+    expect(renewed).toBe(1);
+    // Asked again, the same answer: nothing to replace.
+    await clock.advance(rostersAgainMs + 31_000);
+    await controller.idle();
+    expect(renewed).toBe(1);
+    // The network is back: replaced whatever the answer.
+    controller.online();
+    await controller.idle();
+    expect(renewed).toBe(2);
+    await controller.leave();
   });
 });

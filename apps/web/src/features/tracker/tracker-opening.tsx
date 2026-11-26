@@ -23,6 +23,7 @@ import { openTrackerGame, screenOf, type OpenedTrackerGame } from './open-tracke
 import { readDeviceAccount, writeDeviceAccount } from './device-account.ts';
 import {
   forgetTrackerPageOfGame,
+  renewTrackerPageOfGame,
   registerTrackerWorker,
   takeNewRelease,
 } from './tracker-worker-registration.ts';
@@ -201,6 +202,7 @@ export function TrackerOpening({
         newDeviceId: () => globalThis.crypto.randomUUID(),
         onStoreFailed: () => setStoreFailed(true),
         forgetPage: () => void forgetTrackerPageOfGame(window.location.href),
+        renewPage: () => void renewTrackerPageOfGame(window.location.href),
         // Signed out or left while opening: nothing more is kept and no session taken.
         letGo: () => gone || leaving.current,
         // With no signal, what the device kept is scored from only for the one marked

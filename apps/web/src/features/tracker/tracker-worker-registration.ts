@@ -6,6 +6,7 @@ import {
   trackerScopeOf,
   trackerWorkerForgetGameMessage,
   trackerWorkerForgetMessage,
+  trackerWorkerRenewGameMessage,
   trackerWorkerKeepMessage,
   trackerWorkerReleaseMessage,
   trackerWorkerUpdateMessage,
@@ -157,6 +158,24 @@ export async function forgetTrackerPageOfGame(page: string): Promise<void> {
     const registrations = await navigator.serviceWorker.getRegistrations();
     for (const registration of registrations) {
       registration.active?.postMessage({ type: trackerWorkerForgetGameMessage, page });
+    }
+  } catch {
+    // No worker: no page of the game was kept by one.
+  }
+}
+
+/**
+ * Asks the worker to replace its kept page of the game at `page` with one fetched fresh
+ * (T-489): the rosters fetched changed the names the device stores, or the network is
+ * back. The worker replaces it only for the same account, and never keeps a page it had
+ * not kept. Never fails, and asks nothing of the queue: no tap waits on it.
+ */
+export async function renewTrackerPageOfGame(page: string): Promise<void> {
+  try {
+    if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return;
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    for (const registration of registrations) {
+      registration.active?.postMessage({ type: trackerWorkerRenewGameMessage, page });
     }
   } catch {
     // No worker: no page of the game was kept by one.

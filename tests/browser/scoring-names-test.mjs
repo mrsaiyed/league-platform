@@ -14,10 +14,17 @@
 // - The owner switches "Scorekeepers see full names" on (its wording drawn on the
 //   settings page from the message files): the score page then reads everyone else in
 //   full, those two still not.
+// - Switched off with the game left open, no reload, the signal steady: once the five
+//   minutes are forced on the page's own clock (Playwright's, as bad-wifi-test does; no
+//   setting of the product), the tiles, the stored rosters and the worker's kept page hold
+//   no full name (T-489: an open game asks again).
 // - Switched off again, a reload: within 15 seconds neither the device's storage nor the
 //   worker's kept page holds a surname it showed while on (T-487: a fresh answer wins).
 // - Three table players who read the same and wear no number are told apart before the
 //   tile's ellipsis at 390 wide: "Player 1 · …", "Player 2 · …" (R-33, the place first).
+// - With no signal a player is added at the table (#41) and tapped three times; the signal
+//   back and the rosters fetched fresh, #41 is still on the screen and the score and the
+//   box score sheet count exactly those three points (T-487, T-489).
 // - Admin → Teams shows the recorded name, and the person's page beside it the "Show as".
 // `--no-build` serves the build already here.
 import {
@@ -139,8 +146,20 @@ const deviceStorage = (page) =>
     return kept;
   });
 
+/** Where the device still holds `words`: the stored rows and the worker's kept pages. */
+const holding = (kept, words) => ({
+  stored: Object.entries(kept.databases).flatMap(([name, stores]) =>
+    Object.entries(stores)
+      .filter(([, rows]) => words.test(JSON.stringify(rows)))
+      .map(([store]) => `${name}/${store}`),
+  ),
+  pages: kept.pages.filter((p) => words.test(p.text)).map((p) => p.url),
+});
+
 if (browser) {
   const scorer = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  // The page's clock is Playwright's, so a test can force the five minutes (T-489).
+  await scorer.clock.install();
   await scorer.addCookies([{ ...scorekeeper, url: origin }]);
   const page = await scorer.newPage();
   page.setDefaultTimeout(60_000);
@@ -290,6 +309,63 @@ if (browser) {
     holdsNeither('on: the box score sheet', drawn);
   });
 
+  await step(
+    'switched off with the game left open, no reload: gone within five minutes (T-489)',
+    async () => {
+      const full = /Hawkins|Bearsley/;
+      // On, the open device holds the full names (stored and kept) before the switch.
+      let kept = await deviceStorage(page);
+      for (let i = 0; i < 30 && holding(kept, full).pages.length === 0; i += 1) {
+        await page.waitForTimeout(500);
+        kept = await deviceStorage(page);
+      }
+      const before = holding(kept, full);
+      note(
+        'on, open: the stored rosters and the kept page hold the full names',
+        before.stored.length > 0 && before.pages.length > 0,
+        JSON.stringify(before),
+      );
+      // A mark on this very page: a reload would wipe it.
+      await page.evaluate(() => {
+        window.leftOpen = true;
+      });
+      await ownerPage.goto(`${origin}/${league}/admin/settings`);
+      const section = ownerPage.locator(fullNames);
+      const asSelect = section.locator('select[name="value"]');
+      if ((await asSelect.count()) > 0) await asSelect.selectOption('false');
+      else await section.locator('input[name="value"][value="false"]').check();
+      const answer = await settingAnswer(
+        ownerPage,
+        fullNames,
+        section.locator('button[type=submit]').first(),
+      );
+      note('off, open: the setting is saved', answer.saved, answer.text);
+      // Neither shown again nor offline: only the five minutes, forced on the page's clock.
+      await scorer.clock.fastForward('05:05');
+      let now = holding(await deviceStorage(page), full);
+      for (let i = 0; i < 40 && now.stored.length + now.pages.length > 0; i += 1) {
+        await page.waitForTimeout(500);
+        now = holding(await deviceStorage(page), full);
+      }
+      const tiles = (await page.locator('[data-teams] [data-player]').allInnerTexts()).join(' | ');
+      note('off, open: the tiles show no full name', !full.test(tiles), tiles);
+      note(
+        'off, open: the stored rosters hold no full name',
+        now.stored.length === 0,
+        now.stored.join(', '),
+      );
+      note(
+        'off, open: the kept page holds no full name',
+        now.pages.length === 0,
+        now.pages.join(', '),
+      );
+      note(
+        'off, open: the page was never reloaded',
+        await page.evaluate(() => window.leftOpen === true),
+      );
+    },
+  );
+
   await step('switched off again: a reload holds the full names no longer (T-487)', async () => {
     await ownerPage.goto(`${origin}/${league}/admin/settings`);
     const section = ownerPage.locator(fullNames);
@@ -338,6 +414,59 @@ if (browser) {
     note('off: the device still keeps the game', kept.includes(liveGame));
     holdsNeither('off: the device storage after a reload', kept);
   });
+
+  await step(
+    'a player added at the table with no signal, three taps, the signal back (T-487, T-489)',
+    async () => {
+      const panel = page.locator('[data-players-panel]');
+      const home = panel.locator('[data-players-team="home"]');
+      const scoreBefore = await c.score();
+      await scorer.setOffline(true);
+      await c.more.click();
+      await page.locator('[data-players-open="more"]').click();
+      await panel.waitFor();
+      await home.locator('[data-players-line="home"]').fill('41');
+      await home.locator('[data-players-name="home"]').fill('Tabby Newcombe');
+      await home.locator('[data-players-add="home"]').click();
+      await home.locator('[data-player-row][data-waiting]').first().waitFor();
+      await panel.locator('[data-players-close]').click();
+      await panel.waitFor({ state: 'detached' });
+      await c.substitute('home', 41, 11);
+      for (let i = 0; i < 3; i += 1) await c.play('home', 41, 'p1');
+      note('no signal: #41 has 3 points on the screen', (await c.points('home', 41)) === 3);
+      await scorer.setOffline(false);
+      await c.root.locator('[data-saved-banner][data-state="saved"]').waitFor({ timeout: 90_000 });
+      // Fetched fresh as the signal came back, and again at the five minutes forced here.
+      await scorer.clock.fastForward('05:05');
+      await page.waitForTimeout(3000);
+      note(
+        'the rosters fetched fresh: #41 is still on the screen',
+        await c.tile('home', 41).isVisible(),
+      );
+      note('and has exactly 3 points', (await c.points('home', 41)) === 3);
+      const score = await c.score();
+      note(
+        'the score counts exactly those three points',
+        score.home === scoreBefore.home + 3 && score.away === scoreBefore.away,
+        JSON.stringify({ scoreBefore, score }),
+      );
+      await ownerPage.goto(`${origin}/${league}/admin/games/${liveGame}`);
+      // The sheet's boxes for #41: each its own label and value.
+      const boxes = await ownerPage
+        .locator('main tr', { hasText: '#41' })
+        .first()
+        .locator('input[type="text"]')
+        .evaluateAll((inputs) =>
+          inputs.map((box) => ({ label: box.getAttribute('aria-label') ?? '', value: box.value })),
+        );
+      const points = boxes.filter((box) => /^points\b|\bpoints$/i.test(box.label.trim()));
+      note(
+        'the box score sheet counts exactly 3 points for #41',
+        points.length === 1 && points[0].value === '3',
+        JSON.stringify(boxes),
+      );
+    },
+  );
 
   await step('Admin → Teams keeps the recorded name beside its Show as', async () => {
     await ownerPage.goto(`${origin}/${league}/admin/teams`);

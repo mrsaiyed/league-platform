@@ -290,6 +290,22 @@ export function mayForgetGamePage(
 }
 
 /**
+ * Asks the worker to replace its kept page of one game with one fetched fresh (T-489),
+ * with `page`, the game's tracker address: a fresh rosters answer changed the names the
+ * device stores, or the network is back.
+ */
+export const trackerWorkerRenewGameMessage = 'srleagues-tracker-renew-game';
+
+/**
+ * Whether a page fetched fresh replaces the kept one when the page asks (T-489): only
+ * when both are of the same account, known. Another account's page, or one that names
+ * nobody, is never kept: the next opening deletes the kept pages instead (T-321).
+ */
+export function mayRenewKeptPage(keptMark: string | null, freshMark: string | null): boolean {
+  return keptMark !== null && keptMark === freshMark;
+}
+
+/**
  * The code a tracker page names in its own text (T-487): its scripts' and stylesheets'
  * addresses, made whole against the page's address. A page fetched fresh replaces the
  * kept one only once each of these the worker keeps is kept too, so a reload with no

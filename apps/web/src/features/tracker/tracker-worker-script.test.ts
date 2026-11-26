@@ -8,8 +8,10 @@ import {
   pageAnswerPlan,
   signedInFrom,
   mayForgetGamePage,
+  mayRenewKeptPage,
   pageCodeOf,
   trackerWorkerForgetGameMessage,
+  trackerWorkerRenewGameMessage,
   trackerWorkerForgetMessage,
   trackerWorkerKeepMessage,
   trackerWorkerReleaseMessage,
@@ -368,5 +370,36 @@ describe("the tracker worker's kept page of a game (T-487, T-488)", () => {
     }
     expect(mayForgetGamePage('g-1', null)).toBe(false);
     expect(mayForgetGamePage('g-1', [{ gameId: 'g-2', state: 'waiting' }])).toBe(true);
+  });
+
+  it('asked by the page, replaces the kept page with one fetched fresh for the same account (T-489)', async () => {
+    const world = browserStandIn(
+      { [pageOf('g-1')]: answerOf(html('acc-1', 'Ned Hawkins', '/_next/static/chunks/old.js')) },
+      (url) => (url === newCode ? answerOf('code') : answerOf(html('acc-1', 'Ned H.', newCode))),
+      [{ gameId: 'G-1', state: 'waiting' }],
+    );
+    await world.message({ type: trackerWorkerRenewGameMessage, page: pageOf('g-1') });
+    // Replaced though a tap of the game waits: the page is still kept, its names fresh.
+    const text = await world.keptNow(pageOf('g-1'))?.text();
+    expect(text).toContain('Ned H.');
+    expect(text).not.toContain('Hawkins');
+    expect(world.keptNow(newCode)).toBeDefined();
+  });
+
+  it("asked by the page, keeps the kept page when the fresh one fails or is another account's, and keeps none it had not (T-489)", async () => {
+    for (const fresh of [answerOf('', 503), answerOf(html('acc-2', 'Ned H.', newCode))]) {
+      const world = browserStandIn(
+        { [pageOf('g-1')]: answerOf(html('acc-1', 'Ned Hawkins', '/_next/static/chunks/old.js')) },
+        (url) => (url === newCode ? answerOf('code') : fresh),
+        [],
+      );
+      await world.message({ type: trackerWorkerRenewGameMessage, page: pageOf('g-1') });
+      expect(await world.keptNow(pageOf('g-1'))?.text()).toContain('Ned Hawkins');
+    }
+    const none = browserStandIn({}, () => answerOf(html('acc-1', 'Ned H.', newCode)), []);
+    await none.message({ type: trackerWorkerRenewGameMessage, page: pageOf('g-1') });
+    expect(none.keptNow(pageOf('g-1'))).toBeUndefined();
+    expect(mayRenewKeptPage(null, null)).toBe(false);
+    expect(mayRenewKeptPage('acc-1', 'acc-1')).toBe(true);
   });
 });

@@ -34,6 +34,7 @@ import {
   gamesHoldingBack,
   keptAddressOf,
   mayForgetGamePage,
+  mayRenewKeptPage,
   mayKeepAnswer,
   mayReplaceStored,
   mayServeKeptPage,
@@ -44,6 +45,7 @@ import {
   trackerKeptPrefix,
   trackerNetworkWaitMs,
   trackerWorkerForgetGameMessage,
+  trackerWorkerRenewGameMessage,
   trackerWorkerForgetMessage,
   trackerWorkerKeepMessage,
   trackerWorkerReleaseMessage,
@@ -227,6 +229,21 @@ async function forgetGamePage(page) {
   }
 }
 
+// An open game's rosters changed, or the network is back (T-489): the game's kept page is
+// fetched fresh and replaces the kept one, for the same account only. With no answer, an
+// answer not to keep, or another account's, the kept page stays as it was: the page asks
+// again at its next fetch, and the next opening deletes another account's pages (T-321).
+async function renewGamePage(page) {
+  const what = keptAddressOf({ url: page, method: 'GET', mode: 'navigate' }, scope);
+  if (what === null || what.kind !== 'page') return;
+  const kept = await keptIn(what.key);
+  if (!kept) return;
+  const answer = await fetch(what.key, { credentials: 'same-origin' });
+  if (!mayKeepAnswer(answer)) return;
+  if (!mayRenewKeptPage(await accountOf(kept), await accountOf(answer))) return;
+  await replaceKeptPage(what.key, answer);
+}
+
 async function answerPage(request, key, event) {
   const open = await gamesOpen();
   let kept = await keptIn(key);
@@ -347,6 +364,10 @@ self.addEventListener('message', (event) => {
     event.waitUntil(forgetGamePage(String(event.data.page)).catch(() => undefined));
     return;
   }
+  if (event.data && event.data.type === names.renewGameMessage) {
+    event.waitUntil(renewGamePage(String(event.data.page)).catch(() => undefined));
+    return;
+  }
   if (event.data && event.data.type === names.releaseMessage) {
     const port = event.ports && event.ports[0];
     event.waitUntil(
@@ -382,6 +403,7 @@ export function trackerWorkerScript(): string {
     keepMessage: trackerWorkerKeepMessage,
     forgetMessage: trackerWorkerForgetMessage,
     forgetGameMessage: trackerWorkerForgetGameMessage,
+    renewGameMessage: trackerWorkerRenewGameMessage,
     releaseMessage: trackerWorkerReleaseMessage,
     accountDatabase: deviceAccountDatabaseName,
     accountStore: deviceAccountStoreName,
@@ -396,6 +418,7 @@ export function trackerWorkerScript(): string {
     keptAddressOf,
     mayForgetGamePage,
     mayKeepAnswer,
+    mayRenewKeptPage,
     mayReplaceStored,
     mayServeKeptPage,
     pageAnswerPlan,
