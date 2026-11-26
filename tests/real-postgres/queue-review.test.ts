@@ -51,7 +51,8 @@ const asWorker = (statement: string) =>
 beforeAll(async () => {
   owner = await ownerSession();
   db = ownerDatabase();
-  ownerName = String((await owner.query('select current_user as name')).rows[0]?.name);
+  const me = (await owner.query('select current_user as name')).rows[0] as { name?: unknown };
+  ownerName = String(me.name);
   webUrl = await makeLogin(owner, web, ['app_user', 'sign_in_store']);
   workerUrl = await makeLogin(owner, worker, ['app_user', 'queue_owner']);
 });
