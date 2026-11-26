@@ -25,7 +25,7 @@ import type {
   GameInWindow,
   GameLine,
   GameRecord,
-  GameRosterPlayer,
+  RecordedRosterPlayer,
   GamesTx,
   ScorekeepersTx,
   NewGameCorrection,
@@ -37,7 +37,7 @@ export type MemoryGames = {
   games: GameRecord[];
   lines: GameLine[];
   /** Players on teams' rosters, by team. */
-  roster: GameRosterPlayer[];
+  roster: RecordedRosterPlayer[];
   /** Games the tracker has recorded plays for. */
   tracked: string[];
   corrections: NewGameCorrection[];

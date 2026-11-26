@@ -46,6 +46,57 @@ const setUp = (settings = {}) =>
   });
 
 describe('reading the rosters for the tracker (T-115, T-258)', () => {
+  it("names players by the scoring screens' rule, a person's own request holding (R-33)", async () => {
+    const asked = [
+      {
+        ...player(homeTeamId, 1),
+        firstName: 'Zara',
+        lastName: 'Quintrell',
+        nameRequest: 'removed',
+      },
+      {
+        ...player(homeTeamId, 2),
+        firstName: 'Omar',
+        lastName: 'Vandersloot',
+        nameRequest: 'initials',
+      },
+      { ...player(awayTeamId, 3), jerseyNumber: null, nameRequest: 'removed' },
+      player(awayTeamId, 4),
+    ];
+    for (const on of [false, true]) {
+      const { deps, as } = memoryGames({
+        status: 'live',
+        games: [game(1, { captureMode: 'live' })],
+        grants: [scorekeeperGrant],
+        roster: asked,
+        settings: on
+          ? {
+              'privacy.scorekeepersSeeFullNames': [
+                { level: 'league', document: { version: 1, value: true } },
+              ],
+              // Hidden on public pages: only the setting shows the others' names here.
+              'privacy.publicNames': [
+                { level: 'league', document: { version: 1, value: 'hidden' } },
+              ],
+            }
+          : {},
+      });
+      const result = await readTrackerRosters(as(scorekeeperId), { gameId: gameUuid(1) }, deps);
+      if (!result.ok) throw new Error(result.error.code);
+      const served = JSON.stringify(result.value);
+      expect(served).not.toContain('Quintrell');
+      expect(served).not.toContain('Vandersloot');
+      expect(
+        result.value.players.map((p) => [p.jerseyNumber, p.firstName, p.lastName, p.ordinal]),
+      ).toEqual([
+        ['1', '', '', null],
+        ['2', 'O. V.', '', null],
+        [null, '', '', 1],
+        ['4', 'First4', 'Last4', null],
+      ]);
+    }
+  });
+
   it("gives the game's two teams and their players, those who left marked", async () => {
     const { deps, as } = setUp();
     const result = await readTrackerRosters(as(scorekeeperId), { gameId: gameUuid(1) }, deps);
@@ -60,7 +111,7 @@ describe('reading the rosters for the tracker (T-115, T-258)', () => {
         uniqueJerseys: false,
         allowTies: false,
         statistics: ['points', 'fg3', 'fg1', 'fouls'],
-        players: roster.slice(0, 3),
+        players: roster.slice(0, 3).map((p) => ({ ...p, ordinal: null })),
       },
     });
   });

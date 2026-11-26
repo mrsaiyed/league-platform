@@ -172,6 +172,24 @@ export const playersMayAskForInitials = defineSetting({
 });
 
 /**
+ * R-33: whether the scoring screens (the scorer's rosters, the score page, the box score
+ * sheet) show players in full. Off to start: they show the name the public sees
+ * (scoringNames, games module). On, everyone shows in full except a person whose own
+ * request is "initials" or "removed", which always holds there (R-25). Only the league's
+ * owner and admins change it, like every privacy setting; a stored value that cannot be
+ * read counts as off (readScoringNameView).
+ */
+export const scorekeepersSeeFullNames = defineSetting({
+  key: 'privacy.scorekeepersSeeFullNames',
+  type: z.boolean(),
+  default: false,
+  levels: ['league'],
+  permission: 'league.settings',
+  label: 'setting.privacy.scorekeepersSeeFullNames.label',
+  protectiveOrder: [true, false],
+});
+
+/**
  * The least number of games a player needs to be ranked among the leaders (P7 §6: a rule
  * the league sets). The lead answered the starting value for the founder at step 2.93
  * part 3: 3 games, and the league can change it; 0 sets no minimum. At most 1000, as core's
@@ -229,6 +247,7 @@ export const declaredSettings = settingRegistry([
   publicNames,
   childrenInFullConfirmed,
   playersMayAskForInitials,
+  scorekeepersSeeFullNames,
   siteNotice,
   siteDoNotIndex,
 ]);

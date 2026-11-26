@@ -601,6 +601,10 @@ export const enAdminSettings = {
     'Full names for adults, like "Jordan Ellis". Children are shown by first name and last initial, like "Jordan E.", unless their full names are confirmed below.',
   'setting.privacy.publicNames.option.hidden':
     'Hidden for everyone, adults and children: no names. A player appears by jersey number, like "#12", on team and game pages, and as "A player (name not shown)" in the statistics. People who know the team can still tell who a number is.',
+  // R-33: names on the scoring screens (step 2.226).
+  'setting.privacy.scorekeepersSeeFullNames.label':
+    "Scorekeepers see full names: the scorer's player lists, the score page and the box score sheet show everyone's full name. Off, they show each player the way the public pages do. Anyone shown as initials or with their name taken off always stays that way, whatever this says.",
+  'setting.privacy.scorekeepersSeeFullNames.name': 'Whether scorekeepers see full names',
   // The site's two settings (step 2.60, U-10, U-18).
   'setting.site.doNotIndex.label':
     'Ask search engines not to show this league. A league with children in it is never shown by search engines, whatever this says.',

@@ -34,7 +34,7 @@ import {
 } from './memory-games.test-helper.ts';
 import { sessionUuid, startOfTest } from './memory-scoring.test-helper.ts';
 import { memoryTracker, type MemoryTracker } from './memory-tracker.test-helper.ts';
-import type { GamePlayer, GameRosterPlayer } from './ports.ts';
+import type { GamePlayer, RecordedRosterPlayer } from './ports.ts';
 import { leaseMs } from './scoring-session.ts';
 import { fitWornByName, namedInState, splitTableName } from './table-players.ts';
 
@@ -46,7 +46,7 @@ const walkUp = (n: number) => `01900000-0000-4000-8000-0000000f${String(n).padSt
 const commandUuid = (n: number) => `01900000-0000-7000-8000-0000c0${String(n).padStart(6, '0')}`;
 
 /** The home team: five named players numbered 10 to 14. The visitors have no roster. */
-const homeRoster: GameRosterPlayer[] = homeIds.map((personId, i) => ({
+const homeRoster: RecordedRosterPlayer[] = homeIds.map((personId, i) => ({
   teamId: homeTeamId,
   personId,
   firstName: `Home${i + 1}`,
@@ -54,7 +54,7 @@ const homeRoster: GameRosterPlayer[] = homeIds.map((personId, i) => ({
   jerseyNumber: String(i + 10),
   left: false,
 }));
-const players = (list: readonly GameRosterPlayer[]): GamePlayer[] =>
+const players = (list: readonly RecordedRosterPlayer[]): GamePlayer[] =>
   list.map((p) => ({
     personId: p.personId,
     teamId: p.teamId,
@@ -325,7 +325,7 @@ describe('who may change the players (whoever may score this game, its two teams
 });
 
 describe('numbers (S-37, S-44)', () => {
-  const jordan: GameRosterPlayer = {
+  const jordan: RecordedRosterPlayer = {
     teamId: awayTeamId,
     personId: walkUp(90),
     firstName: 'Jordan',
@@ -460,7 +460,7 @@ describe('names (S-34, S-45)', () => {
   });
 
   it('renames no player of the team’s own roster, and none an admin has reviewed', async () => {
-    const reviewed: GameRosterPlayer = {
+    const reviewed: RecordedRosterPlayer = {
       teamId: awayTeamId,
       personId: walkUp(1),
       firstName: 'Kept',
@@ -934,7 +934,7 @@ describe('the second review’s fixes', () => {
   });
 
   it('says a number is also worn only where the season wants unique numbers (L6)', async () => {
-    const jordan: GameRosterPlayer = {
+    const jordan: RecordedRosterPlayer = {
       teamId: awayTeamId,
       personId: walkUp(90),
       firstName: 'Jordan',
@@ -954,7 +954,7 @@ describe('the second review’s fixes', () => {
   it('cuts a wearer’s long name to fit the reply, never splitting a character (L2)', async () => {
     // 100 characters outside the basic plane each way: what the database keeps, 400 units.
     const long = '𝔸'.repeat(100);
-    const wearer: GameRosterPlayer = {
+    const wearer: RecordedRosterPlayer = {
       teamId: awayTeamId,
       personId: walkUp(90),
       firstName: long,
