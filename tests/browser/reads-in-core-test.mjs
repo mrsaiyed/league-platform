@@ -6,9 +6,11 @@
 // - An admin limited to one program of the draft league opens League settings: the page AS
 //   SERVED (its text and the data sent to the client with it) holds no league setting, no
 //   sentence of who plays in the league or of how a child is shown, no profile and no
-//   publish part (T-474). Settings stays open to them with its head and the Admins row,
-//   and the Admins page keeps step 2.97's own rule (the whole list is for whoever manages
-//   access for the whole league); the owner's Admins page opens from Settings.
+//   publish part (T-474), searched by each setting's bare key in the served page AND in the
+//   answer to a client-side visit of the same address (`RSC: 1`). Settings stays open to
+//   them with its head only: no Admins row, since the Admins page keeps step 2.97's own rule
+//   (the whole list is for whoever manages access for the whole league, S-131). The owner
+//   has the row and the owner's Admins page opens from it.
 // - The owner's League settings still draws every part: the profile, the publish part, the
 //   groups of settings with every setting, the privacy sentences and the Admins row.
 // - A scorekeeper's games page lists their game and opens it, and draws no postponed games
@@ -84,6 +86,21 @@ async function served(page, address) {
   return { status: answer?.status() ?? 0, body: (await answer?.text()) ?? '' };
 }
 
+/** The answer to a client-side visit of `address` (the data a link click fetches). */
+async function servedToClient(page, address) {
+  const answer = await page.request.get(`${origin}${address}`, { headers: { RSC: '1' } });
+  return { status: answer.status(), body: await answer.text() };
+}
+
+/** What of a league's settings `body` holds: marks, privacy sentences and bare keys. */
+const leaksIn = (body, keys) => [
+  ...['settings-profile', 'settings-publish', 'settings-jump', 'data-setting='].filter((m) =>
+    body.includes(m),
+  ),
+  ...privacyWords.filter((w) => body.includes(w)),
+  ...keys.filter((key) => body.includes(key)),
+];
+
 const settingsAddress = `/${draftLeague}/admin/settings`;
 /** The setting keys the owner's page draws, to look for in the program admin's. */
 let ownerSettingKeys = [];
@@ -125,38 +142,47 @@ if (browser !== undefined) {
     }
   });
 
-  await step("a program's admin sees no league setting, and still has the Admins row", async () => {
+  await step("a program's admin sees no league setting and no Admins row", async () => {
     const { context, page } = await signedInAs('local-program-admin-token');
     try {
       const { status, body } = await served(page, settingsAddress);
       note("Settings stays open to a program's admin", status === 200, String(status));
       await page.getByRole('heading', { level: 1, name: 'League settings' }).waitFor();
-      const marks = ['settings-profile', 'settings-publish', 'settings-jump', 'data-setting='];
-      const leaked = [
-        ...marks.filter((m) => body.includes(m)),
-        ...privacyWords.filter((w) => body.includes(w)),
-        ...ownerSettingKeys.filter(
-          (key) => body.includes(`"${key}"`) || body.includes(`${key}-about`),
-        ),
-      ];
+      note('the owner gave keys to look for', ownerSettingKeys.length > 0);
+      const leaked = leaksIn(body, ownerSettingKeys);
       note(
         "the page as served to a program's admin holds no league setting",
         leaked.length === 0,
         leaked.join(', '),
       );
+      const client = await servedToClient(page, settingsAddress);
+      note('a client-side visit is answered 200', client.status === 200, String(client.status));
+      const leakedToClient = leaksIn(client.body, ownerSettingKeys);
+      note(
+        "a client-side visit's answer to a program's admin holds no league setting",
+        client.body.length > 0 && leakedToClient.length === 0,
+        leakedToClient.join(', '),
+      );
       note(
         "the program's admin's page draws no form",
         (await page.locator('main form').count()) === 0,
       );
-      // The Admins row leads to the Admins page (step 2.97), which keeps its own rule: the
-      // league's whole list is for whoever manages access for the whole league, so it
-      // answers this admin with its own refusal, as before this step.
-      await Promise.all([
-        page.waitForURL((url) => url.pathname === `/${draftLeague}/admin/settings/admins`),
-        page.locator('.settings-admins').getByRole('link', { name: 'Admins' }).click(),
-      ]);
-      await page.getByRole('heading', { level: 1, name: 'You do not have access' }).waitFor();
-      note("the Admins row leads to the Admins page, which keeps step 2.97's own rule", true);
+      // No Admins row: the Admins page (step 2.97) keeps its own rule, the league's whole
+      // list is for whoever manages access for the whole league, so a row would lead only
+      // to its refusal (S-131).
+      const adminsAddress = `/${draftLeague}/admin/settings/admins`;
+      note(
+        "a program's admin is drawn no Admins row",
+        (await page.locator('.settings-admins').count()) === 0 &&
+          !body.includes(adminsAddress) &&
+          !client.body.includes(adminsAddress),
+      );
+      const admins = await served(page, adminsAddress);
+      note(
+        "the Admins page keeps step 2.97's own rule for a program's admin",
+        admins.status === 403,
+        String(admins.status),
+      );
     } finally {
       await context.close();
     }
@@ -208,7 +234,7 @@ if (browser !== undefined) {
       const schedule = await served(page, `/${liveLeague}/admin/schedule`);
       note(
         'the schedule, where the draft is, is not theirs to open',
-        schedule.status !== 200 && !schedule.body.includes('data-draft'),
+        schedule.status === 403 && !schedule.body.includes('data-draft'),
         String(schedule.status),
       );
     } finally {

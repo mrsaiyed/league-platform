@@ -2397,6 +2397,18 @@ const rows: readonly Row[] = [
     prepare: async () => ({ input: {} }),
     run: (c, i) => readLeagueSettings(c, i, leaguesDeps),
   },
+  // The same read in an archived league (T-474: in any state of the league), so the holders
+  // still read it where nothing may be edited.
+  {
+    command: 'leagues.read_league_settings',
+    name: 'read the league settings of an archived league',
+    needs: 'league.settings',
+    prepare: async (league) => {
+      await pglite.query("update leagues set status = 'archived' where id = $1", [league.leagueId]);
+      return { input: {} };
+    },
+    run: (c, i) => readLeagueSettings(c, i, leaguesDeps),
+  },
   {
     command: 'leagues.get_season',
     name: 'see a season of the default program',

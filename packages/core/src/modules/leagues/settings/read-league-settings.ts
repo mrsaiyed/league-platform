@@ -6,8 +6,8 @@
 //
 // Since step 2.227 (T-474): `league.settings` for the WHOLE league, in any state of the
 // league, so the owner and a league-wide admin read it as before and an admin limited to
-// one program is refused it. Such an admin still opens Settings for the Admins page of
-// their program (step 2.97), which reads nothing of this.
+// one program is refused it: Settings opens for them with its head only (the Admins row is
+// for whoever the Admins page answers, S-131).
 import { z } from 'zod';
 import { defineCommand, ok, type Result } from '../../../command/index.ts';
 import { readYouthResets, type YouthResets } from '../commands/set-league-audience.ts';

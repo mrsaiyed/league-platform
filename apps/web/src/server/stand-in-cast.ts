@@ -49,8 +49,9 @@ export const standInPeople = {
    */
   teamCoach: { accountId: id(0xae), token: 'local-team-coach-token' },
   /**
-   * An admin of one program of the draft league only (step 2.227): Settings opens for the
-   * Admins page of their program and shows them no league setting.
+   * An admin of one program of the draft league only (step 2.227): Settings opens with its
+   * head only, no league setting and no Admins row (step 2.97's page is for whole-league
+   * managers, S-131).
    */
   programAdmin: { accountId: id(0xaf), token: 'local-program-admin-token' },
 } as const satisfies Record<string, MadeUpPerson>;

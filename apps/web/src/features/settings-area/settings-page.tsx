@@ -2,6 +2,7 @@
 // product declares at the league level, drawn from the declarations (T-98).
 import {
   leagueUrl,
+  listAccess,
   mayChangeLeagueSettings,
   mayEditLeague,
   readLeagueSettings,
@@ -42,12 +43,15 @@ export async function SettingsPage({
   readonly query: Readonly<Record<string, string | string[] | undefined>>;
 }) {
   const view = await loadLeaguePage(league, 'admin', 'settings');
-  const { adminSettings, publicSchedule } = await webPorts();
+  const { adminAccess, adminSettings, publicSchedule } = await webPorts();
   const context = commandContextOf(view.context);
   // What the page draws is one read in core (step 2.227, T-474): it needs `league.settings`
   // for the whole league. An admin limited to one program is refused it and sees only the
-  // head and the Admins row (step 2.97); nothing league-wide is read for them.
+  // head; nothing league-wide is read for them.
   const read = await readLeagueSettings(context, {}, adminSettings.deps);
+  // The Admins row is drawn only for whoever the Admins page answers (step 2.97: the
+  // league's whole list, `list_access` for the whole league), never as a dead link (S-131).
+  const mayOpenAdmins = (await listAccess(context, {}, adminAccess.deps)).ok;
   const shown = read.ok
     ? await adminSettings.deps.transaction(context, async (tx) => ({
         ...read.value,
@@ -86,23 +90,26 @@ export async function SettingsPage({
   return (
     <main className="admin-settings">
       <PageHead title={t('admin.area.settings')} sub={t('adminSettings.intro')} />
-      {/* Who helps run the league (step 2.97): its own page, one row that leads to it. */}
-      <ul className="staff-rows settings-admins">
-        <li className="staff-row">
-          <span className="staff-row-words">
-            <a
-              className="staff-row-link"
-              href={leagueUrl(view.context.league, 'admin-area', {
-                area: 'settings',
-                subpath: ['admins'],
-              })}
-            >
-              {t('adminAccess.title')}
-            </a>
-            <span className="staff-row-facts">{t('adminAccess.fromSettings')}</span>
-          </span>
-        </li>
-      </ul>
+      {/* Who helps run the league (step 2.97): its own page, one row that leads to it,
+          drawn only for whoever that page answers (S-131). */}
+      {mayOpenAdmins ? (
+        <ul className="staff-rows settings-admins">
+          <li className="staff-row">
+            <span className="staff-row-words">
+              <a
+                className="staff-row-link"
+                href={leagueUrl(view.context.league, 'admin-area', {
+                  area: 'settings',
+                  subpath: ['admins'],
+                })}
+              >
+                {t('adminAccess.title')}
+              </a>
+              <span className="staff-row-facts">{t('adminAccess.fromSettings')}</span>
+            </span>
+          </li>
+        </ul>
+      ) : null}
       {/* Said at the top as before; with scripts on the page is drawn again where it was,
           so the answer brings itself into view (T-437). */}
       {problem === undefined ? null : (
