@@ -21,6 +21,14 @@
 // its starting design's main color in the page's styles, not the neutral one (#1f5fbf),
 // and the two leagues differ. A league with no design published is drawn in the neutral
 // one: that fallback is proved in apps/web/src/server/database-league-sites.test.ts.
+// Part 4 (step 2.225, T-81): every public page and public API answer of both seed leagues,
+// and then of the stand-in's two live leagues on a second server, holds no person's or
+// roster place's database id. The ids are collected from the stores as their owners are
+// shown them (the people list, each team's admin page, each game's scorer rosters), and
+// every served byte is searched for each; the pages are found by following every public
+// link from each league's home page, the API answers are each game's snapshot, health and
+// robots.txt. It fails when the snapshot's player key is put back to the person's id.
+import { randomUUID } from 'node:crypto';
 import {
   accessibilityProblems,
   buildNext,
@@ -494,6 +502,319 @@ if (browser) {
     drawnIn.size === people.length && new Set(drawnIn.values()).size === people.length,
     JSON.stringify([...drawnIn]),
   );
+}
+
+const uuidIn = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g;
+const chosenPassword = 'a made-up chosen password';
+
+/** The code in the newest kept email to `address`, read on the kept emails' page. */
+async function codeOnThePage(page, address) {
+  await page.goto(`${origin}/signin/kept-emails`);
+  const email = page.locator(`li[data-kept-email="${address}"]`).first();
+  await email.waitFor();
+  return (await email.locator('code[data-code]').innerText()).trim();
+}
+
+/** A seed owner signed up through the screens; their session cookie's value. */
+async function ownerCookie(address) {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  page.setDefaultTimeout(60_000);
+  await page.goto(`${origin}/signup`);
+  await page.getByLabel('Email').fill(address);
+  await Promise.all([
+    page.waitForURL((url) => url.pathname === '/signup/code'),
+    page.getByRole('button', { name: 'Email me a code' }).click(),
+  ]);
+  let code = '';
+  for (let tries = 0; tries < 10 && !/^\d{6}$/.test(code); tries += 1) {
+    code = await codeOnThePage(page, address).catch(() => '');
+  }
+  await page.goto(`${origin}/signup/code`);
+  await page.getByLabel('Code').fill(code);
+  await Promise.all([
+    page.waitForURL((url) => url.pathname === '/signup/password'),
+    page.getByRole('button', { name: 'Continue' }).click(),
+  ]);
+  await page.getByLabel('Password').fill(chosenPassword);
+  await Promise.all([
+    page.waitForURL((url) => url.pathname !== '/signup/password'),
+    page.getByRole('button', { name: 'Save and sign in' }).click(),
+  ]);
+  const cookie = (await context.cookies()).find((c) => c.name === 'srl_session')?.value ?? '';
+  await context.close();
+  note(`${address} is signed in`, cookie !== '');
+  return cookie;
+}
+
+/**
+ * Part 4: the scan of one world. `leaguesOf` is each league's short name and its owner's
+ * session cookie. Every public page (followed from the league's home page) and every public
+ * API answer is fetched as a visitor, and searched for every person's and roster place's id
+ * the league's owner is shown.
+ */
+async function scanServed(world, at, leaguesOf) {
+  const fetchText = async (path, cookie) => {
+    const answer = await fetch(at + path, {
+      redirect: 'manual',
+      headers: cookie === undefined ? {} : { cookie: `srl_session=${cookie}` },
+    });
+    return {
+      status: answer.status,
+      location: answer.headers.get('location'),
+      text: (await answer.text()).toLowerCase(),
+    };
+  };
+  const local = (href) => (href.startsWith(at) ? href.slice(at.length) || '/' : href);
+  /**
+   * A visitor's answer to one address, its redirects followed (five at most): where it
+   * ended and with what status, and every address it passed through.
+   */
+  const visit = async (address) => {
+    const passed = [address];
+    let answer = await fetchText(address);
+    while (answer.status >= 300 && answer.status < 400 && passed.length <= 5) {
+      const next = local(new URL(answer.location ?? '', at + passed.at(-1)).href);
+      passed.push(next);
+      answer = await fetchText(next);
+    }
+    return { ...answer, end: passed.at(-1), passed };
+  };
+  const linksIn = (html) =>
+    [...html.matchAll(/href="([^"#]*)/g)].map(([, href]) => local(href.replaceAll('&amp;', '&')));
+  let playersInWorld = 0;
+  let namelessInWorld = 0;
+  for (const { slug, cookie, unplayed = false } of leaguesOf) {
+    // The ids, from the stores as the owner is shown them.
+    const personIds = new Set();
+    const placeIds = new Set();
+    const people = await fetchText(`/${slug}/admin/people`, cookie);
+    for (const [, id] of people.text.matchAll(/\/admin\/people\/([0-9a-f-]{36})/g)) {
+      personIds.add(id);
+    }
+    // The accounts the owner can put on a game's table: each one's id, as the scorekeepers
+    // page names it in its forms. No screen an owner sees shows a profile's id (T-467).
+    const accountIds = new Set();
+    const keepers = await fetchText(`/${slug}/admin/games/scorekeepers`, cookie);
+    for (const [, id] of keepers.text.matchAll(
+      /(?:<option value|name="account" value)="([0-9a-f-]{36})"/g,
+    )) {
+      accountIds.add(id);
+    }
+    const teams = await fetchText(`/${slug}/admin/teams`, cookie);
+    const teamPages = new Set(
+      linksIn(teams.text).filter((href) => new RegExp(`^/${slug}/admin/teams/[^/?]+$`).test(href)),
+    );
+    for (const address of teamPages) {
+      const team = await fetchText(address, cookie);
+      for (const [, id] of team.text.matchAll(/name="entry" value="([0-9a-f-]{36})"/g)) {
+        placeIds.add(id);
+      }
+    }
+    // Every public page, followed from the home page as a visitor follows its links.
+    // Each page must answer 200, after its redirects; only the page the scan asks for
+    // knowing it is not there may end in the public "not found" (404).
+    const served = new Map();
+    const notThere = `/${slug}/no-such-page`;
+    const waiting = [`/${slug}`, `/${slug}/my`, notThere];
+    const isPublic = (href) =>
+      (href === `/${slug}` || href.startsWith(`/${slug}/`) || href.startsWith(`/${slug}?`)) &&
+      !/^\/[^/]+\/(admin|score|account|invitation)(\/|$|\?)/.test(href);
+    const limit = 400;
+    const badAnswers = [];
+    const pageOk = new Set();
+    let pagesRead = 0;
+    while (waiting.length > 0 && pagesRead < limit) {
+      const address = waiting.shift();
+      if (served.has(address)) continue;
+      const answer = await visit(address);
+      pagesRead += 1;
+      for (const passed of answer.passed) served.set(passed, '');
+      served.set(answer.end, answer.text);
+      const expected = answer.status === 200 || (address === notThere && answer.status === 404);
+      if (expected) pageOk.add(address);
+      else badAnswers.push(`${address} ended at ${answer.end} with ${answer.status}`);
+      for (const href of linksIn(answer.text)) {
+        if (isPublic(href) && !served.has(href)) waiting.push(href);
+      }
+    }
+    const unread = waiting.filter((href) => !served.has(href));
+    note(
+      `${world} ${slug}: every public page it follows answers 200 (${pagesRead} pages read)`,
+      badAnswers.length === 0,
+      badAnswers.slice(0, 6).join('; '),
+    );
+    note(
+      `${world} ${slug}: the scan reads every public page within its limit of ${limit}`,
+      unread.length === 0,
+      `${unread.length} not read, as ${unread.slice(0, 3).join(', ')}`,
+    );
+    const home = served.get(`/${slug}`) ?? '';
+    const leagueId = home.match(/leagueid\\?":\\?"([0-9a-f-]{36})/)?.[1];
+    const games = new Set(
+      [...served.keys()].flatMap(
+        (a) => a.match(/\/games\/([0-9a-f-]{36})(?:\?|$)/)?.slice(1, 2) ?? [],
+      ),
+    );
+    let playersInSnapshots = 0;
+    for (const game of games) {
+      const api = `/api/v1/leagues/${leagueId}/games/${game}`;
+      const shownAt = [...served.keys()].filter((a) =>
+        new RegExp(`^/${slug}/games/${game}(\\?|$)`).test(a),
+      );
+      note(
+        `${world} ${slug}: game ${game}'s page answers 200`,
+        shownAt.some((a) => pageOk.has(a)),
+        shownAt.join(', '),
+      );
+      const snapshot = await fetchText(`${api}/snapshot`);
+      served.set(`${api}/snapshot`, snapshot.text);
+      note(
+        `${world} ${slug}: game ${game}'s snapshot answers 200`,
+        snapshot.status === 200,
+        String(snapshot.status),
+      );
+      if (snapshot.status === 200) {
+        const { players } = JSON.parse(snapshot.text);
+        playersInSnapshots += players.length;
+        namelessInWorld += players.filter((p) => p.unnamed === true).length;
+      }
+      // The scorer's rosters (staff only): every player's person id, from the store.
+      const rosters = await fetchText(`${api}/rosters`, cookie);
+      if (rosters.status === 200) {
+        for (const player of JSON.parse(rosters.text).players) personIds.add(player.personid);
+      }
+    }
+    for (const address of ['/api/v1/health', '/robots.txt']) {
+      served.set(address, (await fetchText(address)).text);
+    }
+    // The scan is not empty: it has the ids to look for and players' lines to look in.
+    note(
+      `${world} ${slug}: the owner is shown its people's ids`,
+      personIds.size >= 2,
+      String(personIds.size),
+    );
+    note(
+      `${world} ${slug}: the owner is shown its roster places' ids`,
+      placeIds.size >= 2,
+      String(placeIds.size),
+    );
+    note(
+      `${world} ${slug}: its games' pages are found`,
+      games.size >= 2 && leagueId !== undefined,
+      String(games.size),
+    );
+    note(
+      `${world} ${slug}: the owner is shown accounts' ids`,
+      accountIds.size >= 1,
+      String(accountIds.size),
+    );
+    // Counted per league: a league whose snapshots list nobody would be scanned for nothing.
+    // One whose games nobody has played is said so, and must still list nobody.
+    note(
+      unplayed
+        ? `${world} ${slug}: its games' snapshots list no player (none is played)`
+        : `${world} ${slug}: its games' snapshots list players`,
+      unplayed ? playersInSnapshots === 0 : playersInSnapshots > 0,
+      String(playersInSnapshots),
+    );
+    playersInWorld += playersInSnapshots;
+    note(`${world} ${slug}: its public pages are found`, served.size >= 10, String(served.size));
+    const found = [];
+    for (const [address, text] of served) {
+      for (const id of text.match(uuidIn) ?? []) {
+        if (personIds.has(id)) found.push(`a person's id ${id} in ${address}`);
+        if (placeIds.has(id)) found.push(`a roster place's id ${id} in ${address}`);
+        if (accountIds.has(id)) found.push(`an account's id ${id} in ${address}`);
+      }
+    }
+    note(
+      `${world} ${slug}: no public page or API answer holds a person's or roster place's id (${served.size} answers)`,
+      found.length === 0,
+      found.slice(0, 6).join('; '),
+    );
+  }
+  return { playersInWorld, namelessInWorld };
+}
+
+if (browser) {
+  await step('part 4: every public answer on the made-up database holds no person id', async () => {
+    const owners = {
+      lakeside: 'owner@lakeside.example.test',
+      'maple-street': 'owner@maple.example.test',
+    };
+    const leaguesOf = [];
+    for (const [slug, address] of Object.entries(owners)) {
+      leaguesOf.push({ slug, cookie: await ownerCookie(address) });
+    }
+    await scanServed('database', origin, leaguesOf);
+  });
+}
+server?.child.kill();
+server = undefined;
+
+if (browser) {
+  const standIn = `http://localhost:${await freePort()}`;
+  server = startNext(['start', '--port', new URL(standIn).port], {
+    APP_ENV: 'test',
+    PUBLIC_BASE_URL: standIn,
+  });
+  await step('part 4: every public answer on the stand-in holds no person id', async () => {
+    await waitFor(`${standIn}/`, server);
+    // The made-up scorekeeper tips off North Valley's live game (stand-in-games.ts), so
+    // its snapshot lists every player of both teams.
+    const game = `${standIn}/api/v1/leagues/01900000-0000-7000-8000-000000000001/games/01900000-0000-7000-8000-006a00000002`;
+    const post = async (path, body) => {
+      const answer = await fetch(game + path, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          cookie: 'srl_session=local-scorekeeper-token',
+          origin: standIn,
+        },
+        body: JSON.stringify(body),
+      });
+      if (!answer.ok) throw new Error(`${path} answered ${answer.status}`);
+      const reply = await answer.json();
+      const refused = (reply.results ?? []).filter((r) => r.status !== 'accepted');
+      if (refused.length > 0) throw new Error(`taps refused: ${JSON.stringify(refused)}`);
+      return reply;
+    };
+    const { sessionId } = await post('/session', { type: 'open', deviceId: 'scan-tablet' });
+    const player = (team, n) =>
+      `01900000-0000-7000-8000-${(0x70 + team).toString(16).padStart(4, '0')}${n.toString(16).padStart(8, '0')}`;
+    const tap = (input) => ({ commandId: randomUUID(), at: Date.now(), input });
+    // A player added at the table by number only (S-34): a line with no name, its id one
+    // the device made, scored so the snapshot lists it.
+    const numberOnly = randomUUID();
+    await post('/commands', {
+      protocolVersion: 2,
+      sessionId,
+      commands: [
+        tap({ type: 'add-player', side: 'home', playerId: numberOnly, jersey: '77', name: '' }),
+        tap({
+          type: 'lineup',
+          side: 'home',
+          playerIds: [...[1, 2, 3, 4].map((n) => player(3, n)), numberOnly],
+        }),
+        tap({ type: 'lineup', side: 'away', playerIds: [1, 2, 3, 4, 5].map((n) => player(4, n)) }),
+        tap({ type: 'start' }),
+        tap({ type: 'score', side: 'home', playerId: player(3, 1), points: 2 }),
+        tap({ type: 'score', side: 'home', playerId: numberOnly, points: 2 }),
+      ],
+    });
+    const { namelessInWorld } = await scanServed('stand-in', standIn, [
+      { slug: 'north-valley', cookie: 'local-owner-token' },
+      // Its games are all to come (stand-in-world-seed.ts, an empty league's world).
+      { slug: 'harbor-city', cookie: 'local-owner-token', unplayed: true },
+    ]);
+    // The seed leagues have no nameless person; this world's scan meets one.
+    note(
+      'stand-in: a snapshot lists a line with no name',
+      namelessInWorld >= 1,
+      String(namelessInWorld),
+    );
+  });
 }
 
 await browser?.close();

@@ -34,6 +34,7 @@ import {
   gameWords,
 } from './build-game.ts';
 import { GameContent, type GameView } from './game-content.tsx';
+import { publicPlayerKey } from '../../server/player-key.ts';
 
 type World = ReturnType<typeof trackerWorld>;
 const viewing = {
@@ -102,7 +103,7 @@ async function caseFortyFour(world: World) {
 /** The game's page as game-page.tsx draws it, from the same reads. */
 async function pageHtml(world: World) {
   const store = world.tracker.snapshotStoreOf(liveLeagueId);
-  const snapshot = await readGameSnapshot(store, { gameId }, viewing, Date.now());
+  const snapshot = await readGameSnapshot(store, { gameId }, viewing, Date.now(), publicPlayerKey);
   const page = await readGamePage(store, { gameId }, viewing);
   if (!snapshot.ok || !page.ok) throw new Error('no game');
   const view: GameView = {

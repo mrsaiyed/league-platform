@@ -25,6 +25,7 @@ import {
 import { databasePorts } from './database-ports.ts';
 import type { WebPorts } from './ports.ts';
 import type { SignInMail } from './sign-in/sign-in-mail.ts';
+import { publicPlayerKey } from './player-key.ts';
 
 let made: database.MadeUpDatabase;
 let db: database.DatabaseHandle;
@@ -302,7 +303,13 @@ describe('the simulated league’s public pages (step 2.236)', () => {
             audience,
             policy,
           };
-          const shown = await readGameSnapshot(store, { gameId }, viewing, Date.now());
+          const shown = await readGameSnapshot(
+            store,
+            { gameId },
+            viewing,
+            Date.now(),
+            publicPlayerKey,
+          );
           return { shown, page: await readGamePage(store, { gameId }, viewing) };
         },
       );

@@ -160,9 +160,11 @@ const schema = z.object({
   // what a live league shows. Staging and production always hide them; only local and test
   // read it.
   LOCAL_UNRELEASED: z.enum(['shown', 'hidden']).default('shown'),
+  // The public player key's secret (T-465, player-key.ts): optional, because without it
+  // the key's secret is derived from SUPABASE_SECRET_KEY, or made at random on made-up data.
+  SESSION_SECRET: secretText(32).optional(),
   // Nothing uses these yet (R8): each becomes required, where it is used, with the
   // step that first uses it. Given now, they are still checked.
-  SESSION_SECRET: secretText(32).optional(),
   STRIPE_SECRET_KEY: secretText(8).optional(),
   STRIPE_WEBHOOK_SECRET: secretText(8).optional(),
   // The sign-in service (record 018): staging and production only; local work and

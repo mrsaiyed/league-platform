@@ -238,6 +238,102 @@ if (browser) {
     }
   });
 
+  // Step 2.225 (T-462, T-463): the snapshot knows each player by a key of this game only,
+  // and a page holding an answer with other keys, as one opened before the release does,
+  // takes the next answer whole and keeps following, a player's line included.
+  await step(
+    'the page follows with the new keys, and takes an answer with other keys whole',
+    async () => {
+      const answer = await (await fetch(origin + api + '/snapshot')).json();
+      const keys = answer.players.map((p) => p.playerId);
+      const v8 = /^[0-9a-f]{8}-[0-9a-f]{4}-8[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+      note(
+        "the snapshot lists the Hawks' players (the Bears show theirs to staff)",
+        keys.length >= 5,
+        String(keys.length),
+      );
+      note(
+        'each player is known by a version 8 key',
+        keys.every((k) => v8.test(k)),
+        keys.join(' '),
+      );
+      note(
+        "no key is a person's id",
+        keys.every((k) => ![...hawks, ...bears].includes(k)),
+        keys.join(' '),
+      );
+      const screen = await viewer();
+      try {
+        const { page } = screen;
+        await page.locator('[data-live-connection="open"]').waitFor({ timeout: 10_000 });
+        await showsSequence(page, keeper.sequence(), 5_000);
+        const hawksRows = page
+          .locator('section[aria-labelledby="game-players"] table.ui-box-score')
+          .filter({ has: page.locator('caption', { hasText: 'Hawks' }) })
+          .locator('tbody tr');
+        const drawn = await hawksRows.allTextContents();
+        // The next snapshot the page asks for comes with other keys for every player.
+        let changed = 0;
+        await page.route(`**${api}/snapshot**`, async (route) => {
+          const real = await route.fetch();
+          const body = await real.json();
+          for (const player of body.players ?? []) player.playerId = randomUUID();
+          changed += 1;
+          await route.fulfill({ response: real, json: body });
+          await page.unroute(`**${api}/snapshot**`);
+        });
+        const asked = screen.snapshots.length;
+        let sequence = await keeper.tap({ type: 'foul', side: 'home', playerId: hawks[1] });
+        await showsSequence(page, sequence, 10_000);
+        // The page asks for the players after a play (messages do not carry them); 10 s at most.
+        for (let tries = 0; tries < 50 && changed === 0; tries += 1) await pause(200);
+        note(
+          'a snapshot with other keys was taken',
+          changed === 1 && screen.snapshots.length > asked,
+          `${changed}`,
+        );
+        const before = await homeScore(page);
+        const lineBefore = await hawksRows.allTextContents();
+        note(
+          'the page took the other keys whole: no line twice',
+          lineBefore.length === drawn.length,
+          `${lineBefore.length} of ${drawn.length}`,
+        );
+        sequence = await keeper.tap({ type: 'score', side: 'home', playerId: hawks[0], points: 2 });
+        await showsSequence(page, sequence, 5_000);
+        const after = await homeScore(page);
+        note(
+          'the score moved without a reload',
+          Number(after) === Number(before) + 2,
+          `${before} then ${after}`,
+        );
+        await page.waitForFunction(
+          (rows) => {
+            const now = [
+              ...document.querySelectorAll(
+                'section[aria-labelledby="game-players"] table.ui-box-score',
+              ),
+            ]
+              .filter((t) => (t.querySelector('caption')?.textContent ?? '').includes('Hawks'))
+              .flatMap((t) => [...t.querySelectorAll('tbody tr')].map((r) => r.textContent));
+            return now.length === rows.length && now.some((row, i) => row !== rows[i]);
+          },
+          lineBefore,
+          { timeout: 5_000 },
+        );
+        const lineAfter = await hawksRows.allTextContents();
+        const moved = lineAfter.filter((row, i) => row !== lineBefore[i]);
+        note(
+          "one player's line changed without a reload, and no line twice",
+          moved.length === 1 && lineAfter.length === drawn.length,
+          moved.join(' | '),
+        );
+      } finally {
+        await screen.context.close();
+      }
+    },
+  );
+
   await step('messages dropped on purpose: the page recovers by snapshot', async () => {
     const screen = await viewer({ dropMessages: true });
     try {
@@ -261,7 +357,7 @@ if (browser) {
       });
       await showsSequence(screen.page, sequence, 5_000);
       note('the gap was answered by a snapshot', screen.snapshots.length > asked);
-      note('the page shows the game as it stands', (await homeScore(screen.page))?.trim() === '5');
+      note('the page shows the game as it stands', (await homeScore(screen.page))?.trim() === '7'); // 3, 2 (step 2.225), 2
       note(
         "the Bears' points from the dropped messages are there",
         (await screen.page.locator('.ui-scoreboard-side').first().textContent())?.includes('2'),

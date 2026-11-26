@@ -15,6 +15,7 @@ import { keptEmailsFolderFrom } from './kept-emails.ts';
 import { runsOnMadeUpData } from './made-up-mode.ts';
 import type { WebPorts } from './ports.ts';
 import { startWebApp, type StartupDeps } from './startup.ts';
+import { startPublicPlayerKey } from './player-key.ts';
 
 /**
  * Where the app's own lines go: commands at info, warnings at warn, and the one alarm (the
@@ -40,6 +41,8 @@ export function webPorts(): Promise<WebPorts> {
 
 function start(): Promise<WebPorts> {
   const config = getConfig();
+  // The public snapshot's player key, under the secret T-465 chooses (T-462, step 2.225).
+  startPublicPlayerKey(config);
   const logger = createLogger({ sink: consoleSink, level: config.LOG_LEVEL, base: { app: 'web' } });
   return startWebApp(config, {
     database: () => import(/* turbopackIgnore: true */ '@srleagues/database'),

@@ -39,6 +39,28 @@ const applySnapshot = (state: ViewerState, snap: GameSnapshot): ViewerState =>
 const viewing = (sequence: number) => applySnapshot(startViewing(gameId), snapshot(sequence));
 
 describe('a viewer fed numbered messages', () => {
+  it("takes a snapshot whose player keys are not the ones it holds whole (T-462's release)", () => {
+    const line = (playerId: string, points: number) => ({
+      playerId,
+      side: 'home' as const,
+      name: null,
+      jersey: '4',
+      points,
+      fouls: 0,
+      onCourt: true,
+    });
+    // Arrived before the release: the player under their old id.
+    const before = applySnapshot(startViewing(gameId), {
+      ...snapshot(3),
+      players: [line('01900000-0000-7000-8000-00000000f001', 2)],
+    });
+    // The next answer knows the same player by their key in this game only.
+    const keyed = [line('3c0f9a1e-77b2-8d40-9a65-2f1e0c4b7d93', 4)];
+    const after = applySnapshot(before, { ...snapshot(4), players: keyed });
+    expect(after.game?.players).toEqual(keyed);
+    expect(after.game?.sequence).toBe(4);
+  });
+
   it('waits for the first snapshot before applying anything', () => {
     const r = applyMessage(startViewing(gameId), message(1));
     expect(r.outcome).toBe('waiting');
