@@ -68,7 +68,7 @@ describe('the fixture import screen actions', () => {
     expect(report).toMatchObject({ status: 'ready', gameCount: 3, scoreCount: 1, rowsRead: 5 });
     expect(report.problems.map((p) => p.rowNumber)).toEqual([4, 5]);
     expect(report.problems.every((p) => p.message.length > 0)).toBe(true);
-    expect(await ports.draftChangeCount(leagueId, season)).toBe(0);
+    expect(await ports.draftChangeCount(as(scheduler), season)).toBe(0);
 
     const version = { importId, version: String(report.version) };
     const applied = await runImportAction(
@@ -79,7 +79,12 @@ describe('the fixture import screen actions', () => {
       season,
     );
     expect(applied).toEqual({ ok: true, importId, clashCount: 0 });
-    expect(await ports.draftChangeCount(leagueId, season)).toBe(3);
+    expect(await ports.draftChangeCount(as(scheduler), season)).toBe(3);
+    // The count applies the role itself (step 2.227): the owner is told it, a coach (who may
+    // not read the draft) and someone of another league are told nothing.
+    expect(await ports.draftChangeCount(as(owner), season)).toBe(3);
+    expect(await ports.draftChangeCount(as(coach), season)).toBe(0);
+    expect(await ports.draftChangeCount(as(scheduler, otherLeagueId), season)).toBe(0);
     const after = await view(importId);
     expect(after).toMatchObject({ status: 'applied', scoresWaiting: 1 });
 
@@ -96,7 +101,7 @@ describe('the fixture import screen actions', () => {
       season,
     );
     expect(undone).toEqual({ ok: true, importId });
-    expect(await ports.draftChangeCount(leagueId, season)).toBe(0);
+    expect(await ports.draftChangeCount(as(scheduler), season)).toBe(0);
     expect((await view(importId)).status).toBe('undone');
   });
 
@@ -142,7 +147,7 @@ describe('the fixture import screen actions', () => {
     }
     // Nothing was changed: the import still waits and the draft is empty.
     expect((await view(importId)).status).toBe('ready');
-    expect(await ports.draftChangeCount(leagueId, season)).toBe(0);
+    expect(await ports.draftChangeCount(as(scheduler), season)).toBe(0);
   });
 
   it('says plainly when there is no file or no season', async () => {

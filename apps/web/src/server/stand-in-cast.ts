@@ -48,6 +48,12 @@ export const standInPeople = {
    * a coach role on that team alone (step 2.46): sees those numbers, and no other team's.
    */
   teamCoach: { accountId: id(0xae), token: 'local-team-coach-token' },
+  /**
+   * An admin of one program of the draft league only (step 2.227): Settings opens with its
+   * head only, no league setting and no Admins row (step 2.97's page is for whole-league
+   * managers, S-131).
+   */
+  programAdmin: { accountId: id(0xaf), token: 'local-program-admin-token' },
 } as const satisfies Record<string, MadeUpPerson>;
 
 function league(

@@ -143,6 +143,11 @@ const grants = [
     type: 'team',
     id: standInOwlsTeamId,
   }),
+  // An admin of one program of the draft league (step 2.227, T-474).
+  grantOf(16, standInPeople.programAdmin.accountId, 'admin', standInLeagues.draft.id, {
+    type: 'program',
+    id: standInDraftProgramId,
+  }),
 ];
 
 const leagues: readonly (typeof standInLeagues)[keyof typeof standInLeagues][] =

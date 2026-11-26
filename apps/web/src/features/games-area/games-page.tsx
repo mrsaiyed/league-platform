@@ -60,6 +60,7 @@ import { ReopenLine } from './reopen-line.tsx';
 import { SaidLine } from '../list-forms/said-line.tsx';
 import { notDoneOf, notDoneText } from './not-done-text.ts';
 import type { SaidKind } from '../list-forms/said-kind.ts';
+import { keptNames } from './kept-names.ts';
 import { shownTeamNames } from './shown-team-names.ts';
 import { newDateAnchor, waitingListAnchor as waitingAnchor } from './waiting-anchor.ts';
 import {
@@ -545,7 +546,14 @@ export async function GamesPage({
   ];
   const holder = await ports.accessOf(context);
   const reopens = await readReopenViews(games, context, holder, ports.games.deps);
-  const names = shownTeamNames(await ports.games.namesOf(addressee.id));
+  // Every name the league holds, for naming a game a command returned by its id
+  // (gameNamedOff); what the page draws and sends holds only names of the games the
+  // commands returned (step 2.227, T-475).
+  const allNames = shownTeamNames(await ports.games.namesOf(addressee.id));
+  const names = keptNames(allNames, [...games, ...(postponed.ok ? postponed.value : [])], {
+    teamIds: laterTeams,
+    seasonIds: (earlier.ok ? earlier.value.rounds : []).map((r) => r.seasonId),
+  });
   const rowsOf = (of: readonly MyGame[]) => buildGameRows(of, names, holder, reopens);
   // The ports' one clock (step 2.179): the made-up world's own on the stand-in, so a game's
   // time is never measured against another clock than the one it was read on.
@@ -561,11 +569,11 @@ export async function GamesPage({
   const offPage =
     notice === undefined || aboutRow !== undefined
       ? undefined
-      : await gameNamedOff(notice.thing, context, names, ports.games.deps);
+      : await gameNamedOff(notice.thing, context, allNames, ports.games.deps);
   // The games a game put back now shares its place with, named from their records.
   const others: string[] = [];
   for (const other of notice?.about ?? []) {
-    const named = await gameNamedOff(other, context, names, ports.games.deps);
+    const named = await gameNamedOff(other, context, allNames, ports.games.deps);
     if (named !== undefined) others.push(gameText(named));
   }
   const saved = notice === undefined ? undefined : noticeText(notice, aboutRow ?? offPage, others);
