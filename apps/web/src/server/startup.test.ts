@@ -1,7 +1,15 @@
 // T-30 and T-60 at startup: the stand-in for local work, and the login check that
 // stops staging and production on a database role that could see past the fence.
-import { describe, expect, it, vi } from 'vitest';
-import { connectCauseOf, serverCodeOf, type DatabaseHandle } from '@srleagues/database';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import {
+  checkLoginRole as realCheckLoginRole,
+  connectCauseOf,
+  createDatabase as realCreateDatabase,
+  madeUpDatabase,
+  serverCodeOf,
+  type DatabaseHandle,
+  type MadeUpDatabase,
+} from '@srleagues/database';
 import type {
   EmailConfirmation,
   EmailConfirmationQuestion,
@@ -720,5 +728,77 @@ describe('LOCAL_NOW (step 2.179)', () => {
     if (!renewed.ok) throw new Error(`the session could not be renewed: ${renewed.error.code}`);
     expect(renewed.value.accessExpiresAt.getTime()).toBeGreaterThan(before);
     expect((await ports.identify(renewed.value.accessToken)).ok).toBe(true);
+  });
+});
+
+describe('the website reaches nothing of the job queue (step 2.112, T-490)', () => {
+  // The real login check on a made-up database with every migration (0031 made queue_owner
+  // and pgboss); the rest of start-up made up as above.
+  let made: MadeUpDatabase;
+  let realDb: DatabaseHandle;
+  // The made-up database's session is its made-up login; roles are made as the
+  // superuser the session started as, then the session is the login again.
+  const exec = async (statements: string) => {
+    if (made.source.kind !== 'pglite') throw new Error('the made-up database is PGlite');
+    const { pglite } = made.source;
+    const { rows } = await pglite.query<{ login: string }>('select session_user as login');
+    const login = rows[0]?.login ?? '';
+    await pglite.exec(
+      `set session authorization postgres; ${statements}; set session authorization "${login}"`,
+    );
+  };
+  beforeAll(async () => {
+    made = await madeUpDatabase();
+    await exec(`
+      create role made_up_web_login login;
+      create role made_up_middle nologin;
+      grant app_user to made_up_web_login;`);
+    realDb = realCreateDatabase(made.source);
+  });
+  afterAll(async () => {
+    await realDb.close();
+    await made.close();
+  });
+  const startAs = (login: string) => {
+    const d = deps([]);
+    d.checkLoginRole.mockImplementation(() => realCheckLoginRole(realDb, login));
+    return d;
+  };
+  const refused = (said: string) =>
+    `The web app cannot start: the database login role is not fit for the app (T-60): ${said}.`;
+
+  it('starts as a login that is a member of app_user only', async () => {
+    const d = startAs('made_up_web_login');
+    // Production stops only once every check has passed (record 082).
+    await expect(startWebApp(configFor('production'), d.given)).rejects.toThrow(
+      'The web app cannot start: every check passed',
+    );
+    expect(d.checkLoginRole).toHaveBeenCalledOnce();
+  });
+
+  it('refuses a member of queue_owner, in plain words with the statement that mends it', async () => {
+    await exec('grant queue_owner to made_up_web_login');
+    const d = startAs('made_up_web_login');
+    await expect(startWebApp(configFor('production'), d.given)).rejects.toThrow(
+      refused(
+        'made_up_web_login is a member of queue_owner, which owns the job queue (the pgboss schema), and the website must never read or change a queued job: revoke queue_owner from made_up_web_login',
+      ),
+    );
+    expect(d.close).toHaveBeenCalledOnce();
+    await exec('revoke queue_owner from made_up_web_login');
+  });
+
+  it('refuses a member of queue_owner through another role', async () => {
+    await exec('grant queue_owner to made_up_middle; grant made_up_middle to made_up_web_login');
+    const d = startAs('made_up_web_login');
+    await expect(startWebApp(configFor('staging'), d.given)).rejects.toThrow(
+      refused(
+        'made_up_web_login is a member of queue_owner through made_up_middle, which owns the job queue (the pgboss schema), and the website must never read or change a queued job: revoke queue_owner from made_up_middle',
+      ),
+    );
+    expect(d.checkSignInStoreLogin).not.toHaveBeenCalled();
+    await exec(
+      'revoke queue_owner from made_up_middle; revoke made_up_middle from made_up_web_login',
+    );
   });
 });

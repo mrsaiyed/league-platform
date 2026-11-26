@@ -238,6 +238,9 @@ export async function startWebApp(config: Config, deps: StartupDeps): Promise<We
   try {
     let problems: string[];
     try {
+      // The website's own check (T-60): since step 2.112 (T-490) it also refuses a login
+      // that is a member of queue_owner, directly or through another role, or may otherwise
+      // use the pgboss schema, so the website can never read or change a queued job.
       problems = await database.checkLoginRole(db);
     } catch (error) {
       // The driver's message may hold the address; only its kind is told (record 082).

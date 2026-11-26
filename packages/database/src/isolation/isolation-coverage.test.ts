@@ -145,6 +145,10 @@ const reachNoLeagueData = new Map<unknown, string>([
   [databasePackage.createDatabase, 'opens connections; reads no rows'],
   [databasePackage.checkLoginRole, "reads the login role's facts from pg_roles only"],
   [
+    databasePackage.checkWorkerLoginRole,
+    "checkLoginRole for the worker's login (T-490): the same facts from the catalog only; reads no league's rows",
+  ],
+  [
     databasePackage.databaseAnswers,
     'the health check: `select 1` in a transaction with no league and no account set; reads no table',
   ],

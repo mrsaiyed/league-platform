@@ -22,8 +22,16 @@
 // security-definer function the login may run a reviewed one, and no table the
 // migrations did not make. The website, the worker and `npm run test:real-postgres` all
 // run this one function.
+//
+// Since step 2.112 (T-490) it judges a login for one of two uses. The website's (the
+// default, checkLoginRole) may reach nothing of the job queue: a membership of
+// queue_owner, at any depth, or any other right on the schema pgboss is refused. The
+// worker's (checkWorkerLoginRole) holds queue_owner, and pg-boss's tables in pgboss
+// belong to it: a table there that the login itself or queue_owner owns is not counted,
+// and every other rule is the website's, word for word.
 import { sql } from 'kysely';
 import { checkFence } from './check-fence.ts';
+import { queueOwner, queueReachProblems, queueSchema } from './check-queue-schema.ts';
 import { kyselyOf, type DatabaseHandle } from './database-handle.ts';
 
 /** One role the login is or reaches, by the best way there (the login itself first). */
@@ -97,16 +105,38 @@ function reachedProblem(login: string, role: ReachedRole): string | undefined {
 }
 
 /**
- * What is wrong with the role the handle logs in as (or `role`, for tests), in
- * plain words: each names the role, what it can do that it must not, and the statement
- * that takes that away. Empty means it is fit for the app. `membershipOptions` says
- * whether the server keeps SET, INHERIT and ADMIN per membership (PostgreSQL 16 on);
- * read from the server unless a test says.
+ * What is wrong with the role the handle logs in as (or `role`, for tests) for the
+ * website, in plain words: each names the role, what it can do that it must not, and the
+ * statement that takes that away. Empty means it is fit for the app. `membershipOptions`
+ * says whether the server keeps SET, INHERIT and ADMIN per membership (PostgreSQL 16 on);
+ * read from the server unless a test says. A login that reaches the job queue is refused
+ * (T-490).
  */
 export async function checkLoginRole(
   db: DatabaseHandle,
   role?: string,
   membershipOptions?: boolean,
+): Promise<string[]> {
+  return judgeLogin(db, 'website', role, membershipOptions);
+}
+
+/**
+ * The same for the worker's login (T-490): as checkLoginRole, but it may hold queue_owner,
+ * and a table in the job queue's schema that it or queue_owner owns (pg-boss's) is let be.
+ */
+export async function checkWorkerLoginRole(
+  db: DatabaseHandle,
+  role?: string,
+  membershipOptions?: boolean,
+): Promise<string[]> {
+  return judgeLogin(db, 'worker', role, membershipOptions);
+}
+
+async function judgeLogin(
+  db: DatabaseHandle,
+  use: 'website' | 'worker',
+  role: string | undefined,
+  membershipOptions: boolean | undefined,
 ): Promise<string[]> {
   const database = kyselyOf(db);
   const withOptions =
@@ -148,6 +178,9 @@ export async function checkLoginRole(
       join pg_catalog.pg_namespace n on n.oid = c.relnamespace
       where c.relowner = b.oid and c.relkind in ('r', 'p')
         and n.nspname !~ '^pg_' and n.nspname <> 'information_schema'
+        -- The worker's own pg-boss tables (T-490): owned by its login or by queue_owner.
+        and not (${use === 'worker'}::boolean and n.nspname = ${queueSchema}
+          and (cardinality(b.path) = 1 or g.rolname = ${queueOwner}))
     ) owned
     order by cardinality(b.path), g.rolname`.execute(database);
   const self = rows[0];
@@ -170,6 +203,16 @@ export async function checkLoginRole(
       );
     }
   }
+  // Step 2.112 (T-490): the website reaches nothing of the job queue.
+  if (use === 'website') {
+    problems.push(
+      ...(await queueReachProblems(db, {
+        login,
+        superuser: self.superuser,
+        paths: rows.map((reached) => reached.path),
+      })),
+    );
+  }
   // Step 2.238: and the fence the login cannot step past must be whole (check-fence.ts).
   const name = (reached: ReachedRole) => reached.path.at(-1) ?? '';
   problems.push(
@@ -181,6 +224,7 @@ export async function checkLoginRole(
         .map(name),
       reached: rows.map(name),
       databaseOwner: self.database_owner,
+      ...(use === 'worker' ? { queueSchema } : {}),
     })),
   );
   return problems;

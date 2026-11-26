@@ -15,7 +15,8 @@
 //       view, definition (T-481); every table, view and foreign table in their schemas is
 //       one they made, and in any other schema, none they did not make is readable by the
 //       login or a role it may become (T-476): a copy or a view of a league's rows holds no
-//       fence. In a library's own schema (library-schemas.ts, T-482) only ordinary tables
+//       fence. In a library's own schema (library-schemas.ts, T-482; none today) and,
+//       for the worker's login only, in the job queue's (T-490) only ordinary tables
 //       without a league column are let be; any view or foreign table there is refused;
 //   (e) every trigger and rewrite rule on a relation the migrations made is theirs, as
 //       they made it and enabled (T-486): a rule that copies a league's rows elsewhere on
@@ -51,6 +52,11 @@ export type FenceRoles = {
   readonly reached: readonly string[];
   /** The database's owner, for a function a reached role owns. */
   readonly databaseOwner: string;
+  /**
+   * The job queue's schema, for the worker's login only (T-490): there, as in a library's
+   * schema, an ordinary table without a league column is let be. The website gets none.
+   */
+  readonly queueSchema?: string;
 };
 
 /** (a) A league table whose row-level security is not on and forced. */
@@ -419,7 +425,10 @@ async function strangers(
   roles: FenceRoles,
 ): Promise<string[]> {
   const readers = JSON.stringify([roles.login, ...roles.mayBecome]);
-  const libraries = JSON.stringify([...librarySchemas.keys()]);
+  const libraries = JSON.stringify([
+    ...librarySchemas.keys(),
+    ...(roles.queueSchema === undefined ? [] : [roles.queueSchema]),
+  ]);
   const listed = catalog.leagueTables.map((table) => table.table);
   const { rows } = await sql<Stranger>`
     with league_tables as (${leagueTables(listed)})
