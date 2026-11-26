@@ -1,6 +1,6 @@
 // Moves the address of the account set for the transaction once the sign-in service has
 // confirmed a change of email (T-73, T-256, T-458), through the narrow function
-// public.change_own_email (0031), the only way accounts.email changes. `taken`: another
+// public.change_own_email (0032), the only way accounts.email changes. `taken`: another
 // account holds the address, and nothing changed.
 import { sql } from 'kysely';
 import { transactionOf, type AppScope } from '../db/transaction-scope.ts';

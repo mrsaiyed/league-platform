@@ -1,4 +1,4 @@
-// changeOwnEmail and emailFreeForOwnAccount (T-73, T-458, 0031): only the account set for the
+// changeOwnEmail and emailFreeForOwnAccount (T-73, T-458, 0032): only the account set for the
 // transaction; another account's address is "not free" and "taken", changing nothing; the
 // web app's user still cannot write accounts.email itself.
 import type { PGlite } from '@electric-sql/pglite';
@@ -28,7 +28,7 @@ const change = (accountId: string, email: string) =>
 const free = (accountId: string, email: string) =>
   withTransaction(db, { accountId }, (scope) => emailFreeForOwnAccount(scope, email));
 
-describe('a change of email in our own records (0031)', () => {
+describe('a change of email in our own records (0032)', () => {
   it("moves the account set's address, and only that account's", async () => {
     const ana = await newAccount(pglite, 'ana@example.test');
     const bo = await newAccount(pglite, 'bo@example.test');

@@ -36,7 +36,7 @@ export type CodeAttempt =
       readonly attemptsLeft: number;
     };
 
-/** A waiting change of email (T-455): one per sign-in user, the code only hashed (0031). */
+/** A waiting change of email (T-455): one per sign-in user, the code only hashed (0032). */
 export type PendingEmailChange = {
   readonly newEmail: string;
   readonly codeHash: string;

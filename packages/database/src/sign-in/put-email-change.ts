@@ -1,4 +1,4 @@
-// A waiting change of email (T-455, 0031): replaces the sign-in user's earlier one, so
+// A waiting change of email (T-455, 0032): replaces the sign-in user's earlier one, so
 // its code is dead.
 import { signInTransactionOf, type SignInScope } from '../db/sign-in-transaction.ts';
 import type { PendingEmailChange } from './sign-in-store-types.ts';

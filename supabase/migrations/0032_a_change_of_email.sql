@@ -1,4 +1,4 @@
--- 0031: a change of email (step 2.128, T-73, T-455, T-458).
+-- 0032: a change of email (step 2.128, T-73, T-455, T-458).
 --
 -- A waiting change of email is ours, never the sign-in service's (T-455): the service is
 -- told nothing until our own check of the code has passed, and then only to set the
