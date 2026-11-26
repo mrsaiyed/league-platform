@@ -39,7 +39,7 @@ First download the test copy's database certificate (Supabase dashboard, **Datab
 
 At your terminal, run the release command against the new copy, as the tables' owner, the certificate checked: section 1 of [releasing and going back](releasing-and-going-back.md). The address you type has no password in it; paste the owner's password from your vault when the command asks (nothing shows while you do). See every change listed as applied, up to the newest. Run it again: nothing applied.
 
-This makes the tables and the two roles the website needs, `app_user` and `sign_in_store`. Neither can sign in by itself.
+This makes the tables, the two roles the website needs, `app_user` and `sign_in_store`, and the job queue's role `queue_owner` with its empty schema `pgboss` (change 0031). None of them can sign in by itself, and no login is given `queue_owner` here.
 
 ## 4. Make the website's own login, `app_login`
 
@@ -119,16 +119,19 @@ Then deploy the commit the release command named, and read the log together: sec
 
 ## Later: the worker's own login
 
-The first test copy runs **without the worker**. When the worker is added (step 2.112 makes its queue), it gets a login of its own, made the same way as step 4 and given the queue's role as well:
+The first test copy runs **without the worker**. When the worker is added, it gets a login of its own, in this order:
 
-```sql
-create role worker_login login;
-grant app_user, queue_owner to worker_login;
-```
+1. Section 3 first (change 0031 must have made `queue_owner`). Run what follows as the tables' owner (`postgres`), in the dashboard's **SQL editor**: it may give `queue_owner` away because its own change made that role.
+2. Make the worker's login and give it the website's role and the queue's, with nothing else:
 
-and its password is set with `\password worker_login`, as in step 4.
+   ```sql
+   create role worker_login login;
+   grant app_user, queue_owner to worker_login;
+   ```
 
-The website refuses to start with a login that holds `queue_owner`, so the two are never the same login.
+3. Set its password with `\password worker_login`, as in step 4, and save it as "test copy: worker_login".
+
+Never give `queue_owner` to `app_login`, to `app_user`, or to any role `app_login` holds. The website refuses to start with a login that holds `queue_owner` (it names the statement that takes it away, `revoke queue_owner from …`), and the worker refuses to start without it (`grant it queue_owner`), so the two are never the same login. The worker's first start makes the queue's tables; it starts again after that.
 
 ## What the supervised session must prove (not verified until then)
 

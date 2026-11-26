@@ -428,6 +428,29 @@ describe('the start-up guard reads the league fence (step 2.238)', () => {
     await pglite.exec('drop table pgboss.job');
   });
 
+  // Found on the real PostgreSQL (step 2.112, builder 2): the worker's login used as the
+  // website's reads pg-boss's tables through queue_owner, and no sentence may say to drop one.
+  it('(d) never says to drop a table in the job queue’s schema, even judging the website (T-490)', async () => {
+    await pglite.exec(`
+      create table pgboss.job (id uuid, name text, data jsonb);
+      alter table pgboss.job owner to queue_owner;
+      grant queue_owner to ${login};`);
+    try {
+      const said = await checkLoginRole(db, login);
+      expect(said).toContainEqual(
+        expect.stringMatching(
+          /^pgboss\.job is a table that no migration made, and .+ may read it, so nothing has checked its fence: revoke select on table pgboss\.job from \S+$/,
+        ),
+      );
+      expect(said.some((problem) => problem.endsWith(`revoke queue_owner from ${login}`))).toBe(
+        true,
+      );
+      expect(said.join(' ')).not.toMatch(/drop table/);
+    } finally {
+      await pglite.exec(`revoke queue_owner from ${login}; drop table pgboss.job`);
+    }
+  });
+
   // The worker's login holds queue_owner and owns pg-boss's tables (T-490); there only an
   // ordinary table without a league column is let be (T-482's rule, now the worker's).
   it('(d) lets the worker have pg-boss’s own tables, but never a view of a league table (T-482, T-490)', async () => {
