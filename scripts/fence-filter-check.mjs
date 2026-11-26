@@ -178,6 +178,12 @@ const excused = new Map([
     'take-jobs.ts',
   ),
   ...wholeFiles(
+    "the signed-in account's own name: only its own 'self' profile and its own account row," +
+      ' keyed by the transaction account, no league data (step 2.128, decided by the lead)',
+    'read-own-name.ts',
+    'rename-own-profile.ts',
+  ),
+  ...wholeFiles(
     "the league is the transaction's own, inside public.access_list_names (0012)",
     'list-access-names.ts',
   ),
@@ -199,8 +205,9 @@ const excused = new Map([
 // part 2); 14 filters of statements joined on league_id and 17 statements keyed by another
 // league-filtered statement or held by a composite key (part 3); the coin flip's insert (2.56);
 // step 2.128's change-own-email.ts and email-free-for-own-account.ts (approved by the lead,
-// 2026-11-25).
-const mostExcused = 98;
+// 2026-11-25); its read-own-name.ts and rename-own-profile.ts (decided by the lead,
+// 2026-11-26).
+const mostExcused = 100;
 
 /** Whole-file excuses: each file name with the one reason. */
 function wholeFiles(reason, ...files) {
