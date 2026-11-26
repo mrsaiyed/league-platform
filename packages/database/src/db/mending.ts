@@ -17,17 +17,21 @@ export function asRole(role: string, statement: string, databaseOwner: string): 
 /**
  * `statements`, run by the owner holding `role`'s rights for a moment (INHERIT, for a
  * statement that needs the object's owner, and SET, for one that names `role` as the new
- * owner), then taken back.
+ * owner), then taken back: ONE statement, a `do` block (T-497), so a failure in the middle
+ * (a name already taken) leaves no grant behind and hands nothing to anyone.
  */
 export function holdingRole(
   role: string,
   statements: readonly string[],
   databaseOwner: string,
 ): string {
-  if (role === databaseOwner) return statements.join('; ');
-  return [
-    `grant ${role} to current_user with set true, inherit true`,
-    ...statements,
-    `revoke ${role} from current_user`,
-  ].join('; ');
+  const held =
+    role === databaseOwner
+      ? statements
+      : [
+          `grant ${role} to current_user with set true, inherit true`,
+          ...statements,
+          `revoke ${role} from current_user`,
+        ];
+  return `do $mend$ begin ${held.map((statement) => `${statement}; `).join('')}end $mend$`;
 }

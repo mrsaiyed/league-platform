@@ -38,6 +38,8 @@ export const isPredefinedRole = (name: string): boolean => name.startsWith('pg_'
 export function predefinedRoleProblems(
   login: string,
   paths: readonly (readonly string[])[],
+  /** `<role> <holder>` for each membership a grant made by the holder hangs on (T-496). */
+  hanging: ReadonlySet<string> = new Set(),
 ): string[] {
   return paths
     .filter((path) => path.length > 1 && isPredefinedRole(path.at(-1) ?? ''))
@@ -45,12 +47,14 @@ export function predefinedRoleProblems(
     .map((path) => {
       const role = path.at(-1) ?? '';
       const through = path.length > 2 ? ` through ${path.slice(1, -1).join(', then ')}` : '';
+      const holder = path.at(-2) ?? login;
+      const cascade = hanging.has(`${role} ${holder}`) ? ' cascade' : '';
       const why =
         predefinedRoles.get(role) ??
         'is a predefined role this check does not know, so what it gives has not been read';
       return (
         `${login} is a member of ${role}${through}, which ${why}, past every grant the ` +
-        `check reads (T-491): revoke ${role} from ${path.at(-2) ?? login}`
+        `check reads (T-491): revoke ${role} from ${holder}${cascade}`
       );
     });
 }

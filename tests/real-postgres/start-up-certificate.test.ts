@@ -352,7 +352,7 @@ describe('the job queue’s own owner, on a real PostgreSQL (T-490, step 2.112)'
   });
 
   it('a website login holding queue_owner, directly or through a role between, is refused, and its statement mends it', async () => {
-    const revoke = /revoke queue_owner from \w+/;
+    const revoke = /revoke \w+ from \w+/;
     try {
       await owner.exec(`grant queue_owner to ${names.web}`);
       const direct = await webSays(urls.web, ca);
@@ -367,7 +367,7 @@ describe('the job queue’s own owner, on a real PostgreSQL (T-490, step 2.112)'
       await owner.exec(`grant ${names.middle} to ${names.web}`);
       const through = await webSays(urls.web, ca);
       expect(through).toContain(
-        `${names.web} is a member of queue_owner through ${names.middle}, which owns the job queue (the pgboss schema), and the website must never read or change a queued job: revoke queue_owner from ${names.middle}`,
+        `${names.web} is a member of queue_owner through ${names.middle}, which owns the job queue (the pgboss schema), and the website must never read or change a queued job: revoke ${names.middle} from ${names.web}`,
       );
       await mendWith(through, revoke);
       expect(await webSays(urls.web, ca)).toBe('started');

@@ -48,6 +48,7 @@ import {
   type FunctionShape,
   type MigrationCatalog,
 } from './fence-catalog.ts';
+import { hangingProblems } from './check-hanging.ts';
 import { queueSchema } from './check-queue-schema.ts';
 import { librarySchemas } from './library-schemas.ts';
 import { asRole, holdingRole } from './mending.ts';
@@ -283,6 +284,8 @@ type TriggerDefiner = {
   table: string;
   table_owner: string;
   changer: string;
+  /** The relation the login changes, when a foreign key's action reaches this one (T-495). */
+  via: string | null;
 };
 
 /**
@@ -299,27 +302,49 @@ async function unreviewedTriggerDefiners(
   const own = new Set(catalog.functions.map((made) => made.signature));
   // Every trigger on a relation the migrations made is (e)'s to judge, word for word.
   const theirs = new Set(catalog.relations.map((relation) => relation.name));
+  // T-495's second wall: a foreign key's action (cascade, set null, set default) changes
+  // the referencing relation as its owner, whatever the login may do there, to any depth.
   const { rows } = await sql<TriggerDefiner>`
-    select * from (
-      select pg_catalog.quote_ident(pn.nspname) || '.' || pg_catalog.quote_ident(p.proname) ||
-          '(' || pg_catalog.pg_get_function_identity_arguments(p.oid) || ')' as signature,
-        pg_catalog.quote_ident(t.tgname) as trigger,
-        pg_catalog.quote_ident(n.nspname) || '.' || pg_catalog.quote_ident(c.relname) as "table",
-        pg_catalog.pg_get_userbyid(c.relowner)::text as table_owner,
+    with recursive direct as (
+      select c.oid,
         (select r.name from pg_catalog.jsonb_array_elements_text(${reachedRoles(roles)}::jsonb)
             with ordinality as r(name, place)
          where pg_catalog.has_schema_privilege(r.name, n.oid, 'USAGE')
            and (pg_catalog.has_table_privilege(r.name, c.oid, 'INSERT, UPDATE, DELETE, TRUNCATE')
              or pg_catalog.has_any_column_privilege(r.name, c.oid, 'INSERT, UPDATE'))
          order by r.place limit 1) as changer
-      from pg_catalog.pg_trigger t
+      from pg_catalog.pg_class c
+      join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+      where c.relkind in ('r', 'p', 'v', 'f')
+        and n.nspname !~ '^pg_' and n.nspname <> 'information_schema'
+    ), reach(oid, changer, via) as (
+      select d.oid, d.changer, 0::pg_catalog.oid from direct d where d.changer is not null
+      union
+      select k.conrelid, p.changer, case when p.via = 0 then p.oid else p.via end
+      from reach p
+      join pg_catalog.pg_constraint k on k.confrelid = p.oid and k.contype = 'f'
+        and (k.confdeltype in ('c', 'n', 'd') or k.confupdtype in ('c', 'n', 'd'))
+    )
+    select signature, trigger, "table", table_owner, changer, via from (
+      select distinct on (t.oid)
+        pg_catalog.quote_ident(pn.nspname) || '.' || pg_catalog.quote_ident(p.proname) ||
+          '(' || pg_catalog.pg_get_function_identity_arguments(p.oid) || ')' as signature,
+        pg_catalog.quote_ident(t.tgname) as trigger,
+        pg_catalog.quote_ident(n.nspname) || '.' || pg_catalog.quote_ident(c.relname) as "table",
+        pg_catalog.pg_get_userbyid(c.relowner)::text as table_owner,
+        x.changer,
+        (select pg_catalog.quote_ident(vn.nspname) || '.' || pg_catalog.quote_ident(v.relname)
+         from pg_catalog.pg_class v join pg_catalog.pg_namespace vn on vn.oid = v.relnamespace
+         where v.oid = x.via) as via
+      from reach x
+      join pg_catalog.pg_trigger t on t.tgrelid = x.oid
       join pg_catalog.pg_class c on c.oid = t.tgrelid
       join pg_catalog.pg_namespace n on n.oid = c.relnamespace
       join pg_catalog.pg_proc p on p.oid = t.tgfoid
       join pg_catalog.pg_namespace pn on pn.oid = p.pronamespace
       where not t.tgisinternal and p.prosecdef
+      order by t.oid, x.via <> 0
     ) triggers
-    where changer is not null
     order by "table", trigger`.execute(database);
   return rows
     .filter(
@@ -334,7 +359,11 @@ async function unreviewedTriggerDefiners(
           ? roles.login
           : `${roles.login} may become ${found.changer}, which`;
       return (
-        `${who} may change ${found.table}, whose trigger ${found.trigger} runs ` +
+        `${who} may change ${found.table}` +
+        (found.via === null
+          ? ''
+          : ` (a change to ${found.via} reaches it through a foreign key's action, T-495)`) +
+        `, whose trigger ${found.trigger} runs ` +
         `${found.signature}, a security-definer function that is not on the reviewed list, ` +
         `so a change there may reach past the league fence or into the job queue: ` +
         asRole(
@@ -646,6 +675,15 @@ async function strangers(
         `may hold queued jobs from before the job queue had its own schema, and nothing has ` +
         `checked its fence: do not drop it; ask the lead, who moves its jobs or drops it (T-494)`
       );
+    if (ours && isTable && row.leagueish)
+      // T-497: a table with a league column may hold a league's rows (one the T-493 move
+      // gave back to the migrations' owner does): a drop would destroy them.
+      return (
+        `${name} is a table that no migration made, with a league column, so it may hold a ` +
+        `league's rows (as a table moved out of the job queue's schema does), and nothing ` +
+        `has checked its fence: do not drop it; ask the lead, who moves its rows or drops it ` +
+        `(T-494, T-497)`
+      );
     if (ours)
       return (
         `${name} is a ${what} that no migration made, so nothing has checked its fence: ` +
@@ -694,5 +732,6 @@ export async function checkFence(
     ...(await changedRelations(database, catalog)),
     ...(await changedTriggersAndRules(database, catalog)),
     ...(await strangers(database, catalog, roles)),
+    ...(await hangingProblems(database, catalog, roles.databaseOwner)),
   ]);
 }

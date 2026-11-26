@@ -174,11 +174,12 @@ describe('the website’s login reaches nothing of the job queue (checkLoginRole
       grant made_up_middle to made_up_web_login;`);
     const said = await checkLoginRole(db, 'made_up_web_login');
     expect(said).toEqual([
-      'made_up_web_login is a member of queue_owner through made_up_middle, which owns the job queue (the pgboss schema), and the website must never read or change a queued job: revoke queue_owner from made_up_middle',
+      'made_up_web_login is a member of queue_owner through made_up_middle, which owns the job queue (the pgboss schema), and the website must never read or change a queued job: revoke made_up_middle from made_up_web_login',
     ]);
+    // T-496: the way is cut at the website's end; the middle role keeps its own membership.
     await pglite.exec(statementOf(said[0] ?? ''));
     expect(await checkLoginRole(db, 'made_up_web_login')).toEqual([]);
-    await pglite.exec('revoke made_up_middle from made_up_web_login');
+    await pglite.exec('revoke queue_owner from made_up_middle');
   });
 
   it('refuses any other right on the schema: its own, a role’s it reaches, or everyone’s', async () => {

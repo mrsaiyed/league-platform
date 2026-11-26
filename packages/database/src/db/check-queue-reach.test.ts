@@ -181,6 +181,33 @@ describe('what the website may change elsewhere (T-492)', () => {
   });
 });
 
+describe('a right on one column is a right to change (T-492, T-497)', () => {
+  it('refuses the definer trigger on a table the website may insert into by one column only', async () => {
+    await pglite.exec(`
+      create schema made_up_side;
+      grant usage, create on schema made_up_side to ${worker};
+      grant usage on schema made_up_side to app_user;
+      set role ${worker};
+      create table made_up_side.inbox (v text, w text);
+      grant insert (v) on made_up_side.inbox to app_user;
+      create function made_up_side.tg() returns trigger language plpgsql security definer
+        set search_path = pg_catalog
+        as $f$ begin insert into pgboss.job values (2, new.v); return null; end $f$;
+      create trigger tg before insert on made_up_side.inbox
+        for each row execute function made_up_side.tg();
+      reset role;`);
+    const said = await webCheck();
+    const asWorker = (statement: string) =>
+      `grant ${worker} to current_user with set true; set role ${worker}; ${statement}; reset role; revoke ${worker} from current_user`;
+    expect(said).toEqual([
+      `${web} may change made_up_side.inbox, whose trigger tg runs made_up_side.tg(), a security-definer function that is not on the reviewed list, so a change there may reach past the league fence or into the job queue: ${asWorker('drop trigger tg on made_up_side.inbox')}`,
+      `made_up_side.inbox is a table that no migration made, and ${web} may change it, so nothing has checked its fence: ${asWorker('revoke all on table made_up_side.inbox from app_user')}`,
+    ]);
+    await mended(said, webCheck);
+    await pglite.exec('drop schema made_up_side cascade');
+  });
+});
+
 describe('the fence never drops a table named like pg-boss’s own in public (T-494)', () => {
   it('says to ask, not to drop', async () => {
     await pglite.exec('create table public.job (id int)');

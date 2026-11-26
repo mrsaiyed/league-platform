@@ -58,6 +58,8 @@ type ReachedRole = {
   first_table: string | null;
   tables: number;
   database_owner: string;
+  /** The role on the way before this one made a grant of it, which hangs on its own (T-496). */
+  hanging: boolean;
 };
 
 /** The powers a plain login must not have, as words and the clause that drops each. */
@@ -107,7 +109,7 @@ function reachedProblem(login: string, role: ReachedRole): string | undefined {
   const parent = role.path.at(-2) ?? login;
   return (
     `${login} may ${role.may_become ? 'become' : 'act as'} ${name}${through}, which ` +
-    `${listed(faults)}: revoke ${name} from ${parent}`
+    `${listed(faults)}: revoke ${name} from ${parent}${role.hanging ? ' cascade' : ''}`
   );
 }
 
@@ -176,7 +178,15 @@ async function judgeLogin(
       g.rolcreatedb as create_db, g.rolreplication as replication,
       owned.first_table, owned.tables,
       (select pg_catalog.pg_get_userbyid(d.datdba)::text from pg_catalog.pg_database d
-       where d.datname = pg_catalog.current_database()) as database_owner
+       where d.datname = pg_catalog.current_database()) as database_owner,
+      -- T-496: a grant of the role made by the role before it on the way hangs on that
+      -- membership, and the owner's revoke fails with "dependent privileges exist" unless
+      -- it cascades (seen on the real server, for any role).
+      exists (
+        select 1 from pg_catalog.pg_auth_members h
+        join pg_catalog.pg_roles gr on gr.oid = h.grantor
+        where h.roleid = b.oid and cardinality(b.path) > 1
+          and gr.rolname = b.path[cardinality(b.path) - 1]) as hanging
     from best b
     join pg_catalog.pg_roles g on g.oid = b.oid
     cross join lateral (
@@ -214,6 +224,11 @@ async function judgeLogin(
   const predefined = predefinedRoleProblems(
     login,
     rows.map((reached) => reached.path),
+    new Set(
+      rows
+        .filter((reached) => reached.hanging)
+        .map((reached) => `${reached.path.at(-1) ?? ''} ${reached.path.at(-2) ?? ''}`),
+    ),
   );
   if (predefined.length > 0) return [...problems, ...predefined];
   // Step 2.112 (T-490): the website reaches nothing of the job queue.

@@ -102,7 +102,14 @@ export async function queueReachProblems(db: DatabaseHandle, reach: QueueReach):
   const problems: string[] = [];
   const toOwner = reach.paths.find((path) => path.at(-1) === queueOwner);
   if (toOwner !== undefined) {
-    const holder = toOwner.at(-2) ?? reach.login;
+    // T-496: the way is cut at the website's own end, at the first role on it that the
+    // website does not need (app_user and sign_in_store it does), so the worker's login,
+    // reached that way, keeps its own membership of queue_owner.
+    const cut = toOwner.findIndex(
+      (role, place) => place > 0 && role !== 'app_user' && role !== 'sign_in_store',
+    );
+    const role = toOwner[cut] ?? queueOwner;
+    const holder = toOwner[cut - 1] ?? reach.login;
     // A grant the holder made of it (it held ADMIN) hangs on its own: without cascade the
     // owner's revoke fails with "dependent privileges exist" (seen on the real server).
     const { rows } = await sql<{ hanging: boolean }>`
@@ -110,12 +117,12 @@ export async function queueReachProblems(db: DatabaseHandle, reach: QueueReach):
         select 1 from pg_catalog.pg_auth_members m
         join pg_catalog.pg_roles g on g.oid = m.roleid
         join pg_catalog.pg_roles h on h.oid = m.grantor
-        where g.rolname = ${queueOwner} and h.rolname = ${holder}) as hanging`.execute(database);
+        where g.rolname = ${role} and h.rolname = ${holder}) as hanging`.execute(database);
     const through = toOwner.length > 2 ? ` through ${toOwner.slice(1, -1).join(', then ')}` : '';
     problems.push(
       `${reach.login} is a member of ${queueOwner}${through}, which owns the job queue ` +
         `(the ${queueSchema} schema), and the website must never read or change a queued ` +
-        `job: revoke ${queueOwner} from ${holder}${rows[0]?.hanging === true ? ' cascade' : ''}`,
+        `job: revoke ${role} from ${holder}${rows[0]?.hanging === true ? ' cascade' : ''}`,
     );
   }
   if (reach.superuser) return problems;

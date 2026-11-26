@@ -469,7 +469,7 @@ describe('the start-up guard reads the league fence (step 2.238)', () => {
       'pgboss.kept has a league column but its row-level security is off, so every role that may read it sees every league: alter table pgboss.kept enable row level security, force row level security',
       `pgboss.every_program is a view that no migration made, and ${login} may read it, so nothing has checked its fence: revoke select on table pgboss.every_program from ${login}`,
       // T-493: a league's rows do not belong in the queue's schema; moved out, never dropped.
-      `pgboss.kept has a league column, so it does not belong in the job queue's schema, which is for pg-boss's own tables: ${login} may use it there, and its owner postgres could switch its fence off; give it to the migrations' owner, out of the queue's schema (its rows are kept): alter table pgboss.kept set schema public; alter table public.kept owner to postgres`,
+      `pgboss.kept has a league column, so it does not belong in the job queue's schema, which is for pg-boss's own tables: ${login} may use it there, and its owner postgres could switch its fence off; give it to the migrations' owner, out of the queue's schema (its rows are kept): do $mend$ begin alter table pgboss.kept set schema public; alter table public.kept owner to postgres; end $mend$`,
     ]);
     expect(said.join(' ')).not.toMatch(/drop (table|view)/);
     await pglite.exec('drop table pgboss.kept; drop view pgboss.every_program');

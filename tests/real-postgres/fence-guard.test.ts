@@ -34,10 +34,13 @@ const db = appDatabase(1);
 let owner: PostgresDriver;
 let a: string;
 let b: string;
+let ownerName = '';
 beforeAll(async () => {
   a = await makeMadeUpLeague(`alpha-${fresh()}`);
   b = await makeMadeUpLeague(`bravo-${fresh()}`);
   owner = await ownerSession();
+  const me = (await owner.query('select current_user as name')).rows[0] as { name?: unknown };
+  ownerName = String(me.name);
 });
 afterAll(async () => {
   await owner.close();
@@ -268,13 +271,20 @@ describe('(a) a league table whose row-level security is not on and forced', () 
 
   it('a league table a new migration adds without a forced fence: refused, naming it', async () => {
     const table = `public.p_new_${fresh()}`;
+    const key = `${table.slice('public.'.length)}_league_id_fkey`;
     await plantedAndMended(
       [`create table ${table} (id int, league_id uuid references public.leagues (id))`],
       [
         `${table} has a league column but its row-level security is off, so every role that may read it sees every league: alter table ${table} enable row level security, force row level security`,
-        `${table} is a table that no migration made, so nothing has checked its fence: drop table ${table} (or make it in a migration)`,
+        // T-497: a table with a league column may hold a league's rows: never a drop.
+        `${table} is a table that no migration made, with a league column, so it may hold a league's rows (as a table moved out of the job queue's schema does), and nothing has checked its fence: do not drop it; ask the lead, who moves its rows or drops it (T-494, T-497)`,
+        // T-495: and it may not hang on the migrations' leagues.
+        `${table}, which no migration made, has a foreign key ${key} on public.leagues, which they made, so a change to a league's rows there may run what ${ownerName} put on ${table} (a cascade into a trigger), and ${ownerName} may test which rows exist past the league fence (T-495): alter table ${table} drop constraint ${key}`,
       ],
       [`drop table if exists ${table}`],
+      async () => {},
+      // The lead's answer for a made-up table that holds no rows.
+      [`drop table ${table}`],
     );
   });
 });

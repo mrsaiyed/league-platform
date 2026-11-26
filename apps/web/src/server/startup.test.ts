@@ -793,7 +793,7 @@ describe('the website reaches nothing of the job queue (step 2.112, T-490)', () 
     const d = startAs('made_up_web_login');
     await expect(startWebApp(configFor('staging'), d.given)).rejects.toThrow(
       refused(
-        'made_up_web_login is a member of queue_owner through made_up_middle, which owns the job queue (the pgboss schema), and the website must never read or change a queued job: revoke queue_owner from made_up_middle',
+        'made_up_web_login is a member of queue_owner through made_up_middle, which owns the job queue (the pgboss schema), and the website must never read or change a queued job: revoke made_up_middle from made_up_web_login',
       ),
     );
     expect(d.checkSignInStoreLogin).not.toHaveBeenCalled();
