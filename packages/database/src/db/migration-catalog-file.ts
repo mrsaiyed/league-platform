@@ -9,14 +9,13 @@ import { applyMigrations, defaultMigrationsFolder, pgliteDriver } from '../migra
 import { createDatabase } from './create-database.ts';
 import { kyselyOf } from './database-handle.ts';
 import {
-  readDefinerShapes,
   readFencePolicies,
+  readFunctionShapes,
   readLeagueTables,
   readRelations,
   readSchemas,
   type MigrationCatalog,
 } from './fence-catalog.ts';
-import { reviewedDefiners } from './reviewed-definers.ts';
 
 /** Where the catalog is checked in. */
 export const migrationCatalogPath = fileURLToPath(
@@ -34,13 +33,12 @@ export async function readMigrationCatalog(
     if (!run.ok) throw new Error(`migrations failed: ${run.error.code}: ${run.error.message}`);
     const database = kyselyOf(db);
     const schemas = await readSchemas(database);
-    const relations = (await readRelations(database, schemas)).map((relation) => relation.name);
     return {
       schemas,
-      relations,
+      relations: await readRelations(database, schemas),
       leagueTables: await readLeagueTables(database),
       policies: await readFencePolicies(database),
-      definers: await readDefinerShapes(database, [...reviewedDefiners.keys()]),
+      functions: await readFunctionShapes(database, schemas),
     };
   } finally {
     await db.close();
@@ -55,10 +53,11 @@ export async function migrationCatalogFile(
   const catalog = await readMigrationCatalog(folder);
   const text = `// Generated from supabase/migrations by \`npm run db:types\`. Do not edit: a test
 // fails when this file differs from a fresh generation (T-468). The start-up guard
-// (check-fence.ts) refuses a relation in these schemas that is not listed here, a league
-// table listed here that is missing or whose league column is gone or renamed, a policy on
-// a league table that is not listed here word for word, and a reviewed definer function
-// whose body, settings, owner, language or security differ from what is listed here.
+// (check-fence.ts) refuses a relation in these schemas that is not listed here, one listed
+// here that is missing or of another kind, owner or definition (T-481), a league table
+// listed here whose league column is gone or renamed, a policy on a league table that is
+// not listed here word for word or is missing, and a function listed here that is missing
+// or whose body, settings, owner, language, security or volatility differ (T-477).
 import type { MigrationCatalog } from './fence-catalog.ts';
 
 export const migrationCatalog: MigrationCatalog = ${JSON.stringify(catalog)};

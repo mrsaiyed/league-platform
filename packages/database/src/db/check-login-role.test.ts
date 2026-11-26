@@ -11,13 +11,17 @@ import type { DatabaseHandle } from './database-handle.ts';
 // check (step 2.238, check-fence.test.ts) names for every login. These tests are about
 // the roles, so that one sentence is set aside here and asserted once, on its own. So are
 // the two tables in made_up_later, which a login that may become a superuser can read
-// (T-476), asserted once below.
+// (T-476), asserted once below, and sign_in.users given another owner, which the fence
+// check names as a relation the migrations made no longer as they made it (T-481).
+const plantedOwner =
+  'sign_in.users is a table the migrations made, but it is now owned by made_up_sign_in_owner, not postgres, so it may not be what they made: alter table sign_in.users owner to postgres';
 const plantedStranger =
   'platform.made_up_kept is a table that no migration made, so nothing has checked its fence: drop table platform.made_up_kept (or make it in a migration)';
 const laterStranger = /^made_up_later\.(one|two) is a table that no migration made, and /;
 const checkLoginRole = async (...args: Parameters<typeof checkEverything>) =>
   (await checkEverything(...args)).filter(
-    (problem) => problem !== plantedStranger && !laterStranger.test(problem),
+    (problem) =>
+      problem !== plantedStranger && problem !== plantedOwner && !laterStranger.test(problem),
   );
 
 let pglite: PGlite;
@@ -105,7 +109,7 @@ describe('checkLoginRole', () => {
   });
 
   it('also reads the fence: the one table planted outside the migrations is named', async () => {
-    expect(await checkEverything(db, 'made_up_app_login')).toEqual([plantedStranger]);
+    expect(await checkEverything(db, 'made_up_app_login')).toEqual([plantedOwner, plantedStranger]);
   });
 
   it('reports a login that is not app_user, or can become the owner', async () => {

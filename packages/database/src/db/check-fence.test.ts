@@ -37,14 +37,22 @@ const statementOf = (problem: string) =>
     .replace(/ \(or make it in a migration\)$/, '')
     .replace(/, then make it again as its migration does$/, '');
 
-/** Plants `plant`, expects exactly `said`, runs each sentence's statement, expects none. */
-async function plantedAndMended(plant: string, said: string[]) {
+/**
+ * Plants `plant`, expects exactly `said`, runs each sentence's statement; then, for a
+ * mending in two steps, expects `thenSaid` and runs its statements too; expects none.
+ */
+async function plantedAndMended(plant: string, said: string[], thenSaid: string[] = []) {
   await pglite.exec(plant);
   const problems = await checkLoginRole(db, login);
   expect(problems).toEqual(said);
   for (const problem of problems) await pglite.exec(statementOf(problem));
+  expect(await checkLoginRole(db, login)).toEqual(thenSaid);
+  for (const problem of thenSaid) await pglite.exec(statementOf(problem));
   expect(await checkLoginRole(db, login)).toEqual([]);
 }
+
+/** What the guard says once the programs' fence policy is dropped (it fails closed). */
+const missingFence = `public.programs is missing its policy programs_league_fence, which the migrations made, so its rows are not fenced as they meant: create policy programs_league_fence on public.programs as permissive for all to public using (${fence}) with check (${fence})`;
 
 describe('the start-up guard reads the league fence (step 2.238)', () => {
   it('passes with nothing planted, for the login and for app_user', async () => {
@@ -88,7 +96,10 @@ describe('the start-up guard reads the league fence (step 2.238)', () => {
     `);
     const asMigrated = {
       ...migrationCatalog,
-      relations: [...migrationCatalog.relations, 'public.made_up_new_league'],
+      relations: [
+        ...migrationCatalog.relations,
+        { name: 'public.made_up_new_league', kind: 'r', owner: 'postgres', definition: null },
+      ],
     };
     const problems = await checkFence(
       db,
@@ -204,11 +215,8 @@ describe('the start-up guard reads the league fence (step 2.238)', () => {
       [
         `public.programs has its policy programs_league_fence changed from the migrations' (now for update to public using (${fence}) with check (${fence})): drop policy programs_league_fence on public.programs, then make it again as its migration does`,
       ],
+      [missingFence],
     );
-    await pglite.exec(
-      `create policy programs_league_fence on public.programs using ${fence} with check ${fence}`,
-    );
-    expect(await checkLoginRole(db, login)).toEqual([]);
   });
 
   it('(b) refuses a fence policy made again as restrictive', async () => {
@@ -219,11 +227,8 @@ describe('the start-up guard reads the league fence (step 2.238)', () => {
       [
         `public.programs has its policy programs_league_fence changed from the migrations' (now as restrictive to public using (${fence}) with check (${fence})): drop policy programs_league_fence on public.programs, then make it again as its migration does`,
       ],
+      [missingFence],
     );
-    await pglite.exec(
-      `create policy programs_league_fence on public.programs using ${fence} with check ${fence}`,
-    );
-    expect(await checkLoginRole(db, login)).toEqual([]);
   });
 
   it('(c) refuses a reviewed function whose body, settings or owner changed (T-477)', async () => {
@@ -297,5 +302,133 @@ describe('the start-up guard reads the league fence (step 2.238)', () => {
     // Select without the schema's use, and use through a role the login does not reach.
     expect(await checkLoginRole(db, login)).toEqual([]);
     await pglite.exec('drop schema made_up_unread cascade');
+  });
+  it('(d) refuses a listed table moved away and a view put in its place (T-481)', async () => {
+    // The confirming look's plant: names alone matched, and the login read both leagues.
+    await pglite.exec(`
+      create schema made_up_hidden;
+      alter table public.accounts set schema made_up_hidden;
+      create view public.accounts as select * from public.programs;
+      grant select on public.accounts to ${login};`);
+    expect(await checkLoginRole(db, login)).toEqual([
+      "public.accounts is a table the migrations made, but it is now a view, so it may hold rows of any league: drop view public.accounts, then run the migrations' own definition again",
+    ]);
+    await pglite.exec(`
+      drop view public.accounts;
+      alter table made_up_hidden.accounts set schema public;
+      drop schema made_up_hidden;`);
+    expect(await checkLoginRole(db, login)).toEqual([]);
+  });
+
+  it('(d) refuses a listed table replaced by one of the same name another role owns (T-481)', async () => {
+    await pglite.exec(`
+      create schema made_up_hidden;
+      alter table public.accounts set schema made_up_hidden;
+      create role made_up_other_owner nologin;
+      create table public.accounts as select id, name from public.programs;
+      alter table public.accounts owner to made_up_other_owner;
+      grant select on public.accounts to ${login};`);
+    expect(await checkLoginRole(db, login)).toEqual([
+      'public.accounts is a table the migrations made, but it is now owned by made_up_other_owner, not postgres, so it may not be what they made: alter table public.accounts owner to postgres',
+    ]);
+    await pglite.exec(`
+      drop table public.accounts;
+      alter table made_up_hidden.accounts set schema public;
+      drop schema made_up_hidden;`);
+    expect(await checkLoginRole(db, login)).toEqual([]);
+  });
+
+  it('(c) refuses the fence’s own functions changed by hand, every one (T-477, widened)', async () => {
+    const otherLeague = '00000000-0000-4000-8000-00000000000b';
+    const plants: readonly (readonly [string, string, string])[] = [
+      [
+        'public.current_league_id()',
+        `create or replace function public.current_league_id() returns uuid language sql
+           stable parallel safe set search_path = pg_catalog, pg_temp
+           as $$ select '${otherLeague}'::uuid $$`,
+        'body',
+      ],
+      [
+        'public.current_league_id()',
+        'alter function public.current_league_id() volatile',
+        'volatility',
+      ],
+      [
+        'public.current_account_id()',
+        `create or replace function public.current_account_id() returns uuid language sql
+           stable parallel safe set search_path = pg_catalog, pg_temp
+           as $$ select '${otherLeague}'::uuid $$`,
+        'body',
+      ],
+      [
+        'public.require_view_of_every_league()',
+        `create or replace function public.require_view_of_every_league() returns void
+           language plpgsql stable set search_path = pg_catalog, pg_temp as $$ begin end $$`,
+        'body',
+      ],
+    ];
+    for (const [signature, plant, part] of plants) {
+      const original = (
+        await pglite.query<{ d: string }>(
+          `select pg_get_functiondef('${signature}'::regprocedure) as d`,
+        )
+      ).rows[0]!.d;
+      await pglite.exec(plant);
+      expect(await checkLoginRole(db, login)).toEqual([
+        `${signature} is a function the migrations made whose ${part} changed since the migrations made it, so the fence or the command that calls it may no longer hold: run the migrations' own definition again`,
+      ]);
+      await pglite.exec(original);
+      expect(await checkLoginRole(db, login)).toEqual([]);
+    }
+  });
+
+  it('(c) refuses a function the migrations made that is missing', async () => {
+    // As a catalog that lists one more function than there is: what a function dropped
+    // by hand looks like, without dropping one of the fence's own.
+    const listed = migrationCatalog.functions.find(
+      (shape) => shape.signature === 'public.current_league_id()',
+    )!;
+    const withGone = {
+      ...migrationCatalog,
+      functions: [...migrationCatalog.functions, { ...listed, signature: 'public.made_up_gone()' }],
+    };
+    const roles = { login, mayBecome: [], reached: [login], databaseOwner: 'postgres' };
+    expect(await checkFence(db, roles, withGone)).toEqual([
+      "public.made_up_gone() is a function the migrations made, but it is missing, so what calls it fails: run the migrations' own definition again",
+    ]);
+    expect(await checkFence(db, roles)).toEqual([]);
+  });
+
+  it('(b) names a fence policy dropped with its league column (cascade) and the column made again', async () => {
+    await plantedAndMended(
+      `alter table public.courts drop column league_id cascade;
+       alter table public.courts add column league_id uuid;`,
+      [
+        `public.courts is missing its policy courts_league_fence, which the migrations made, so its rows are not fenced as they meant: create policy courts_league_fence on public.courts as permissive for all to public using (${fence}) with check (${fence})`,
+      ],
+    );
+  });
+
+  it('(d) lets a library’s own schema be, but never its view of a league table (T-482)', async () => {
+    await pglite.exec(`
+      create role made_up_queue_owner nologin;
+      create schema pgboss authorization made_up_queue_owner;
+      create table pgboss.job (id uuid, name text, data jsonb);
+      grant usage on schema pgboss to ${login};
+      grant select on pgboss.job to ${login};`);
+    expect(await checkLoginRole(db, login)).toEqual([]);
+    await pglite.exec(`
+      create table pgboss.kept (id uuid, league_id uuid);
+      create view pgboss.every_program as select name from public.programs;
+      grant select on pgboss.kept, pgboss.every_program to ${login};`);
+    const said = await checkLoginRole(db, login);
+    expect(said).toEqual([
+      'pgboss.kept has a league column but its row-level security is off, so every role that may read it sees every league: alter table pgboss.kept enable row level security, force row level security',
+      `pgboss.every_program is a view that no migration made, and ${login} may read it, so nothing has checked its fence: revoke select on table pgboss.every_program from ${login}`,
+      `pgboss.kept is a table that no migration made, and ${login} may read it, so nothing has checked its fence: revoke select on table pgboss.kept from ${login}`,
+    ]);
+    expect(said.join(' ')).not.toMatch(/drop (table|view)/);
+    await pglite.exec('drop schema pgboss cascade; drop role made_up_queue_owner');
+    expect(await checkLoginRole(db, login)).toEqual([]);
   });
 });

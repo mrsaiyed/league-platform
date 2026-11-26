@@ -35,8 +35,8 @@ export type LeagueTable = {
   readonly place: number;
 };
 
-/** A reviewed security-definer function as the migrations leave it (T-477). */
-export type DefinerShape = {
+/** A function the migrations made, as they leave it (T-477, widened). */
+export type FunctionShape = {
   /** `schema.name(arguments)`, as reviewed-definers.ts keys it. */
   readonly signature: string;
   /** sha256 of its body (prosrc, and a SQL-standard body if it has one). */
@@ -46,16 +46,30 @@ export type DefinerShape = {
   readonly owner: string;
   readonly language: string;
   readonly securityDefiner: boolean;
+  /** i (immutable), s (stable) or v (volatile), as stored (provolatile). */
+  readonly volatility: string;
 };
 
-/** What the migrations made: their schemas, every relation in them, the fence's policies. */
+/** A table, view, materialized view, foreign table or sequence the migrations made (T-481). */
+export type CatalogRelation = {
+  /** `schema.name`, each part quoted as PostgreSQL would need. */
+  readonly name: string;
+  /** pg_class.relkind: r, p, v, m, f or S. */
+  readonly kind: string;
+  readonly owner: string;
+  /** For a view or materialized view, sha256 of its definition and options; else null. */
+  readonly definition: string | null;
+};
+
+/** What the migrations made: their schemas, every relation and function in them, the fence. */
 export type MigrationCatalog = {
   readonly schemas: readonly string[];
-  /** `schema.name` of every table, view and foreign table in those schemas. */
-  readonly relations: readonly string[];
+  /** Every table, view, materialized view, foreign table and sequence in those schemas. */
+  readonly relations: readonly CatalogRelation[];
   readonly leagueTables: readonly LeagueTable[];
   readonly policies: readonly FencePolicy[];
-  readonly definers: readonly DefinerShape[];
+  /** Every function in those schemas that no extension brought. */
+  readonly functions: readonly FunctionShape[];
 };
 
 /**
@@ -98,14 +112,24 @@ export async function readLeagueTables(database: Kysely<Database>): Promise<Leag
   return rows;
 }
 
+const sha256 = (text: string) => createHash('sha256').update(text).digest('hex');
+
+/** An extension's own objects, which the migrations did not write. */
+const notOfAnExtension = (catalogTable: string, oid: RawBuilder<unknown>) => sql`
+  not exists (
+    select 1 from pg_catalog.pg_depend d
+    where d.classid = ${sql.raw(`'${catalogTable}'`)}::pg_catalog.regclass and d.objid = ${oid}
+      and d.deptype = 'e')`;
+
 /**
- * The shape of each function in `signatures` that exists (T-477): the same on PostgreSQL 16
- * and 17, since each part is stored as written, not printed back.
+ * The shape of every function in `schemas` that no extension brought (T-477, widened): the
+ * same on PostgreSQL 16 and 17, since each part is stored as written, not printed back (a
+ * SQL-standard body, printed back, is compared as a policy's rule is).
  */
-export async function readDefinerShapes(
+export async function readFunctionShapes(
   database: Kysely<Database>,
-  signatures: readonly string[],
-): Promise<DefinerShape[]> {
+  schemas: readonly string[],
+): Promise<FunctionShape[]> {
   const { rows } = await sql<{
     signature: string;
     source: string;
@@ -114,32 +138,31 @@ export async function readDefinerShapes(
     owner: string;
     language: string;
     security_definer: boolean;
+    volatility: string;
   }>`
-    select * from (
-      select pg_catalog.quote_ident(n.nspname) || '.' || pg_catalog.quote_ident(p.proname) ||
-          '(' || pg_catalog.pg_get_function_identity_arguments(p.oid) || ')' as signature,
-        p.prosrc as source,
-        case when p.prosqlbody is null then null
-          else pg_catalog.pg_get_function_sqlbody(p.oid) end as standard,
-        coalesce(p.proconfig, array[]::text[]) as settings,
-        pg_catalog.pg_get_userbyid(p.proowner)::text as owner, l.lanname::text as language,
-        p.prosecdef as security_definer
-      from pg_catalog.pg_proc p
-      join pg_catalog.pg_namespace n on n.oid = p.pronamespace
-      join pg_catalog.pg_language l on l.oid = p.prolang
-    ) functions
-    where signature in (
-      select pg_catalog.jsonb_array_elements_text(${JSON.stringify(signatures)}::jsonb))
-    order by signature`.execute(database);
+    select pg_catalog.quote_ident(n.nspname) || '.' || pg_catalog.quote_ident(p.proname) ||
+        '(' || pg_catalog.pg_get_function_identity_arguments(p.oid) || ')' as signature,
+      p.prosrc as source,
+      case when p.prosqlbody is null then null
+        else pg_catalog.pg_get_function_sqlbody(p.oid) end as standard,
+      coalesce(p.proconfig, array[]::text[]) as settings,
+      pg_catalog.pg_get_userbyid(p.proowner)::text as owner, l.lanname::text as language,
+      p.prosecdef as security_definer, p.provolatile::text as volatility
+    from pg_catalog.pg_proc p
+    join pg_catalog.pg_namespace n on n.oid = p.pronamespace
+    join pg_catalog.pg_language l on l.oid = p.prolang
+    where n.nspname::text in (
+        select pg_catalog.jsonb_array_elements_text(${JSON.stringify(schemas)}::jsonb))
+      and ${notOfAnExtension('pg_catalog.pg_proc', sql`p.oid`)}
+    order by 1`.execute(database);
   return rows.map((row) => ({
     signature: row.signature,
-    body: createHash('sha256')
-      .update(row.standard === null ? row.source : `${row.source}\0${row.standard}`)
-      .digest('hex'),
+    body: sha256(row.standard === null ? row.source : `${row.source}\0${rule(row.standard)}`),
     settings: row.settings,
     owner: row.owner,
     language: row.language,
     securityDefiner: row.security_definer,
+    volatility: row.volatility,
   }));
 }
 
@@ -152,21 +175,42 @@ export async function readSchemas(database: Kysely<Database>): Promise<string[]>
   return rows.map((row) => row.name);
 }
 
-/** Every table, view and foreign table in `schemas`, with its kind (pg_class.relkind). */
+/**
+ * Every table, view, materialized view, foreign table and sequence in `schemas` that no
+ * extension brought, with its kind, owner and, for a view, a hash of its definition and
+ * options (security_invoker among them), compared as a policy's rule is (T-481).
+ */
 export async function readRelations(
   database: Kysely<Database>,
   schemas: readonly string[],
-): Promise<{ name: string; kind: string }[]> {
-  const { rows } = await sql<{ name: string; kind: string }>`
+): Promise<CatalogRelation[]> {
+  const { rows } = await sql<{
+    name: string;
+    kind: string;
+    owner: string;
+    view: string | null;
+    options: string[] | null;
+  }>`
     select pg_catalog.quote_ident(n.nspname) || '.' || pg_catalog.quote_ident(c.relname) as name,
-      c.relkind::text as kind
+      c.relkind::text as kind, pg_catalog.pg_get_userbyid(c.relowner)::text as owner,
+      case when c.relkind in ('v', 'm') then pg_catalog.pg_get_viewdef(c.oid) end as view,
+      c.reloptions::text[] as options
     from pg_catalog.pg_class c
     join pg_catalog.pg_namespace n on n.oid = c.relnamespace
-    where c.relkind in ('r', 'p', 'v', 'm', 'f')
+    where c.relkind in ('r', 'p', 'v', 'm', 'f', 'S')
       and n.nspname::text in (
         select pg_catalog.jsonb_array_elements_text(${JSON.stringify(schemas)}::jsonb))
+      and ${notOfAnExtension('pg_catalog.pg_class', sql`c.oid`)}
     order by 1`.execute(database);
-  return rows;
+  return rows.map((row) => ({
+    name: row.name,
+    kind: row.kind,
+    owner: row.owner,
+    definition:
+      row.view === null
+        ? null
+        : sha256(`${rule(row.view) ?? ''}\0${[...(row.options ?? [])].sort().join(',')}`),
+  }));
 }
 
 /** Every policy on a league table (found, or one of `listed`). */

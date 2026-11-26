@@ -6,23 +6,30 @@
 //       every one the migrations' catalog lists is there with its league column (T-470);
 //   (b) every policy on a league table is one of the migrations' own, word for word
 //       (migration-catalog.ts): a wider rule, such as `using (true)`, is refused by name;
+//       and every one of theirs is there (a missing one fails closed, but is named);
 //   (c) every SECURITY DEFINER function the login or a role it may become can run is on
-//       the reviewed list (reviewed-definers.ts, T-469), and each reviewed one is as the
-//       migrations made it: body, settings, owner, language and security (T-477);
-//   (d) every table, view and foreign table in the migrations' schemas is one they made,
-//       and in any other schema, none they did not make is readable by the login or a
-//       role it may become (T-476): a copy or a view of a league's rows holds no fence.
+//       the reviewed list (reviewed-definers.ts, T-469), and every function the migrations
+//       made (current_league_id, which every fence policy calls, among them) is as they
+//       made it: body, settings, owner, language, security and volatility (T-477);
+//   (d) every relation the migrations made is there, of the same kind, owner and, for a
+//       view, definition (T-481); every table, view and foreign table in their schemas is
+//       one they made, and in any other schema, none they did not make is readable by the
+//       login or a role it may become (T-476): a copy or a view of a league's rows holds no
+//       fence. A library's own schema (library-schemas.ts, T-482) is let be where it holds
+//       no league column and no view of a league table.
 // Each is named in a plain sentence with the one statement that puts it right.
 import { sql, type Kysely } from 'kysely';
 import { kyselyOf, type DatabaseHandle } from './database-handle.ts';
 import {
   leagueTables,
-  readDefinerShapes,
   readFencePolicies,
-  type DefinerShape,
+  readFunctionShapes,
+  readRelations,
   type FencePolicy,
+  type FunctionShape,
   type MigrationCatalog,
 } from './fence-catalog.ts';
+import { librarySchemas } from './library-schemas.ts';
 import { migrationCatalog } from './migration-catalog.ts';
 import { reviewedDefiners } from './reviewed-definers.ts';
 import type { Database } from './schema-types.ts';
@@ -111,7 +118,15 @@ const policyText = (policy: FencePolicy) =>
   (policy.using === null ? '' : ` using (${policy.using})`) +
   (policy.check === null ? '' : ` with check (${policy.check})`);
 
-/** (b) A policy on a league table that is not one of the migrations', word for word. */
+/** The statement that makes a migration's policy again as they made it. */
+const createPolicy = (policy: FencePolicy) =>
+  `create policy ${policy.name} on ${policy.table} as ` +
+  `${policy.permissive ? 'permissive' : 'restrictive'} for ${policy.command} ${policyText(policy)}`;
+
+/**
+ * (b) A policy on a league table that is not one of the migrations', word for word, and
+ * one of theirs that is missing from a league table that is there.
+ */
 async function widePolicies(
   database: Kysely<Database>,
   catalog: MigrationCatalog,
@@ -119,7 +134,9 @@ async function widePolicies(
   const own = new Map(catalog.policies.map((policy) => [`${policy.table} ${policy.name}`, policy]));
   const problems: string[] = [];
   const listed = catalog.leagueTables.map((table) => table.table);
+  const seen = new Set<string>();
   for (const found of await readFencePolicies(database, listed)) {
+    seen.add(`${found.table} ${found.name}`);
     const name = `${found.name} on ${found.table}`;
     const made = own.get(`${found.table} ${found.name}`);
     if (made === undefined) {
@@ -144,6 +161,18 @@ async function widePolicies(
       `${found.table} has its policy ${found.name} changed from the migrations' ` +
         `(now ${found.permissive ? '' : 'as restrictive '}` +
         `${found.command === 'all' ? '' : `for ${found.command} `}${policyText(found)}): ${remedy}`,
+    );
+  }
+  const { rows: present } = await sql<{ table: string }>`
+    select l.name as "table"
+    from pg_catalog.jsonb_array_elements_text(${JSON.stringify(listed)}::jsonb) as l(name)
+    where pg_catalog.to_regclass(l.name) is not null`.execute(database);
+  const there = new Set(present.map((row) => row.table));
+  for (const made of catalog.policies) {
+    if (seen.has(`${made.table} ${made.name}`) || !there.has(made.table)) continue;
+    problems.push(
+      `${made.table} is missing its policy ${made.name}, which the migrations made, so its ` +
+        `rows are not fenced as they meant: ${createPolicy(made)}`,
     );
   }
   return problems;
@@ -208,38 +237,44 @@ async function unreviewedDefiners(
     });
 }
 
-const shapeParts: readonly [keyof DefinerShape, string][] = [
+const shapeParts: readonly [keyof FunctionShape, string][] = [
   ['body', 'body'],
   ['settings', 'settings'],
   ['owner', 'owner'],
   ['language', 'language'],
   ['securityDefiner', 'security'],
+  ['volatility', 'volatility'],
 ];
 
-/** (c) A reviewed security-definer function changed since the migrations made it (T-477). */
-async function changedDefiners(
+/**
+ * (c) A function the migrations made that is missing or changed since (T-477, widened):
+ * each fence policy calls current_league_id, so one that names another league opens it.
+ */
+async function changedFunctions(
   database: Kysely<Database>,
   catalog: MigrationCatalog,
 ): Promise<string[]> {
   const found = new Map(
-    (
-      await readDefinerShapes(
-        database,
-        catalog.definers.map((definer) => definer.signature),
-      )
-    ).map((shape) => [shape.signature, shape]),
+    (await readFunctionShapes(database, catalog.schemas)).map((shape) => [shape.signature, shape]),
   );
-  return catalog.definers.flatMap((made) => {
+  const again = "run the migrations' own definition again";
+  return catalog.functions.flatMap((made) => {
     const now = found.get(made.signature);
-    if (now === undefined) return [];
+    const what = reviewedDefiners.has(made.signature)
+      ? 'a reviewed security-definer function'
+      : 'a function the migrations made';
+    if (now === undefined)
+      return [`${made.signature} is ${what}, but it is missing, so what calls it fails: ${again}`];
     const changed = shapeParts
       .filter(([part]) => JSON.stringify(now[part]) !== JSON.stringify(made[part]))
       .map(([, words]) => words);
     if (changed.length === 0) return [];
+    const why = reviewedDefiners.has(made.signature)
+      ? 'its review no longer holds'
+      : 'the fence or the command that calls it may no longer hold';
     return [
-      `${made.signature} is a reviewed security-definer function whose ${changed.join(', ')} ` +
-        `changed since the migrations made it, so its review no longer holds: run the ` +
-        `migrations' own definition again`,
+      `${made.signature} is ${what} whose ${changed.join(', ')} ` +
+        `changed since the migrations made it, so ${why}: ${again}`,
     ];
   });
 }
@@ -250,7 +285,44 @@ const kindWords: Record<string, string> = {
   v: 'view',
   m: 'materialized view',
   f: 'foreign table',
+  S: 'sequence',
 };
+
+/**
+ * (d) A relation the migrations made that is missing, or of another kind, owner or view
+ * definition (T-481): a table moved away and a view of another table put in its place
+ * keeps its name, and so passed the check of names alone.
+ */
+async function changedRelations(
+  database: Kysely<Database>,
+  catalog: MigrationCatalog,
+): Promise<string[]> {
+  const found = new Map(
+    (await readRelations(database, catalog.schemas)).map((relation) => [relation.name, relation]),
+  );
+  const again = "run the migrations' own definition again";
+  return catalog.relations.flatMap((made) => {
+    const what = kindWords[made.kind] ?? 'table';
+    const start = `${made.name} is a ${what} the migrations made, but`;
+    const now = found.get(made.name);
+    if (now === undefined) return [`${start} it is missing, so what reads it fails: ${again}`];
+    if (now.kind !== made.kind) {
+      const nowWhat = kindWords[now.kind] ?? 'table';
+      return [
+        `${start} it is now a ${nowWhat}, so it may hold rows of any league: ` +
+          `drop ${nowWhat} ${made.name}, then ${again}`,
+      ];
+    }
+    if (now.owner !== made.owner)
+      return [
+        `${start} it is now owned by ${now.owner}, not ${made.owner}, so it may not be what ` +
+          `they made: alter ${what} ${made.name} owner to ${made.owner}`,
+      ];
+    if (now.definition !== made.definition)
+      return [`${start} its definition changed, so it may read rows of any league: ${again}`];
+    return [];
+  });
+}
 
 type Stranger = {
   name: string;
@@ -258,6 +330,7 @@ type Stranger = {
   ours: boolean;
   reader: string | null;
   holders: string[];
+  library: boolean;
 };
 
 /**
@@ -271,8 +344,11 @@ async function strangers(
   roles: FenceRoles,
 ): Promise<string[]> {
   const readers = JSON.stringify([roles.login, ...roles.mayBecome]);
+  const libraries = JSON.stringify([...librarySchemas.keys()]);
+  const listed = catalog.leagueTables.map((table) => table.table);
   const { rows } = await sql<Stranger>`
-    select * from (
+    with league_tables as (${leagueTables(listed)})
+    select name, kind, ours and not library as ours, reader, holders, library from (
       select pg_catalog.quote_ident(n.nspname) || '.' || pg_catalog.quote_ident(c.relname)
           as name,
         c.relkind::text as kind,
@@ -293,19 +369,33 @@ async function strangers(
             select (pg_catalog.aclexplode(a.attacl)).* from pg_catalog.pg_attribute a
             where a.attrelid = c.oid and a.attacl is not null
           ) e
-          where e.privilege_type = 'SELECT' order by 1) as holders
+          where e.privilege_type = 'SELECT' order by 1) as holders,
+        n.nspname::text in (select pg_catalog.jsonb_array_elements_text(${libraries}::jsonb))
+          as library,
+        exists (
+          select 1 from pg_catalog.pg_attribute a
+          where a.attrelid = c.oid and a.attname = 'league_id' and a.attnum > 0
+            and not a.attisdropped)
+        or exists (
+          select 1 from pg_catalog.pg_rewrite w
+          join pg_catalog.pg_depend d
+            on d.classid = 'pg_catalog.pg_rewrite'::pg_catalog.regclass and d.objid = w.oid
+          join league_tables t on t.oid = d.refobjid
+          where w.ev_class = c.oid) as leagueish
       from pg_catalog.pg_class c
       join pg_catalog.pg_namespace n on n.oid = c.relnamespace
       where c.relkind in ('r', 'p', 'v', 'm', 'f')
         and n.nspname !~ '^pg_' and n.nspname <> 'information_schema'
         and pg_catalog.quote_ident(n.nspname) || '.' || pg_catalog.quote_ident(c.relname)
           not in (
-            select pg_catalog.jsonb_array_elements_text(${JSON.stringify(catalog.relations)}::jsonb))
+            select pg_catalog.jsonb_array_elements_text(${JSON.stringify(
+              catalog.relations.map((relation) => relation.name),
+            )}::jsonb))
     ) relations
-    where ours or reader is not null
+    where (ours or reader is not null) and not (library and not leagueish)
     order by name`.execute(database);
   const reached = new Set(['public', ...roles.reached]);
-  return rows.map(({ name, kind, ours, reader, holders }) => {
+  return rows.map(({ name, kind, ours, reader, holders, library }) => {
     const what = kindWords[kind] ?? 'table';
     if (ours)
       return (
@@ -313,10 +403,13 @@ async function strangers(
         `drop ${what} ${name} (or make it in a migration)`
       );
     const from = holders.filter((holder) => reached.has(holder));
+    // In a library's schema the library's own tables are never dropped (T-482).
     const statement =
       from.length > 0
         ? `revoke select on table ${name} from ${from.join(', ')}`
-        : `drop ${what} ${name}`;
+        : library
+          ? `revoke select on table ${name} from ${String(reader)}`
+          : `drop ${what} ${name}`;
     const who =
       reader === roles.login ? roles.login : `${roles.login} may become ${String(reader)}, which`;
     return (
@@ -342,7 +435,8 @@ export async function checkFence(
     ...(await openTables(database, catalog)),
     ...(await widePolicies(database, catalog)),
     ...(await unreviewedDefiners(database, roles)),
-    ...(await changedDefiners(database, catalog)),
+    ...(await changedFunctions(database, catalog)),
+    ...(await changedRelations(database, catalog)),
     ...(await strangers(database, catalog, roles)),
   ];
 }
