@@ -25,7 +25,7 @@ export interface ScoringNameView {
   readonly scorekeepersSeeFullNames: boolean;
 }
 
-/** What the names follow apart from the audience, which the store adds (readScoringNameView). */
+/** What the names follow apart from the audience, which scoringNameSettingsOf adds (readScoringNameView). */
 export type ScoringNameSettings = Omit<ScoringNameView, 'audience'>;
 
 /** One player of a team's roster as recorded. Nothing given here leaves the rule raw. */

@@ -6,6 +6,7 @@ import {
   findTeam,
   deleteGameAssignment,
   findGame,
+  findLeagueAudience,
   findGameGivenFormat,
   findSeason,
   findStatusBeforeCancelled,
@@ -57,6 +58,8 @@ export function gamesStore(scope: LeagueScope): GamesStore {
     listLines: (gameId) => listGameLines(scope, gameId),
     replaceLines: (gameId, lines) => replaceGameLines(scope, gameId, lines),
     listRoster: (gameId, names) => listGameRoster(scope, gameId, names),
+    // The one reviewed read of it, as the people and leagues stores use (youth if unknown).
+    leagueAudience: () => findLeagueAudience(scope),
     // Both still in the league, one of them in the bin: a restore brings the player back.
     inBin: async ({ teamId, personId }) => {
       const [person, team] = [

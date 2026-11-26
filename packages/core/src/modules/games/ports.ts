@@ -3,8 +3,8 @@
 import type { GameFormatRules, PlaySource, SeasonRules } from '@srleagues/contracts';
 import type { CommandTx } from '../../command/index.ts';
 import type { AccessReader, AccessStore, ActivityLog } from '../access/index.ts';
-import type { StoredSetting } from '../leagues/index.ts';
-import type { ScoringNameSettings } from './scoring-names.ts';
+import type { Audience, StoredSetting } from '../leagues/index.ts';
+import type { ScoringNameView } from './scoring-names.ts';
 
 /** A game of a season, in or out of the bin (T3 §8). */
 export type GameRecord = {
@@ -304,12 +304,13 @@ export type GamesStore = {
   /**
    * The players (not coaches) on either team's roster, those who have left included,
    * by team, roster order and name. Names as the scoring screens' rule gives them under
-   * these settings and the league's audience (R-33, scoringNames): the store applies it,
-   * so no recorded name the rule keeps back leaves the store.
+   * this view of the league, its audience included, as the caller read it
+   * (scoringNameSettingsOf; R-33, scoringNames): the store applies it, so no recorded
+   * name the rule keeps back leaves the store.
    */
   readonly listRoster: (
     gameId: string,
-    names: ScoringNameSettings,
+    names: ScoringNameView,
   ) => Promise<readonly GameRosterPlayer[]>;
   /**
    * Whether the person and team are both still in the league and one of them is in the bin
@@ -327,6 +328,12 @@ export type GamesStore = {
   ) => Promise<{ readonly programId: string; readonly rules: unknown } | undefined>;
   /** The league's own stored values of one setting (the league level), as a lookup reads them. */
   readonly leagueSettingRows: (key: string) => Promise<readonly StoredSetting[]>;
+  /**
+   * Who plays in the league (adult, youth or mixed), for the scoring screens' names
+   * (R-33). A league whose audience cannot be read counts as youth: the careful reading,
+   * as the people module's own (PeopleStore.leagueAudience).
+   */
+  readonly leagueAudience: () => Promise<Audience>;
   /**
    * A season's games still to be decided (not final, forfeit or cancelled), not in the bin,
    * soonest first (those with no time last), with who is assigned to score each, in the

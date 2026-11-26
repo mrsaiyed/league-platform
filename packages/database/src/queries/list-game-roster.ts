@@ -5,14 +5,14 @@
 // team in the bin, are not listed (A-5, T-45). Only names, the person's own request and
 // the jersey are read, never birth dates or contact details (R-16): whether they are a
 // child is worked out in SQL (R-28). Names leave only as the scoring screens' rule gives
-// them (R-33, scoringNames, under the settings the caller read and the league's
-// audience): no recorded name it keeps back is in the answer. Every table is filtered to
-// the league (T-28).
+// them (R-33, scoringNames, under the settings and the league's audience the caller read
+// and hands in, scoringNameSettingsOf): no recorded name it keeps back is in the answer.
+// One statement; every table is filtered to the league (T-28).
 import {
   namedRoster,
   type GameRosterPlayer,
   type RecordedRosterPlayer,
-  type ScoringNameSettings,
+  type ScoringNameView,
 } from '@srleagues/core';
 import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
 import { isMinorSql } from './minor-by-age-sql.ts';
@@ -20,18 +20,9 @@ import { isMinorSql } from './minor-by-age-sql.ts';
 export async function listGameRoster(
   scope: LeagueScope,
   gameId: string,
-  names: ScoringNameSettings,
+  names: ScoringNameView,
 ): Promise<GameRosterPlayer[]> {
-  const trx = transactionOf(scope);
-  const league = await trx
-    .selectFrom('leagues')
-    .select('audience')
-    .where('id', '=', scope.leagueId)
-    .executeTakeFirst();
-  // An unknown audience is treated as youth: the careful reading.
-  const audience =
-    league?.audience === 'adult' || league?.audience === 'mixed' ? league.audience : 'youth';
-  const rows = await trx
+  const rows = await transactionOf(scope)
     .selectFrom('games as g')
     .innerJoin('roster_entries as r', (join) =>
       join
@@ -101,5 +92,5 @@ export async function listGameRoster(
     ...players.filter((p) => p.teamId === home),
     ...players.filter((p) => p.teamId !== home),
   ];
-  return namedRoster(ordered, { ...names, audience });
+  return namedRoster(ordered, names);
 }

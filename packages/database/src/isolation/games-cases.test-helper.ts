@@ -485,6 +485,7 @@ registerIsolationCase({
   // With full names on: what the rule would show is the most another league could get.
   run: (scope, target) =>
     listGameRoster(scope, target.upcomingGameId, {
+      audience: 'adult',
       policy: defaultNamePolicy,
       scorekeepersSeeFullNames: true,
     }),

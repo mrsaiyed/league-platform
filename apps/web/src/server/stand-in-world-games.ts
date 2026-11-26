@@ -291,8 +291,9 @@ export function worldGamesStore(s: LeagueWorld, now: () => Date): GamesStore {
           addedAtGameId: e.addedAtGameId,
           needsReview: e.needsReview,
         }));
-      return namedRoster(recorded, { ...names, audience: s.audience });
+      return namedRoster(recorded, names);
     },
+    leagueAudience: async () => s.audience,
     // Plays past the last "not started" marker, by core's one rule; the players the
     // scorer's table changed are events too, but not plays (records 058, 061).
     seasonArchived: async (seasonId) =>

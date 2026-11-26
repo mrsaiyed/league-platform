@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { defaultNamePolicy, type NamePolicy } from '../people/index.ts';
-import { readScoringNameView } from './queries/read-scoring-name-view.ts';
+import type { GamesTx } from './ports.ts';
+import { readScoringNameView, scoringNameSettingsOf } from './queries/read-scoring-name-view.ts';
 import {
   scoringNames,
   type PlayerForScoring,
@@ -168,6 +169,21 @@ describe('readScoringNameView', () => {
     for (const damaged of [null, { version: 2, value: true }, { value: true }]) {
       const read = await readScoringNameView(rows(damaged));
       expect(read.scorekeepersSeeFullNames, JSON.stringify(damaged)).toBe(false);
+    }
+  });
+});
+
+describe('scoringNameSettingsOf', () => {
+  // The audience travels with the settings to listRoster, read by the store's one read of
+  // it (GamesStore.leagueAudience, youth where it cannot be read: find-league-audience).
+  it("hands the league's own audience in beside the settings", async () => {
+    for (const audience of ['youth', 'mixed', 'adult'] as const) {
+      const games = { leagueSettingRows: async () => [], leagueAudience: async () => audience };
+      expect(await scoringNameSettingsOf({ games } as unknown as Pick<GamesTx, 'games'>)).toEqual({
+        audience,
+        policy: defaultNamePolicy,
+        scorekeepersSeeFullNames: false,
+      });
     }
   });
 });
