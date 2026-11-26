@@ -28,6 +28,8 @@ const reads = new Set([
   // Which of a public page's games the person may score (step 2.153): a read.
   'games.list_scoring_offers',
   'leagues.get_season',
+  // What Admin → League settings draws, checked in core (step 2.227): a read.
+  'leagues.read_league_settings',
   'leagues.preview_season_rules',
   'scheduling.list_venues',
   // How many games each venue and court has, for the venues screen (step 2.49): a read.

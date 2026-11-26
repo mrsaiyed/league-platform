@@ -363,8 +363,8 @@ describe("the seasons each person is told of (mayListSeason, the schedule admin'
     // A scheduler limited to one program is told only of that program's season.
     programScheduler: ['Winter Season'],
     otherProgramScheduler: ['Camp 2027'],
-    // A scorekeeper reads the schedule league-wide (P4 §4).
-    scorekeeper: ['Camp 2027', 'Winter Season'],
+    // A scorekeeper does not read the schedule (P4 §4 "their games and nothing else", T-472).
+    scorekeeper: [],
     stranger: [],
     otherLeagueAdmin: [],
   };
@@ -448,16 +448,11 @@ describe("the seasons each person is told of (mayListSeason, the schedule admin'
 
 // Admin → Schedule (half 2): every command the grid sends, through scheduleAdmin.deps, on
 // the seed's Winter Season (of the default program). Reading the schedule is the owner's,
-// the admins', the schedulers' at its program and the scorekeepers' (P4 §4,
-// `schedule.read`); editing the draft and publishing it the owner's, the admins' and the
-// schedulers' at its program (`schedule.edit`, `schedule.publish`).
-const readers: readonly Actor[] = [
-  'owner',
-  'admin',
-  'scheduler',
-  'programScheduler',
-  'scorekeeper',
-];
+// the admins' and the schedulers' at its program (P4 §4, `schedule.read`), never a
+// scorekeeper's, who sees "their games and nothing else" (step 2.227, T-472); editing the
+// draft and publishing it the owner's, the admins' and the schedulers' at its program
+// (`schedule.edit`, `schedule.publish`).
+const readers: readonly Actor[] = ['owner', 'admin', 'scheduler', 'programScheduler'];
 const editors: readonly Actor[] = ['owner', 'admin', 'scheduler', 'programScheduler'];
 
 /** The Winter Season's schedule as the owner reads it. */

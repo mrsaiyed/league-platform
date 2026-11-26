@@ -119,9 +119,12 @@ export const rolePermissions: Readonly<Record<Role, readonly Permission[]>> = {
   ],
   // Site, news, media, awards, sponsors.
   editor: ['site.edit', 'site.publish', 'content.edit'],
-  // Score games, and nothing else. Which games (any, or only assigned ones) is the
-  // league's choice, decided by the games module (P4 §4).
-  scorekeeper: ['games.score', 'schedule.read'],
+  // Score games, and nothing else (P4 §4: "a list of their games and nothing else"). Which
+  // games (any, or only assigned ones) is the league's choice, decided by the games module.
+  // No `schedule.read` since step 2.227 (T-472): it opened every season's unpublished draft,
+  // the venues and the postponed games; the games a scorekeeper scores bring their own
+  // place and time through the `games.score` reads.
+  scorekeeper: ['games.score'],
   // Their own club's teams, rosters and registrations; reads the schedule.
   club_admin: ['teams.manage', 'rosters.manage', 'registration.manage', 'schedule.read'],
   // Their own team: roster changes the league allows, lineup, messaging the team.

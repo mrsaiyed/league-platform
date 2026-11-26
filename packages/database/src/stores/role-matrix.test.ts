@@ -116,6 +116,7 @@ import {
   putBackOnRoster,
   readGameFormat,
   readInvitation,
+  readLeagueSettings,
   putGameBack,
   readReopenOffer,
   readTrackedBoxScore,
@@ -430,8 +431,9 @@ const heldBy: Readonly<Record<LesserRole, readonly Permission[]>> = {
   ],
   // "Site, news, media, awards, sponsors"
   editor: ['site.edit', 'site.publish', 'content.edit'],
-  // "Score games", and see the list of their games
-  scorekeeper: ['games.score', 'schedule.read'],
+  // "Score games", and see the list of their games and nothing else: not the schedule's
+  // draft, its venues or its postponed games (step 2.227, T-472)
+  scorekeeper: ['games.score'],
 };
 
 /** Who should succeed at a command needing `needs` at `scope`, from the tables above. */
@@ -1848,7 +1850,8 @@ const divisionAndVenueRows: readonly Row[] = [
     },
     run: (c, i) => restoreCourt(c, i, schedulingDeps),
   },
-  // Reading the schedule: the scheduler (program-limited too), scorekeepers, the owner and admins.
+  // Reading the schedule: the scheduler (program-limited too), the owner and admins; not a
+  // scorekeeper (step 2.227, T-472).
   {
     command: 'scheduling.list_venues',
     name: 'see the venues and courts',
@@ -2384,6 +2387,15 @@ const rows: readonly Row[] = [
       return { input: { seasonId, version: shown.rows[0]?.version ?? 1 } };
     },
     run: (c, i) => archiveSeason(c, i, leaguesDeps),
+  },
+  // What Admin → League settings draws (step 2.227, T-474): the league's own settings, so
+  // the whole league's `league.settings`; an admin limited to one program is refused.
+  {
+    command: 'leagues.read_league_settings',
+    name: 'read the league settings',
+    needs: 'league.settings',
+    prepare: async () => ({ input: {} }),
+    run: (c, i) => readLeagueSettings(c, i, leaguesDeps),
   },
   {
     command: 'leagues.get_season',
