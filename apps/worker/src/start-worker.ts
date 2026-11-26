@@ -8,9 +8,11 @@
 //    PLATFORM_DATABASE_URL, with the server's certificate always checked, against
 //    PLATFORM_DATABASE_CA when it is given (step 2.203). A connection that fails is told
 //    in fixed words by the driver's code: the certificate, the login, or not reached.
-// 3. The login role is checked (checkLoginRole, T-60): a superuser, a role that
+// 3. The login role is checked (checkWorkerLoginRole, T-60): a superuser, a role that
 //    bypasses row-level security, or the tables' owner stops the start, and so does a
 //    hole in the league fence itself (step 2.238, check-fence.ts in the database package).
+//    It is the website's check, but the login may hold queue_owner and own pg-boss's
+//    tables in pgboss, so it starts again after pg-boss made them (T-490).
 // 4. With pg-boss on a hosted database, its schema is checked (checkQueueSchema,
 //    T-257): the release makes it, the worker never does (record 053).
 // 5. The health check starts listening (WORKER_HEALTH_PORT). It answers 503 until
@@ -23,8 +25,8 @@
 // migration (record 053).
 import type { Server } from 'node:http';
 import {
-  checkLoginRole,
   checkQueueSchema,
+  checkWorkerLoginRole,
   connectCauseOf,
   serverCodeOf,
   madeUpDatabase,
@@ -52,7 +54,7 @@ export type StartWorkerDeps = {
   readonly pollMs?: number;
   /** A last look older than this makes the health check answer 503. Default 60 seconds. */
   readonly heartbeatMaxAgeMs?: number;
-  /** The login role check (T-60), replaceable in tests. Default: checkLoginRole. */
+  /** The login role check (T-60), replaceable in tests. Default: checkWorkerLoginRole. */
   readonly checkLoginRole?: (db: DatabaseHandle) => Promise<string[]>;
   /** pg-boss's schema check (T-257), replaceable in tests. Default: checkQueueSchema. */
   readonly checkQueueSchema?: (db: DatabaseHandle) => Promise<string[]>;
@@ -179,7 +181,7 @@ export async function startWorker(
 
     let problems: string[];
     try {
-      problems = await (deps.checkLoginRole ?? checkLoginRole)(wired.db);
+      problems = await (deps.checkLoginRole ?? checkWorkerLoginRole)(wired.db);
       if (problems.length === 0 && queueKind === 'pg-boss' && source.kind === 'postgres') {
         problems = await (deps.checkQueueSchema ?? checkQueueSchema)(wired.db);
       }

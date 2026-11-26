@@ -9,6 +9,7 @@
 // a league column renamed by hand must not hide its table.
 import { createHash } from 'node:crypto';
 import { sql, type Kysely, type RawBuilder } from 'kysely';
+import { queueSchema } from './check-queue-schema.ts';
 import type { Database } from './schema-types.ts';
 
 /** One policy on a league table, as the catalog states it. */
@@ -216,11 +217,15 @@ export async function readFunctionShapes(
   }));
 }
 
-/** The schemas that are not the server's own. */
+/**
+ * The schemas that are not the server's own, but the job queue's: the migrations make it
+ * empty and what is in it is pg-boss's (T-490), judged by the worker's rule, not as theirs.
+ */
 export async function readSchemas(database: Kysely<Database>): Promise<string[]> {
   const { rows } = await sql<{ name: string }>`
     select n.nspname::text as name from pg_catalog.pg_namespace n
     where n.nspname !~ '^pg_' and n.nspname <> 'information_schema'
+      and n.nspname <> ${queueSchema}
     order by 1`.execute(database);
   return rows.map((row) => row.name);
 }

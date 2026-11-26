@@ -1,13 +1,14 @@
 // T-469: the SECURITY DEFINER functions the app's login may run, each with the reason it
 // was reviewed and let through. Such a function runs as its owner, which sees past the
 // league fence, so it is the one way a login fenced to one league could read another's
-// rows. The start-up guard (check-fence.ts) refuses any other the login, or a role it may
-// become, can run; the isolation check (isolation-coverage.test.ts) proves this list is
-// exactly what the migrations let app_user run, so adding a line here is a review.
-// Each reason was written from the function's body as the migrations leave it.
-//
-// Trigger functions are not here: no one can call them, they run only on a write to their
-// table, which the fence already holds.
+// rows. The start-up guard (check-fence.ts) refuses any other in a schema the login, or a
+// role it may become, may use, of any return type and whoever may run it (T-499: PostgreSQL
+// checks the right to run an aggregate's transition function, an operator's or a cast's
+// against another role than the caller); the isolation check (isolation-coverage.test.ts)
+// proves this list is exactly the security-definer functions the migrations make in a
+// schema app_user may use, so adding a line here is a review. Each reason was written from
+// the function's body as the migrations leave it. Trigger functions are here too since
+// T-499: no one can call them, but the rule no longer asks who may.
 
 /** `schema.name(arguments)` as the catalog states it, and the reviewed reason. */
 export const reviewedDefiners: ReadonlyMap<string, string> = new Map([
@@ -22,6 +23,18 @@ export const reviewedDefiners: ReadonlyMap<string, string> = new Map([
   [
     'public.account_of_sign_in(wanted text)',
     'the account one sign-in id belongs to: its id only, from accounts; reads no league table (0012, record 052)',
+  ],
+  [
+    'public.check_league_has_default_program()',
+    'trigger function only, run on a write to leagues or programs: refuses to end a transaction in which a league that still exists has no default program; reads only that league’s own leagues and programs rows, returns nothing (0003, 0005)',
+  ],
+  [
+    'public.check_league_slug_free()',
+    'trigger function only, run on a write to leagues: refuses a short name that still forwards to another league; reads only league_slug_history’s short names and league ids, returns the row it was given (0003, 0005)',
+  ],
+  [
+    'public.check_old_slug_free()',
+    'trigger function only, run on a write to league_slug_history: refuses a former short name another league holds or forwards; reads only short names and league ids, returns the row it was given (0003, 0005)',
   ],
   [
     'public.create_own_profile(given_first_name text, given_last_name text, given_birth_date date)',

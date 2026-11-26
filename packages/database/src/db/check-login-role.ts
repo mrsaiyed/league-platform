@@ -22,9 +22,24 @@
 // security-definer function the login may run a reviewed one, and no table the
 // migrations did not make. The website, the worker and `npm run test:real-postgres` all
 // run this one function.
+//
+// Since step 2.112 (T-490) it judges a login for one of two uses. The website's (the
+// default, checkLoginRole) may reach nothing of the job queue: a membership of
+// queue_owner, at any depth, or any other right on the schema pgboss is refused. The
+// worker's (checkWorkerLoginRole) holds queue_owner, and pg-boss's tables in pgboss
+// belong to it: a table there that the login itself or queue_owner owns is not counted,
+// and every other rule is the website's, word for word.
+//
+// Since step 2.112's review (T-491) neither login may be a member, at any depth, of one of
+// PostgreSQL's predefined roles (pg_read_all_data and the rest, predefined-roles.ts): they
+// give rights no grant list shows. While one is held, the queue's and the fence's checks
+// are not asked (every right they read would come through it, and their sentences would
+// name revokes that change nothing); they are asked at the next start, once it is revoked.
 import { sql } from 'kysely';
 import { checkFence } from './check-fence.ts';
+import { queueOwner, queueReachProblems, queueSchema } from './check-queue-schema.ts';
 import { kyselyOf, type DatabaseHandle } from './database-handle.ts';
+import { predefinedRoleProblems } from './predefined-roles.ts';
 
 /** One role the login is or reaches, by the best way there (the login itself first). */
 type ReachedRole = {
@@ -43,6 +58,8 @@ type ReachedRole = {
   first_table: string | null;
   tables: number;
   database_owner: string;
+  /** The role on the way before this one made a grant of it, which hangs on its own (T-496). */
+  hanging: boolean;
 };
 
 /** The powers a plain login must not have, as words and the clause that drops each. */
@@ -92,21 +109,43 @@ function reachedProblem(login: string, role: ReachedRole): string | undefined {
   const parent = role.path.at(-2) ?? login;
   return (
     `${login} may ${role.may_become ? 'become' : 'act as'} ${name}${through}, which ` +
-    `${listed(faults)}: revoke ${name} from ${parent}`
+    `${listed(faults)}: revoke ${name} from ${parent}${role.hanging ? ' cascade' : ''}`
   );
 }
 
 /**
- * What is wrong with the role the handle logs in as (or `role`, for tests), in
- * plain words: each names the role, what it can do that it must not, and the statement
- * that takes that away. Empty means it is fit for the app. `membershipOptions` says
- * whether the server keeps SET, INHERIT and ADMIN per membership (PostgreSQL 16 on);
- * read from the server unless a test says.
+ * What is wrong with the role the handle logs in as (or `role`, for tests) for the
+ * website, in plain words: each names the role, what it can do that it must not, and the
+ * statement that takes that away. Empty means it is fit for the app. `membershipOptions`
+ * says whether the server keeps SET, INHERIT and ADMIN per membership (PostgreSQL 16 on);
+ * read from the server unless a test says. A login that reaches the job queue is refused
+ * (T-490).
  */
 export async function checkLoginRole(
   db: DatabaseHandle,
   role?: string,
   membershipOptions?: boolean,
+): Promise<string[]> {
+  return judgeLogin(db, 'website', role, membershipOptions);
+}
+
+/**
+ * The same for the worker's login (T-490): as checkLoginRole, but it may hold queue_owner,
+ * and a table in the job queue's schema that it or queue_owner owns (pg-boss's) is let be.
+ */
+export async function checkWorkerLoginRole(
+  db: DatabaseHandle,
+  role?: string,
+  membershipOptions?: boolean,
+): Promise<string[]> {
+  return judgeLogin(db, 'worker', role, membershipOptions);
+}
+
+async function judgeLogin(
+  db: DatabaseHandle,
+  use: 'website' | 'worker',
+  role: string | undefined,
+  membershipOptions: boolean | undefined,
 ): Promise<string[]> {
   const database = kyselyOf(db);
   const withOptions =
@@ -139,7 +178,15 @@ export async function checkLoginRole(
       g.rolcreatedb as create_db, g.rolreplication as replication,
       owned.first_table, owned.tables,
       (select pg_catalog.pg_get_userbyid(d.datdba)::text from pg_catalog.pg_database d
-       where d.datname = pg_catalog.current_database()) as database_owner
+       where d.datname = pg_catalog.current_database()) as database_owner,
+      -- T-496: a grant of the role made by the role before it on the way hangs on that
+      -- membership, and the owner's revoke fails with "dependent privileges exist" unless
+      -- it cascades (seen on the real server, for any role).
+      exists (
+        select 1 from pg_catalog.pg_auth_members h
+        join pg_catalog.pg_roles gr on gr.oid = h.grantor
+        where h.roleid = b.oid and cardinality(b.path) > 1
+          and gr.rolname = b.path[cardinality(b.path) - 1]) as hanging
     from best b
     join pg_catalog.pg_roles g on g.oid = b.oid
     cross join lateral (
@@ -148,6 +195,9 @@ export async function checkLoginRole(
       join pg_catalog.pg_namespace n on n.oid = c.relnamespace
       where c.relowner = b.oid and c.relkind in ('r', 'p')
         and n.nspname !~ '^pg_' and n.nspname <> 'information_schema'
+        -- The worker's own pg-boss tables (T-490): owned by its login or by queue_owner.
+        and not (${use === 'worker'}::boolean and n.nspname = ${queueSchema}
+          and (cardinality(b.path) = 1 or g.rolname = ${queueOwner}))
     ) owned
     order by cardinality(b.path), g.rolname`.execute(database);
   const self = rows[0];
@@ -170,6 +220,28 @@ export async function checkLoginRole(
       );
     }
   }
+  // T-491: no predefined role, for either login; the rest is read once none is held.
+  const predefined = predefinedRoleProblems(
+    login,
+    rows.map((reached) => reached.path),
+    new Set(
+      rows
+        .filter((reached) => reached.hanging)
+        .map((reached) => `${reached.path.at(-1) ?? ''} ${reached.path.at(-2) ?? ''}`),
+    ),
+  );
+  if (predefined.length > 0) return [...problems, ...predefined];
+  // Step 2.112 (T-490): the website reaches nothing of the job queue.
+  if (use === 'website') {
+    problems.push(
+      ...(await queueReachProblems(db, {
+        login,
+        superuser: self.superuser,
+        paths: rows.map((reached) => reached.path),
+        databaseOwner: self.database_owner,
+      })),
+    );
+  }
   // Step 2.238: and the fence the login cannot step past must be whole (check-fence.ts).
   const name = (reached: ReachedRole) => reached.path.at(-1) ?? '';
   problems.push(
@@ -181,6 +253,7 @@ export async function checkLoginRole(
         .map(name),
       reached: rows.map(name),
       databaseOwner: self.database_owner,
+      ...(use === 'worker' ? { queueSchema } : {}),
     })),
   );
   return problems;

@@ -69,6 +69,8 @@ describe('the tables’ owner, made as Supabase’s postgres is', () => {
     expect(owner.memberships).toEqual([
       { of: 'app_login', admin: true, inherit: false, set: false },
       { of: 'app_user', admin: true, inherit: false, set: false },
+      // Made by 0031 (T-490): its own grant with SET is revoked at the file's end.
+      { of: 'queue_owner', admin: true, inherit: false, set: false },
       { of: 'sign_in_store', admin: true, inherit: false, set: false },
     ]);
   });
@@ -83,6 +85,8 @@ describe('the tables’ owner, made as Supabase’s postgres is', () => {
           /^postgres owns tables \(\S+ and \d+ more\), so it could switch their fence off: the app must log in as a role of its own \(as app_login is\), not as the tables’ owner$/,
         ),
         'postgres is a member of app_user but may not switch to it (set role): grant app_user to postgres with set true',
+        // Its ADMIN of queue_owner (T-490) would let it grant itself the queue's rights.
+        'postgres is a member of queue_owner, which owns the job queue (the pgboss schema), and the website must never read or change a queued job: revoke queue_owner from postgres',
       ]);
     } finally {
       await db.close();
@@ -90,8 +94,8 @@ describe('the tables’ owner, made as Supabase’s postgres is', () => {
   });
 
   it('cannot set role app_user', async () => {
-    // Its ADMIN-only memberships in app_login, app_user and sign_in_store are reached, but
-    // none of those has a power or a table, so none is reported above.
+    // Its ADMIN-only memberships in app_login, app_user, queue_owner and sign_in_store are
+    // reached; none has a power, and only queue_owner's is reported above (T-490).
     const session = await ownerSession();
     try {
       // 42501: permission denied to set role "app_user".
