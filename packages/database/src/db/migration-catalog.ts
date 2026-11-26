@@ -1,7 +1,9 @@
 // Generated from supabase/migrations by `npm run db:types`. Do not edit: a test
 // fails when this file differs from a fresh generation (T-468). The start-up guard
-// (check-fence.ts) refuses a relation in these schemas that is not listed here, and a
-// policy on a league table that is not listed here word for word.
+// (check-fence.ts) refuses a relation in these schemas that is not listed here, a league
+// table listed here that is missing or whose league column is gone or renamed, a policy on
+// a league table that is not listed here word for word, and a reviewed definer function
+// whose body, settings, owner, language or security differ from what is listed here.
 import type { MigrationCatalog } from './fence-catalog.ts';
 
 export const migrationCatalog: MigrationCatalog = {
@@ -58,6 +60,44 @@ export const migrationCatalog: MigrationCatalog = {
     'sign_in.refresh_tokens',
     'sign_in.sessions',
     'sign_in.users',
+  ],
+  leagueTables: [
+    { table: 'public.activity_log', column: 'league_id', place: 2 },
+    { table: 'public.command_receipts', column: 'league_id', place: 2 },
+    { table: 'public.courts', column: 'league_id', place: 2 },
+    { table: 'public.divisions', column: 'league_id', place: 2 },
+    { table: 'public.game_assignments', column: 'league_id', place: 2 },
+    { table: 'public.game_corrections', column: 'league_id', place: 2 },
+    { table: 'public.game_events', column: 'league_id', place: 2 },
+    { table: 'public.game_states', column: 'league_id', place: 2 },
+    { table: 'public.games', column: 'league_id', place: 2 },
+    { table: 'public.imports', column: 'league_id', place: 2 },
+    { table: 'public.invitations', column: 'league_id', place: 2 },
+    { table: 'public.jobs', column: 'league_id', place: 2 },
+    { table: 'public.league_features', column: 'league_id', place: 2 },
+    { table: 'public.league_slug_history', column: 'league_id', place: 2 },
+    { table: 'public.leagues', column: 'id', place: 1 },
+    { table: 'public.people', column: 'league_id', place: 2 },
+    { table: 'public.player_game_stats', column: 'league_id', place: 2 },
+    { table: 'public.programs', column: 'league_id', place: 2 },
+    { table: 'public.role_grants', column: 'league_id', place: 2 },
+    { table: 'public.roster_entries', column: 'league_id', place: 2 },
+    { table: 'public.rounds', column: 'league_id', place: 2 },
+    { table: 'public.schedule_drafts', column: 'league_id', place: 2 },
+    { table: 'public.schedule_revisions', column: 'league_id', place: 2 },
+    { table: 'public.scoring_sessions', column: 'league_id', place: 2 },
+    { table: 'public.season_player_totals', column: 'league_id', place: 2 },
+    { table: 'public.seasons', column: 'league_id', place: 2 },
+    { table: 'public.setting_values', column: 'league_id', place: 2 },
+    { table: 'public.site_releases', column: 'league_id', place: 2 },
+    { table: 'public.sites', column: 'league_id', place: 2 },
+    { table: 'public.stages', column: 'league_id', place: 2 },
+    { table: 'public.standings_adjustments', column: 'league_id', place: 2 },
+    { table: 'public.standings_coin_flips', column: 'league_id', place: 2 },
+    { table: 'public.standings_rows', column: 'league_id', place: 2 },
+    { table: 'public.support_access_log', column: 'league_id', place: 2 },
+    { table: 'public.teams', column: 'league_id', place: 2 },
+    { table: 'public.venues', column: 'league_id', place: 2 },
   ],
   policies: [
     {
@@ -383,6 +423,82 @@ export const migrationCatalog: MigrationCatalog = {
       roles: 'public',
       using: '(league_id = ( SELECT current_league_id() AS current_league_id))',
       check: '(league_id = ( SELECT current_league_id() AS current_league_id))',
+    },
+  ],
+  definers: [
+    {
+      signature: 'public.access_list_names()',
+      body: '4db2e3d9a49207320e7780600d1bce2e76b84f4ca77d26d6c9163912a20bc367',
+      settings: ['search_path=pg_catalog, pg_temp'],
+      owner: 'postgres',
+      language: 'sql',
+      securityDefiner: true,
+    },
+    {
+      signature: 'public.account_for_sign_in(given_sign_in_id text, given_email text)',
+      body: 'ef984eb05ff2c3d6da8a973074fc0b2d962e44b7b3456f7fae637b411729b74b',
+      settings: ['search_path=pg_catalog, pg_temp'],
+      owner: 'postgres',
+      language: 'plpgsql',
+      securityDefiner: true,
+    },
+    {
+      signature: 'public.account_of_sign_in(wanted text)',
+      body: 'c2ad366ade23d873ecb7f1e5d6b163cd155f1ef5bcb86ec9536d97cb8b8115e7',
+      settings: ['search_path=pg_catalog, pg_temp'],
+      owner: 'postgres',
+      language: 'sql',
+      securityDefiner: true,
+    },
+    {
+      signature:
+        'public.create_own_profile(given_first_name text, given_last_name text, given_birth_date date)',
+      body: '6465e9bb397edcb6eb643764b7aa96570995a975033f45c840aac762600c8302',
+      settings: ['search_path=pg_catalog, pg_temp'],
+      owner: 'postgres',
+      language: 'plpgsql',
+      securityDefiner: true,
+    },
+    {
+      signature: 'public.erase_account()',
+      body: 'dd8fb4f33679380042be5370aa44aab8f2aa0faa1249dd732d33dbd597d51b4b',
+      settings: ['search_path=pg_catalog, pg_temp'],
+      owner: 'postgres',
+      language: 'plpgsql',
+      securityDefiner: true,
+    },
+    {
+      signature: 'public.find_league_by_slug(wanted text)',
+      body: '0572d9f07710913c9f978e33a78793a6ea27897b2d13a1730a771bcc16d37538',
+      settings: ['search_path=pg_catalog, pg_temp'],
+      owner: 'postgres',
+      language: 'sql',
+      securityDefiner: true,
+    },
+    {
+      signature:
+        'public.keep_email(given_to text, given_kind text, given_subject text, given_text text)',
+      body: '1e50001389ab1bb84529597c0c41536150d8c5228f5425ee68b70ec28ce9fd02',
+      settings: ['search_path=pg_catalog, pg_temp'],
+      owner: 'postgres',
+      language: 'plpgsql',
+      securityDefiner: true,
+    },
+    {
+      signature: 'public.my_leagues()',
+      body: 'd225c30eb3614ebeda51e5b561762b3d390dab16f9d07992414f85f2266d76de',
+      settings: ['search_path=pg_catalog, pg_temp'],
+      owner: 'postgres',
+      language: 'plpgsql',
+      securityDefiner: true,
+    },
+    {
+      signature: 'public.take_jobs(how_many integer, lease_seconds integer)',
+      body: 'd972748a0066577be10c0be16ea0ee2eaf328b422f1c0cfd2872cd26e5f89e14',
+      settings: ['search_path=pg_catalog, pg_temp'],
+      owner: 'postgres',
+      language: 'plpgsql',
+      securityDefiner: true,
     },
   ],
 };

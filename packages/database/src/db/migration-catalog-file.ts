@@ -9,11 +9,14 @@ import { applyMigrations, defaultMigrationsFolder, pgliteDriver } from '../migra
 import { createDatabase } from './create-database.ts';
 import { kyselyOf } from './database-handle.ts';
 import {
+  readDefinerShapes,
   readFencePolicies,
+  readLeagueTables,
   readRelations,
   readSchemas,
   type MigrationCatalog,
 } from './fence-catalog.ts';
+import { reviewedDefiners } from './reviewed-definers.ts';
 
 /** Where the catalog is checked in. */
 export const migrationCatalogPath = fileURLToPath(
@@ -32,7 +35,13 @@ export async function readMigrationCatalog(
     const database = kyselyOf(db);
     const schemas = await readSchemas(database);
     const relations = (await readRelations(database, schemas)).map((relation) => relation.name);
-    return { schemas, relations, policies: await readFencePolicies(database) };
+    return {
+      schemas,
+      relations,
+      leagueTables: await readLeagueTables(database),
+      policies: await readFencePolicies(database),
+      definers: await readDefinerShapes(database, [...reviewedDefiners.keys()]),
+    };
   } finally {
     await db.close();
     await pglite.close();
@@ -46,8 +55,10 @@ export async function migrationCatalogFile(
   const catalog = await readMigrationCatalog(folder);
   const text = `// Generated from supabase/migrations by \`npm run db:types\`. Do not edit: a test
 // fails when this file differs from a fresh generation (T-468). The start-up guard
-// (check-fence.ts) refuses a relation in these schemas that is not listed here, and a
-// policy on a league table that is not listed here word for word.
+// (check-fence.ts) refuses a relation in these schemas that is not listed here, a league
+// table listed here that is missing or whose league column is gone or renamed, a policy on
+// a league table that is not listed here word for word, and a reviewed definer function
+// whose body, settings, owner, language or security differ from what is listed here.
 import type { MigrationCatalog } from './fence-catalog.ts';
 
 export const migrationCatalog: MigrationCatalog = ${JSON.stringify(catalog)};

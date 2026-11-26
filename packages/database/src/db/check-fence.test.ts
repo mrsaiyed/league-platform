@@ -175,4 +175,127 @@ describe('the start-up guard reads the league fence (step 2.238)', () => {
       ],
     );
   });
+
+  it('(a) holds a listed league table whose league column was renamed (T-470, changed)', async () => {
+    // Found by its column alone, this table would vanish from the guard, and with it the
+    // wide policy planted on it.
+    await plantedAndMended(
+      `alter table public.activity_log rename column league_id to lg;
+       create policy made_up_wide on public.activity_log for select using (true);`,
+      [
+        'public.activity_log is a league table the migrations made, but its league column league_id is now named lg, so its fence cannot be read: alter table public.activity_log rename column lg to league_id',
+        `public.activity_log has its policy activity_log_league_fence changed from the migrations' (now to public using (${fence.replace('league_id', 'lg')}) with check (${fence.replace('league_id', 'lg')})): alter policy activity_log_league_fence on public.activity_log to public using (${fence}) with check (${fence})`,
+        'public.activity_log has a policy made_up_wide that no migration made, so its rule (to public using (true)) is not known to name the league: drop policy made_up_wide on public.activity_log',
+      ],
+    );
+  });
+
+  it('(b) refuses a fence policy whose roles alone were changed', async () => {
+    await plantedAndMended('alter policy programs_league_fence on public.programs to app_user', [
+      `public.programs has its policy programs_league_fence changed from the migrations' (now to app_user using (${fence}) with check (${fence})): alter policy programs_league_fence on public.programs to public using (${fence}) with check (${fence})`,
+    ]);
+  });
+
+  it('(b) refuses a fence policy made again for one command only', async () => {
+    await plantedAndMended(
+      `drop policy programs_league_fence on public.programs;
+       create policy programs_league_fence on public.programs for update
+         using ${fence} with check ${fence};`,
+      [
+        `public.programs has its policy programs_league_fence changed from the migrations' (now for update to public using (${fence}) with check (${fence})): drop policy programs_league_fence on public.programs, then make it again as its migration does`,
+      ],
+    );
+    await pglite.exec(
+      `create policy programs_league_fence on public.programs using ${fence} with check ${fence}`,
+    );
+    expect(await checkLoginRole(db, login)).toEqual([]);
+  });
+
+  it('(b) refuses a fence policy made again as restrictive', async () => {
+    await plantedAndMended(
+      `drop policy programs_league_fence on public.programs;
+       create policy programs_league_fence on public.programs as restrictive
+         using ${fence} with check ${fence};`,
+      [
+        `public.programs has its policy programs_league_fence changed from the migrations' (now as restrictive to public using (${fence}) with check (${fence})): drop policy programs_league_fence on public.programs, then make it again as its migration does`,
+      ],
+    );
+    await pglite.exec(
+      `create policy programs_league_fence on public.programs using ${fence} with check ${fence}`,
+    );
+    expect(await checkLoginRole(db, login)).toEqual([]);
+  });
+
+  it('(c) refuses a reviewed function whose body, settings or owner changed (T-477)', async () => {
+    const slug = 'public.find_league_by_slug(wanted text)';
+    const again = `${slug} is a reviewed security-definer function whose`;
+    const tail = `changed since the migrations made it, so its review no longer holds: run the migrations' own definition again`;
+    const original = (
+      await pglite.query<{ d: string }>(
+        `select pg_get_functiondef('public.find_league_by_slug(text)'::regprocedure) as d`,
+      )
+    ).rows[0]!.d;
+    // The `where` clauses taken out: the same name now answers every league.
+    const widened = original.replace(/AS \$function\$[\s\S]*\$function\$/, (body) =>
+      body.replace(/where[\s\S]*?(;|\$function\$)/i, (_whole, end: string) => ` ${end}`),
+    );
+    expect(widened).not.toBe(original);
+    for (const [plant, part] of [
+      [widened, 'body'],
+      [`alter function public.find_league_by_slug(text) set search_path = public`, 'settings'],
+      [
+        `create role made_up_definer_owner nologin;
+         alter function public.find_league_by_slug(text) owner to made_up_definer_owner;`,
+        'owner',
+      ],
+    ] as const) {
+      await pglite.exec(plant);
+      expect(await checkLoginRole(db, login)).toEqual([`${again} ${part} ${tail}`]);
+      await pglite.exec(
+        `${original}; alter function public.find_league_by_slug(text) owner to postgres`,
+      );
+      expect(await checkLoginRole(db, login)).toEqual([]);
+    }
+  });
+
+  it('(d) refuses a view, materialized view or copy elsewhere the login can read (T-476)', async () => {
+    await plantedAndMended(
+      `create schema made_up_copies;
+       create view made_up_copies.every_program as select * from public.programs;
+       create materialized view made_up_copies.kept_programs as select * from public.programs;
+       grant usage on schema made_up_copies to ${login};
+       grant select on made_up_copies.every_program, made_up_copies.kept_programs to ${login};`,
+      [
+        `made_up_copies.every_program is a view that no migration made, and ${login} may read it, so nothing has checked its fence: revoke select on table made_up_copies.every_program from ${login}`,
+        `made_up_copies.kept_programs is a materialized view that no migration made, and ${login} may read it, so nothing has checked its fence: revoke select on table made_up_copies.kept_programs from ${login}`,
+      ],
+    );
+    await plantedAndMended(
+      `create role made_up_copier nologin;
+       grant made_up_copier to ${login} with inherit false, set true;
+       create table made_up_copies.program_names as select league_id as lg, name from public.programs;
+       create view made_up_copies.program_leagues as select league_id from public.programs;
+       grant usage on schema made_up_copies to made_up_copier;
+       grant select on made_up_copies.program_names to made_up_copier;
+       grant select (league_id) on made_up_copies.program_leagues to made_up_copier;`,
+      [
+        `made_up_copies.program_leagues is a view that no migration made, and ${login} may become made_up_copier, which may read it, so nothing has checked its fence: revoke select on table made_up_copies.program_leagues from made_up_copier`,
+        `made_up_copies.program_names is a table that no migration made, and ${login} may become made_up_copier, which may read it, so nothing has checked its fence: revoke select on table made_up_copies.program_names from made_up_copier`,
+      ],
+    );
+  });
+
+  it('(d) lets be, in another schema, what the login cannot read', async () => {
+    await pglite.exec(`
+      create schema made_up_unread;
+      create view made_up_unread.every_program as select * from public.programs;
+      create table made_up_unread.copy as select league_id as lg from public.programs;
+      grant select on made_up_unread.every_program to ${login};
+      create role made_up_far nologin;
+      grant usage on schema made_up_unread to made_up_far;
+      grant select on made_up_unread.copy to made_up_far;`);
+    // Select without the schema's use, and use through a role the login does not reach.
+    expect(await checkLoginRole(db, login)).toEqual([]);
+    await pglite.exec('drop schema made_up_unread cascade');
+  });
 });
