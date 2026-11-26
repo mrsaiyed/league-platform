@@ -18,10 +18,18 @@
 // steps that each add a command rarely touch the same lines (step 2.188, record 072);
 // the order of rows changes nothing that is checked.
 //
-// Club admins, coaches and captains are not here: their scopes (a club, a team)
-// cannot be granted until those tables exist (0004). Their permissions are tested
-// in core (modules/access/policy.test.ts), and they join this matrix with the
-// clubs and teams step.
+// The people tried (step 2.228): the owner, admins, each lesser role for the whole
+// league and limited to one program, a coach and a captain of a team (since 0008 a
+// role can be given for one team, and theirs is moved onto the team the call is
+// about, so "their own team" is tried), someone with no role or a removed one, our
+// staff and a visitor. A club admin is not here only because the database still
+// refuses a club scope until the clubs table exists (0008); a test below proves that
+// refusal, so the day a club can be given this file fails until the club admin joins.
+//
+// Each row is also run in an archived and in a suspended league (U-9: read-only,
+// with R-26's and T-226's exceptions, written out here by hand), and each scoring
+// row in a league that scores assigned games only (P4 §4), by a scorekeeper assigned
+// to the game and one who is not (T-500, T-501, T-502).
 import { defaultSeasonRules, formatOfRules, startingDesign } from '@srleagues/contracts';
 import { basketball } from '@srleagues/sports';
 import { createHash, randomUUID } from 'node:crypto';
@@ -236,7 +244,12 @@ const actors = [
   'scheduler',
   'editor',
   'scorekeeper',
+  'program_registrar',
   'program_scheduler',
+  'program_editor',
+  'program_scorekeeper',
+  'coach',
+  'captain',
   'no_role',
   'revoked_admin',
   'staff',
@@ -335,10 +348,63 @@ async function grant(leagueId: string, role: string, scope: string | null = null
   return accountId;
 }
 
+/** A coach or captain grant for one team (0008). */
+async function grantForTeam(leagueId: string, role: 'coach' | 'captain', teamId: string) {
+  const accountId = await newAccount(pglite);
+  await pglite.query(
+    `insert into role_grants (league_id, account_id, role, scope_type, scope_id)
+     values ($1, $2, $3, 'team', $4)`,
+    [leagueId, accountId, role, teamId],
+  );
+  return accountId;
+}
+
+/**
+ * The team a call is about, if any: its `teamId`, the team of its `rosterEntryId`, or
+ * the home team of its `gameId`. The coach and the captain are moved onto it, so a row
+ * tries them on their own team (P4 §4).
+ */
+async function teamOfInput(input: unknown): Promise<string | null> {
+  if (typeof input !== 'object' || input === null) return null;
+  const fields = input as Record<string, unknown>;
+  if (typeof fields['teamId'] === 'string') return fields['teamId'];
+  const lookups: readonly [string, string][] = [
+    ['rosterEntryId', 'select team_id as id from roster_entries where id = $1'],
+    ['gameId', 'select home_team_id as id from games where id = $1'],
+  ];
+  for (const [field, sql] of lookups) {
+    const value = fields[field];
+    if (typeof value !== 'string') continue;
+    const found = await pglite.query<{ id: string | null }>(sql, [value]);
+    if (found.rows[0]?.id) return found.rows[0].id;
+  }
+  return null;
+}
+
+/** A grant's scope never changes (0004): the old grant is removed and a new one given. */
+async function moveTeamGrantsTo(league: League, teamId: string) {
+  await pglite.query(
+    `with old as (
+       update role_grants set revoked_at = now()
+        where league_id = $1 and role in ('coach', 'captain') and revoked_at is null
+          and scope_id <> $2
+       returning account_id, role)
+     insert into role_grants (league_id, account_id, role, scope_type, scope_id)
+     select $1, account_id, role, 'team', $2 from old`,
+    [league.leagueId, teamId],
+  );
+}
+
 /** A league with one account per actor. */
 async function leagueWithActors(): Promise<League> {
   const made = await newLeague(pglite);
   const programId = await newProgram(pglite, made.leagueId);
+  // A team of its own for the coach and the captain until a row's team is known.
+  const teamId = await newTeam(
+    pglite,
+    made.leagueId,
+    await newSeason(pglite, made.leagueId, made.defaultProgramId),
+  );
   const ids = new Map<Actor, string>([
     ['owner', made.ownerId],
     ['admin', await grant(made.leagueId, 'admin')],
@@ -347,7 +413,12 @@ async function leagueWithActors(): Promise<League> {
     ['scheduler', await grant(made.leagueId, 'scheduler')],
     ['editor', await grant(made.leagueId, 'editor')],
     ['scorekeeper', await grant(made.leagueId, 'scorekeeper')],
+    ['program_registrar', await grant(made.leagueId, 'registrar', programId)],
     ['program_scheduler', await grant(made.leagueId, 'scheduler', programId)],
+    ['program_editor', await grant(made.leagueId, 'editor', programId)],
+    ['program_scorekeeper', await grant(made.leagueId, 'scorekeeper', programId)],
+    ['coach', await grantForTeam(made.leagueId, 'coach', teamId)],
+    ['captain', await grantForTeam(made.leagueId, 'captain', teamId)],
     ['no_role', await newAccount(pglite)],
     ['revoked_admin', await grant(made.leagueId, 'admin')],
     ['staff', staffId],
@@ -448,9 +519,35 @@ function expectedActors(needs: CommandRequirement, scope: 'league' | 'program'):
   for (const role of ['registrar', 'scheduler', 'editor', 'scorekeeper'] as const) {
     if (heldBy[role].includes(needs)) allowed.push(role);
   }
-  if (scope === 'program' && heldBy.scheduler.includes(needs)) allowed.push('program_scheduler');
+  // A role limited to one program holds its permissions there only (P4 §4).
+  if (scope === 'program') {
+    for (const [actor, role] of programLimited) {
+      if (heldBy[role].includes(needs)) allowed.push(actor);
+    }
+  }
+  // A coach or captain holds nothing any command of stage 2 needs: see teamRolesHold.
+  for (const actor of ['coach', 'captain'] as const) {
+    if (teamRolesHold.includes(needs)) allowed.push(actor);
+  }
   return allowed;
 }
+
+/** The lesser roles limited to the league's other program, and the role each one is. */
+const programLimited: readonly (readonly [Actor, LesserRole])[] = [
+  ['program_registrar', 'registrar'],
+  ['program_scheduler', 'scheduler'],
+  ['program_editor', 'editor'],
+  ['program_scorekeeper', 'scorekeeper'],
+];
+
+/**
+ * P4 §4, by hand: a coach or captain has "their own team: roster changes the league
+ * allows, lineup, messaging the team". No league can yet allow a coach a roster change
+ * (no setting for it exists), and lineups and team messages are not commands of stage
+ * 2, so on their own team as anywhere else they may do nothing but what any signed-in
+ * person may (T-500).
+ */
+const teamRolesHold: readonly Permission[] = [];
 
 /** The binned stand-in: a row put in the bin, for the restore commands. */
 async function binned(table: 'divisions' | 'venues' | 'courts', id: string) {
@@ -2764,25 +2861,288 @@ describe('every role against every command (T4 §12)', () => {
     expect(rows.filter((r) => r.name.includes(bannerSetting.key))).toHaveLength(6);
   });
 
+  it('cannot yet give anyone a club admin role: a club scope is refused until clubs exist (0008)', async () => {
+    const made = await newLeague(pglite);
+    const accountId = await newAccount(pglite);
+    await expect(
+      pglite.query(
+        `insert into role_grants (league_id, account_id, role, scope_type, scope_id)
+         values ($1, $2, 'club_admin', 'club', $3)`,
+        [made.leagueId, accountId, randomUUID()],
+      ),
+    ).rejects.toThrow(/role_grants_scope_available/);
+  });
+
   for (const row of rows) {
     it(`${row.command}: ${row.name} (${row.needs})`, async () => {
       const outcomes: Partial<Record<Actor, string>> = {};
       for (const actor of actors) {
-        const league = await leagueWithActors();
-        const { input, leagueId } = await row.prepare(league);
-        const context = {
-          leagueId: leagueId ?? league.leagueId,
-          accountId: league.accountOf(actor),
-          requestId: 'matrix',
-        };
-        const result = await row.run(context, input);
-        outcomes[actor] = result.ok ? 'ok' : (result.error?.code ?? 'failed');
+        outcomes[actor] = await runRow(row, actor);
       }
       const allowed = expectedActors(row.needs, row.scope ?? 'league');
       const expected = Object.fromEntries(
-        actors.map((actor) => [actor, allowed.includes(actor) ? 'ok' : 'not-allowed']),
+        actors.map((actor) => [
+          actor,
+          !allowed.includes(actor)
+            ? 'not-allowed'
+            : notTheirs[row.command]?.actors.includes(actor)
+              ? notTheirs[row.command]?.code
+              : 'ok',
+        ]),
       );
       expect(outcomes).toEqual(expected);
+    });
+  }
+});
+
+/**
+ * Reopening one's own result (S-38, step 2.177): the result these rows reopen was
+ * recorded by the matrix's scorekeeper, so another scorekeeper, the one limited to the
+ * program, holds the permission but is refused: the result is not theirs.
+ */
+const notTheirs: Readonly<Record<string, { actors: readonly Actor[]; code: string }>> = {
+  'games.reopen_own_result': { actors: ['program_scorekeeper'], code: 'not-recorded-by-you' },
+  'games.reopen_tracked_game': { actors: ['program_scorekeeper'], code: 'not-ended-by-you' },
+};
+
+/** One row as one actor, in a league of its own; `before` runs after the input is made. */
+async function runRow(
+  row: Row,
+  actor: Actor,
+  before: (league: League, input: unknown) => Promise<void> = async () => {},
+  accountOf: (league: League) => string | null = (league) => league.accountOf(actor),
+): Promise<string> {
+  const league = await leagueWithActors();
+  const { input, leagueId } = await row.prepare(league);
+  const team = await teamOfInput(input);
+  if (team !== null) await moveTeamGrantsTo(league, team);
+  await before(league, input);
+  const context = {
+    leagueId: leagueId ?? league.leagueId,
+    accountId: accountOf(league),
+    requestId: 'matrix',
+  };
+  const result = await row.run(context, input);
+  return result.ok ? 'ok' : (result.error?.code ?? 'failed');
+}
+
+/**
+ * Puts the league in a state as our staff would, without counting a change of the
+ * league's version (0002), so an input made for the league's first version still fits.
+ */
+async function putLeagueIn(league: League, status: 'archived' | 'suspended') {
+  await pglite.exec(`begin; set local session_replication_role = replica;
+    update leagues set status = '${status}' where id = '${league.leagueId}'; commit;`);
+}
+
+/**
+ * U-9, by hand: the commands that only read. In an archived or suspended league they
+ * still work for whoever may use them (the league's pages stay, R-26's reason).
+ */
+const readCommands: ReadonlySet<string> = new Set([
+  'access.list_access',
+  'access.list_activity',
+  'access.my_access',
+  'access.search_activity',
+  'games.list_earlier_games',
+  'games.list_games_needing_result',
+  'games.list_later_games',
+  'games.list_my_games',
+  'games.list_postponed_games',
+  'games.list_scorekeepers',
+  'games.list_scoring_offers',
+  'imports.get_fixture_import',
+  'leagues.get_season',
+  'leagues.list_bin',
+  'leagues.list_bin_part',
+  'leagues.list_divisions',
+  'leagues.read_league_settings',
+  'people.get_person',
+  'people.list_people',
+  'scheduling.count_place_games',
+  'scheduling.get_schedule_draft',
+  'scheduling.list_venues',
+  'scheduling.preview_schedule_publish',
+  'teams.count_team_games',
+  'teams.list_roster',
+]);
+
+/**
+ * T-501, by hand: the reads that are the first step of a change and answer only someone
+ * who may make it: the sheet a score is typed on, the tracker's state and rosters, a
+ * game's format for the tracker, the grid a tracked game is corrected in, whether a
+ * result or a sheet can be reopened or put back, the preview of new season rules and
+ * the list adjustments are added on. In a read-only league no one may make the change
+ * (U-9), so they are refused with it; the league's pages still show what they show.
+ */
+const changeToolReads: ReadonlySet<string> = new Set([
+  'games.get_box_score_sheet',
+  'games.read_game_format',
+  'games.read_own_result_offer',
+  'games.read_own_result_offers',
+  'games.read_reopen_offer',
+  'games.read_sheet_put_back_offer',
+  'games.read_tracked_box_score',
+  'games.read_tracker_rosters',
+  'games.read_tracker_state',
+  'leagues.preview_season_rules',
+  'standings.list_adjustments',
+]);
+
+/**
+ * FINDING (for the lead, step 2.228): rows the sweep below cannot settle from the spec,
+ * each named with what was seen; they show as "todo" until the lead decides.
+ */
+const stateFindings: Readonly<Record<string, string>> = {
+  // U-9 makes an archived or suspended league read-only, and the spec does not say our
+  // staff may still remove a draft league made by mistake once it is suspended (or
+  // archived without ever being published). The command refuses only a league that was
+  // published or used, so staff removed it in both states.
+  'leagues.remove_draft':
+    'staff removed a never-published league in an archived and a suspended state',
+};
+
+type LeagueState = 'archived' | 'suspended';
+
+/**
+ * The changes that still work in an archived or suspended league, by hand from the
+ * spec, each with its reason; every other change is refused there (U-9).
+ */
+function stillWorksIn(row: Row, state: LeagueState): boolean | string {
+  switch (row.command) {
+    // U-9, T-226: cancelling an invitation and removing someone always work; taking a
+    // scorekeeper off a game is taking their access to it away.
+    case 'access.cancel_invitation':
+    case 'access.revoke_grant':
+    case 'games.unassign_scorekeeper':
+      return true;
+    // T-226, T-288: no one joins a read-only league, and a link that does not work is
+    // answered as every such link is.
+    case 'access.read_invitation':
+      return 'invitation-not-usable';
+    // R-26: a person's request set to initials or removed shows less of them; both
+    // rows ask for less than the full name a new person starts with.
+    case 'people.set_name_request':
+      return true;
+    // Making a league changes no league that exists.
+    case 'leagues.create':
+      return true;
+    // U-9: the owner or an admin un-archives ("publish" from archived goes back to
+    // live); only our staff lift a suspension, and that returns the league to draft,
+    // so publishing a suspended league is refused. Only we suspend, an archived league
+    // too; a league already suspended has nothing to suspend (T-502).
+    case 'leagues.set_status':
+      if (state === 'archived') return true;
+      return row.needs === 'platform-staff' ? false : 'illegal-transition';
+    default:
+      return false;
+  }
+}
+
+/** What each allowed actor should get in a read-only league: "ok", "refused" or a code. */
+function stateExpectation(row: Row, state: LeagueState): string {
+  if (readCommands.has(row.command)) return 'ok';
+  if (changeToolReads.has(row.command)) return 'refused';
+  const works = stillWorksIn(row, state);
+  return works === true ? 'ok' : works === false ? 'refused' : works;
+}
+
+/** A refusal for the league's state: "not-allowed", or the invitations' own "league-read-only" (T-501). */
+const stateRefusals: readonly string[] = ['not-allowed', 'league-read-only'];
+
+describe('every command in an archived or suspended league (U-9, R-26)', () => {
+  for (const state of ['archived', 'suspended'] as const) {
+    for (const row of rows) {
+      const finding = stateFindings[row.command];
+      if (finding !== undefined) {
+        it.todo(`${state}: ${row.command}: ${row.name}: FINDING: ${finding}`);
+        continue;
+      }
+      it(`${state}: ${row.command}: ${row.name}`, async () => {
+        // Those who may use the command in a league that is not read-only.
+        const allowed = expectedActors(row.needs, row.scope ?? 'league');
+        const outcomes: Partial<Record<Actor, string>> = {};
+        for (const actor of allowed) {
+          const code = await runRow(row, actor, (league) => putLeagueIn(league, state));
+          outcomes[actor] = stateRefusals.includes(code) ? 'refused' : code;
+        }
+        const expected = Object.fromEntries(
+          allowed.map((actor) => [actor, stateExpectation(row, state)]),
+        );
+        expect(outcomes).toEqual(expected);
+      });
+    }
+  }
+
+  it('names only commands that have rows among its findings and its lists', () => {
+    const named = [...Object.keys(stateFindings), ...readCommands, ...changeToolReads];
+    expect(named.filter((command) => !rows.some((row) => row.command === command))).toEqual([]);
+  });
+
+  // R-26: "Names on public pages" moved toward less still works; toward more is refused.
+  it('archived: names on public pages move toward less, never toward more (R-26)', async () => {
+    const set = setSettingFor(declaredSettings);
+    const league = await leagueWithActors();
+    await putLeagueIn(league, 'archived');
+    const as = { leagueId: league.leagueId, accountId: league.ownerId, requestId: 'matrix' };
+    const to = (value: string, version: number | null) =>
+      set(as, { level: 'league', key: 'privacy.publicNames', value, version }, leaguesDeps);
+    expect(await to('firstNameLastInitial', null)).toMatchObject({ ok: true });
+    expect(await to('fullName', 1)).toMatchObject({ ok: false });
+    expect(await to('hidden', 1)).toMatchObject({ ok: true });
+  });
+});
+
+/**
+ * P4 §4 and A-13, by hand: in a league that scores assigned games only, a scorekeeper
+ * scores only a game assigned to them; the owner, admins and schedulers score any.
+ * A command about no one game (a list across the league) works for both scorekeepers,
+ * each game's own door checking again (T-349).
+ */
+describe('every scoring command where the league scores assigned games only (P4 §4)', () => {
+  const scoringRows = rows.filter((row) => row.needs === 'games.score' && !row.declared);
+  for (const row of scoringRows) {
+    it(`${row.command}: ${row.name}`, async () => {
+      const outcomes: Record<string, string> = {};
+      let aboutOneGame = false;
+      const assignedOnly = async (league: League, input: unknown) => {
+        await pglite.query(
+          `insert into setting_values (league_id, level, key, value)
+           values ($1, 'league', 'games.whoMayScore', $2::jsonb)`,
+          [league.leagueId, JSON.stringify({ version: 1, value: 'assignedOnly' })],
+        );
+        const gameId =
+          typeof input === 'object' && input !== null
+            ? (input as Record<string, unknown>)['gameId']
+            : undefined;
+        aboutOneGame = typeof gameId === 'string';
+        if (typeof gameId === 'string') {
+          await pglite.query(
+            'insert into game_assignments (league_id, game_id, account_id) values ($1, $2, $3)',
+            [league.leagueId, gameId, league.accountOf('scorekeeper')],
+          );
+        }
+      };
+      for (const actor of ['owner', 'scheduler', 'scorekeeper'] as const) {
+        outcomes[actor] = await runRow(row, actor, assignedOnly);
+      }
+      // A second scorekeeper of the whole league, with no assignment.
+      let unassigned: string | null = null;
+      outcomes['unassigned_scorekeeper'] = await runRow(
+        row,
+        'scorekeeper',
+        async (league, input) => {
+          await assignedOnly(league, input);
+          unassigned = await grant(league.leagueId, 'scorekeeper');
+        },
+        () => unassigned,
+      );
+      expect(outcomes).toEqual({
+        owner: 'ok',
+        scheduler: 'ok',
+        scorekeeper: 'ok',
+        unassigned_scorekeeper: aboutOneGame ? 'not-allowed' : 'ok',
+      });
     });
   }
 });
