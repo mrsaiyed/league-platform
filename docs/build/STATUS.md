@@ -58,7 +58,6 @@ Every lane's work is on GitHub. Three at a time, by short helpers on the lead's 
 | Lane (branch `lane/…`) | Where it stands                                                                                                        | What is left                                       |
 | ---------------------- | ---------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
 | 2.191-ci-parallel      | parked                                                                                                                 | after the first test is in the founder's hands     |
-| 2.225-no-person-id     | finished, pushed twice at 18df7ca1, waiting for GitHub (the sixteenth lead's wait started 00:35 UTC on 2026-11-26)     | land on a pass                                     |
 | 2.128-your-account     | finished at b70c095b but for the fence-list edit                                                                       | the founder's yes, then the edit, push twice, land |
 | 2.238-start-guard      | opened 00:45 UTC on 2026-11-26; builder 1 of 2 (the guard and its proofs on the embedded database); has T-468 to T-471 | builder 2 (the real server), review, close         |
 | 2.227-reads-in-core    | opened 00:45 UTC on 2026-11-26; builder 1 of 2 (core and database); has T-472 to T-475 and S-131                       | builder 2 (pages, browser proof), review, close    |
