@@ -187,3 +187,5 @@ One line each (USAGE.md, rule 9). Done in batches; a line is removed when it is 
 - 2.226 leftovers: Show as beside the recorded name on Admin → Teams, People and the bin comes with step 2.146; a stored roster made before the step keeps recorded names until that game's waiting taps are saved (T-484's exception); a device with no signal keeps a name until signal is back; a read-only scoring page asks for rosters only when shown again or back online; the scorer's activity was not searched for surnames; a final game with a tap set aside keeping its kept page is proved by unit tests only; player tiles show the short name (Ned H.) even with the setting on.
 
 - 2.253: standings.list_adjustments stays refused in a read-only league until the standings forms are hidden there; game-states-test timed out once on GitHub (also on the build branch at 5eab52f).
+
+- 2.234: a held sign-up asks recovery for a made-up address where a no-account sign-up asks magiclink (same round trips); sign_in.codes rows are never swept; 17 database-port tests depend on the order of tests in their own file.
