@@ -1,4 +1,4 @@
-// T-504, T-506, T-507, T-509, T-510, T-511 on both adapters: the local stand-in and the
+// T-504, T-506, T-507, T-509, T-510, T-511, T-522 on both adapters: the local stand-in and the
 // Supabase adapter (against the fake Supabase Auth and the in-memory store) count alike.
 // A stranger's wrong passwords and wrong codes do not shut out a device the app vouches
 // for, nor spoil its waiting code; every ask for a code, a known device's too, meets the
@@ -167,6 +167,46 @@ describe.each(adapters)('on %s', (_name, setup) => {
       ...Array(4).fill('code-wrong'),
       'too-many-attempts',
       'too-many-attempts',
+      'too-many-attempts',
+      'code-expired',
+    ]);
+    expect(await attack('nobody@example.test')).toEqual(atMember);
+  });
+
+  it("the owner's new password leaves a stranger's held entry answering as for no account (T-522)", async () => {
+    // The look's attack: the member is mid-reset on the laptop, a stranger's ask is held,
+    // and the owner then sets a password. At the member's address the stranger's entry
+    // keeps its attempts and expiry with no code, as at an address with no account.
+    const attack = async (email: string) => {
+      const env = await withMember();
+      const vouched = { email: member, networkAddress: here, knownDevice: laptop.deviceId };
+      expect(outcome(await env.sign.startReset(vouched))).toBe('ok');
+      const owners = codeFor(env, member);
+      env.advanceSeconds(60);
+      const strangers = { email, networkAddress: elsewhere };
+      const seen = [outcome(await env.sign.startReset(strangers))];
+      const wrong = owners === '000000' ? '111111' : '000000';
+      seen.push(outcome(await env.sign.verifyCode({ ...strangers, code: wrong })));
+      const checked = await env.sign.verifyCode({ ...vouched, code: owners });
+      if (!checked.ok) expect.fail('the owner could not use their own code');
+      const set = await env.sign.setPassword({
+        proof: checked.value.proof,
+        password,
+        device: laptop,
+      });
+      expect(outcome(set)).toBe('ok');
+      for (let i = 0; i < 4; i++) {
+        seen.push(outcome(await env.sign.verifyCode({ ...strangers, code: wrong })));
+      }
+      // Ten minutes from the stranger's own ask, not from the new password.
+      env.advanceSeconds(10 * 60);
+      seen.push(outcome(await env.sign.verifyCode({ ...strangers, code: wrong })));
+      return seen;
+    };
+    const atMember = await attack(member);
+    expect(atMember).toEqual([
+      'ok',
+      ...Array(4).fill('code-wrong'),
       'too-many-attempts',
       'code-expired',
     ]);

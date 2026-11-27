@@ -139,7 +139,10 @@ export type SignInCodeStore = {
    * for one address, one gets it. Forgets proofs that have run out.
    */
   readonly takeProof: (proofHash: string, at: Date) => Promise<HeldProof | undefined>;
-  /** Ends every proof and code for the address. */
+  /**
+   * Ends every proof for the address and the codes its known devices asked for; every
+   * other asker's entry stays with its code removed, attempts and expiry unchanged (T-522).
+   */
   readonly dropProofsFor: (email: string) => Promise<void>;
 };
 

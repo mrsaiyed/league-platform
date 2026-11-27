@@ -376,8 +376,39 @@ describe('the database sign-in store: what only the database can do', () => {
       status: 'none',
     });
     expect(await s.codes.takeCodeAttempt('ben@example.test', at, null)).toEqual({ status: 'none' });
+  });
+
+  it("a new password ends the known device's code and leaves the other entry its attempts, with no code (T-522)", async () => {
+    await emptyTables();
+    const s = store();
+    const laptop = 'device-made-up-0000000001';
+    await s.codes.putCode('ana@example.test', {
+      verifyType: 'recovery',
+      expiresAt: minutes(10),
+      attemptsLeft: 5,
+      knownDevice: laptop,
+    });
+    await s.codes.putCode('ana@example.test', {
+      verifyType: 'recovery',
+      expiresAt: minutes(12),
+      attemptsLeft: 5,
+      knownDevice: null,
+    });
+    expect(await s.codes.takeCodeAttempt('ana@example.test', at, null)).toMatchObject({
+      attemptsLeft: 4,
+    });
     await s.codes.dropProofsFor('ana@example.test');
-    expect(await s.codes.takeCodeAttempt('ana@example.test', at, null)).toEqual({ status: 'none' });
+    expect(await s.codes.takeCodeAttempt('ana@example.test', at, laptop)).toEqual({
+      status: 'none',
+    });
+    expect(await s.codes.takeCodeAttempt('ana@example.test', minutes(11), null)).toEqual({
+      status: 'taken',
+      verifyType: null,
+      attemptsLeft: 3,
+    });
+    expect(await s.codes.takeCodeAttempt('ana@example.test', minutes(12), null)).toEqual({
+      status: 'none',
+    });
   });
 
   it('slows, then locks, wrong guesses per address, and a right one clears the address', async () => {

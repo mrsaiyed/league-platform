@@ -341,10 +341,18 @@ export function createLocalSignInStandIn(options: LocalSignInOptions): LocalSign
     };
   };
 
-  /** Ends other proofs and codes for the address once its password is set. */
+  /**
+   * Ends other proofs for the address once its password is set, and the owner's own codes
+   * (a known device's). Every other asker's entry stays, its code removed and its attempts
+   * and expiry unchanged, so a stranger hears what an address with no account says (T-522).
+   */
   const forgetProofsFor = (email: string) => {
     for (const [proof, held] of proofs) if (held.email === email) proofs.delete(proof);
-    pendingCodes.delete(email);
+    const entries = pendingCodes.get(email);
+    for (const [asker, pending] of entries ?? []) {
+      if (asker !== null) entries?.delete(asker);
+      else entries?.set(asker, { ...pending, code: null });
+    }
   };
 
   const service: SignInService = {

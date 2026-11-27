@@ -228,7 +228,13 @@ export function createMemorySignInStore(options: MemorySignInStoreOptions): Supa
       },
       async dropProofsFor(email) {
         for (const [hash, proof] of proofs) if (proof.email === email) proofs.delete(hash);
-        codes.delete(email);
+        // The owner's own codes (a known device's) end; every other asker's entry stays,
+        // its code removed, its attempts and expiry its own (T-522).
+        const entries = codes.get(email);
+        for (const [asker, pending] of entries ?? []) {
+          if (asker !== null) entries?.delete(asker);
+          else entries?.set(asker, { ...pending, verifyType: null });
+        }
       },
     },
 
