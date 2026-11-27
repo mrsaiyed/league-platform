@@ -4,6 +4,8 @@ Moved out of `STATUS.md` on 2026-11-22 so that the status stays short (USAGE.md,
 
 ## Entries
 
+- 2026-11-27 07:20 UTC — Step 2.146 landed (second Opus lead, 2026-11-27): a person's Show as (as the league shows / initials / removed, with a reason) on their record in Admin -> People, shown beside the recorded name on Teams, People and the bin; #12 with the team under Hidden; walk-ups of unknown age shown as children until an admin marks them, never covered by the league's yes, one word as an initial, and keeping the site out of search (S-134 to S-136, T-513 to T-518, R-28 changed); finders for ticked-and-18 and walk-ups; the Privacy screen's notes and who confirmed. Four builders, a review (4 Mediums), a fix round, a confirming look by the strongest model (3 Mediums, mended), a closing helper, two small fixes.
+
 - 2026-11-27 06:07 UTC — Step 2.234 landed (second Opus lead, 2026-11-27): limits on wrong sign-in and reset tries, a known device spared strangers' wrong tries, each asker's code entry its own (T-504 to T-512, T-522, S-133; migration 0033). Two builders, a review by attack, two fix rounds, two confirming looks by the strongest model (the first found two Highs, mended), a closing helper with one more mend, a fix of a race in the test stand-in's kept emails.
 
 - 2026-11-27 06:04 UTC — Step 2.253 landed (second Opus lead, 2026-11-27): in an archived league the admin's box score sheet, a game's format and the tracked grid are viewable with every change refused (T-519 to T-521); in a suspended league only the owner and admins; Earlier games links them. One builder, a review (1 Medium, 5 Lows), a fix round.

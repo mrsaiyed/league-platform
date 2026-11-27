@@ -189,3 +189,5 @@ One line each (USAGE.md, rule 9). Done in batches; a line is removed when it is 
 - 2.253: standings.list_adjustments stays refused in a read-only league until the standings forms are hidden there; game-states-test timed out once on GitHub (also on the build branch at 5eab52f).
 
 - 2.234: a held sign-up asks recovery for a made-up address where a no-account sign-up asks magiclink (same round trips); sign_in.codes rows are never swept; 17 database-port tests depend on the order of tests in their own file.
+
+- 2.146: rows 24 and 27 (the wider R-28 scan, the two T-81 scans with dates) not built: a step of their own; a walk-up restored from the bin is no longer a walk-up; the scorer's screens are not given the walk-up mark (with the league's yes and 'scorekeepers see full names' off, a scorer sees a walk-up in full).

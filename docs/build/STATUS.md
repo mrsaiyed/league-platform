@@ -63,10 +63,9 @@ Learned, not yet rules elsewhere: (a) a lane that adds a page, a route, a field,
 
 Every lane's work is on GitHub. Three at a time, by short helpers on the lead's own machine.
 
-| Lane (branch `lane/…`) | Where it stands   | What is left                                      |
-| ---------------------- | ----------------- | ------------------------------------------------- |
-| 2.191-ci-parallel      | parked            | after the first test is in the founder's hands    |
-| 2.146-show-as          | builder 1 (03:40) | builders 2-3, review, look by the strongest model |
+| Lane (branch `lane/…`) | Where it stands | What is left                                   |
+| ---------------------- | --------------- | ---------------------------------------------- |
+| 2.191-ci-parallel      | parked          | after the first test is in the founder's hands |
 
 Next free: STEP 2.254, migration 0034, T-523 (T-513 to T-518 are 2.146's), S-138 (S-134 to S-136 2.146, S-137 2.253), R-35 (R-34 2.146), R-34, A-25, U-27 (the Handover part says which numbers were given out and are unused). Numbers already given out stand with their lanes (in each lane’s note).
 
