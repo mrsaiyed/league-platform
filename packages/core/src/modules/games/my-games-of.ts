@@ -9,6 +9,7 @@ import { accessOfAccount, readOnlyLeagueStatuses, type Scope } from '../access/i
 import { archivedSeasonRefusesScoring, gameInArchivedSeason } from './archived-season.ts';
 import { recordingOf } from './game-fields.ts';
 import type { GameInWindow, GamesTx } from './ports.ts';
+import { mayViewInState } from './policy.ts';
 import { mayScoreUnder, scoringRuleOf } from './scoring-access.ts';
 import { rulesOfGame } from './season-rules-of.ts';
 
@@ -53,6 +54,13 @@ export type MyGame = {
    */
   readonly leagueScores: boolean;
   /**
+   * Whether the person may view its box score sheet, changing nothing, by the sheet's own
+   * rule (mayViewScoring, T-519): in a working league as it is scored, in an archived one
+   * too; in a suspended one only for the owner and admins (T-520). Earlier games links a
+   * decided game's box score by this, not by `scorable`.
+   */
+  readonly viewable: boolean;
+  /**
    * Whether the live tracker has recorded plays of a game still to be decided (scheduled
    * or live), by the store's own rule (plays since its last "not started" marker): such a
    * game is ended in the tracker, never by a score typed by hand (S-46). False for a game
@@ -73,6 +81,7 @@ const view = (
   scorable: boolean,
   inArchivedSeason: boolean,
   leagueOpen: boolean,
+  viewable: boolean,
   hasPlays: boolean,
   forfeitScore: MyGame['forfeitScore'],
 ): MyGame => ({
@@ -94,6 +103,7 @@ const view = (
   scorable,
   inArchivedSeason,
   leagueScores: leagueOpen,
+  viewable,
   hasPlays,
   version: game.version,
   forfeitScore,
@@ -122,6 +132,8 @@ export async function myGamesOf(
   if (holder === undefined) return undefined;
   const rule = await scoringRuleOf(tx);
   const scorable = await leagueScores(tx);
+  const status = await tx.access.leagueStatus();
+  const viewable = status !== undefined && mayViewInState(status, holder);
   const mine = entries.filter((entry) => {
     const scope: Scope = { type: 'program', id: entry.programId };
     return mayScoreUnder(holder, scope, rule, entry.assigned);
@@ -141,7 +153,7 @@ export async function myGamesOf(
     const open = scorable && !(await archivedSeasonRefusesScoring(entry.game, tx, holder, scope));
     const archived = await gameInArchivedSeason({ gameId: entry.game.id }, tx);
     listed.push(
-      view(entry, today, open, archived, scorable, plays, {
+      view(entry, today, open, archived, scorable, viewable, plays, {
         winner: forfeit.winnerScore,
         loser: forfeit.loserScore,
       }),

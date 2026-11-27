@@ -98,10 +98,13 @@ export function buildGameRows(
       lineupsSet: game.hasPlays && status !== 'live',
       trackerLink: status === 'live' || (status === 'scheduled' && game.recording === 'live'),
       canScore: game.scorable && open,
+      // A decided game's sheet is linked to whoever may view it (T-519), so an archived
+      // league's box scores stay reachable (U-9); a game still to play only while scorable.
       boxScoreLink:
-        game.scorable &&
-        ((status === 'scheduled' && !game.hasPlays) ||
-          ((status === 'final' || status === 'forfeit') && game.recording === 'box-score')),
+        (game.scorable && status === 'scheduled' && !game.hasPlays) ||
+        (game.viewable &&
+          (status === 'final' || status === 'forfeit') &&
+          game.recording === 'box-score'),
       // A game with only its line-ups set may be forfeited too (step 2.56): a team that
       // did not come after line-ups were set.
       canForfeit:

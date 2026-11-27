@@ -160,6 +160,7 @@ export const enAdminGames = {
   'admin.boxScore.tracked.save': 'Save the changes',
   'admin.boxScore.tracked.saved': 'Saved. These plays were added to the game’s list of plays:',
   'admin.boxScore.tracked.title': 'Edit box score: {away} at {home}',
+  'admin.boxScore.tracked.view': 'See the box score as it was tracked',
   // The box score grid (step 2.64).
   'admin.games.boxScore': 'Box score',
   // Step 2.158 (H9; A-5): "Forfeit, postpone or cancel" asks once, naming the game, and only

@@ -14,6 +14,7 @@ import {
   game,
   gameUuid,
   homeTeamId,
+  ownerId,
   schedulerGrant,
   schedulerId,
   scorekeeperGrant,
@@ -194,20 +195,34 @@ describe("reading a game's format (step 2.119)", () => {
   });
 });
 
-describe('a game format in an archived or suspended league (T-519)', () => {
-  it('is shown to whoever could see it before, saying it cannot be changed', async () => {
-    for (const status of ['archived', 'suspended']) {
-      const t = setUp({ status });
-      for (const who of [schedulerId, scorekeeperId]) {
-        expect(await readGameFormat(t.as(who), { gameId }, t.deps)).toMatchObject({
-          ok: true,
-          value: { change: { may: false, reason: 'league-read-only' } },
-        });
-      }
-      expect(await readGameFormat(t.as(strangerId), { gameId }, t.deps)).toMatchObject({
-        ok: false,
-        error: { code: 'not-allowed' },
-      });
+describe('a game format in an archived or suspended league (T-519, T-520)', () => {
+  const readOnly = { ok: true, value: { change: { may: false, reason: 'league-read-only' } } };
+  const refused = { ok: false, error: { code: 'not-allowed' } };
+
+  it('is shown in an archived league to whoever could see it before, saying it cannot be changed', async () => {
+    const t = setUp({ status: 'archived' });
+    for (const who of [ownerId, schedulerId, scorekeeperId]) {
+      expect(await readGameFormat(t.as(who), { gameId }, t.deps)).toMatchObject(readOnly);
     }
+    expect(await readGameFormat(t.as(strangerId), { gameId }, t.deps)).toMatchObject(refused);
+  });
+
+  it('is shown in a suspended league only to its owner and admins, as the league opens (S-126)', async () => {
+    const t = setUp({ status: 'suspended' });
+    expect(await readGameFormat(t.as(ownerId), { gameId }, t.deps)).toMatchObject(readOnly);
+    for (const who of [schedulerId, scorekeeperId, strangerId]) {
+      expect(await readGameFormat(t.as(who), { gameId }, t.deps)).toMatchObject(refused);
+    }
+  });
+
+  it('says a decided game is over, not that it cannot be changed (the format line)', async () => {
+    const t = setUp({ status: 'archived' });
+    const game = gameOf(t);
+    if (game === undefined) throw new Error('no game');
+    Object.assign(game, { status: 'final' });
+    expect(await readGameFormat(t.as(scorekeeperId), { gameId }, t.deps)).toMatchObject({
+      ok: true,
+      value: { change: { may: false, reason: 'finished' } },
+    });
   });
 });

@@ -82,6 +82,7 @@ describe('listMyGames', () => {
       scorable: true,
       inArchivedSeason: false,
       leagueScores: true,
+      viewable: true,
       hasPlays: false,
       version: 1,
       // The starting rules' forfeit score (step 2.158: the forfeit's question says it).
@@ -173,6 +174,19 @@ describe('listMyGames', () => {
         ['2', false],
       ]);
     }
+  });
+
+  it('lets an archived league be viewed, a suspended one only by its owner and admins (T-519, T-520)', async () => {
+    const viewable = async (status: string, account: string) => {
+      const { deps, as } = memoryGames({ games, grants, status });
+      const result = await listMyGames(as(account), {}, deps);
+      return result.ok && [...new Set(result.value.games.map((g) => g.viewable))];
+    };
+    expect(await viewable('live', scorekeeperId)).toEqual([true]);
+    expect(await viewable('archived', scorekeeperId)).toEqual([true]);
+    expect(await viewable('archived', ownerId)).toEqual([true]);
+    expect(await viewable('suspended', ownerId)).toEqual([true]);
+    expect(await viewable('suspended', scorekeeperId)).toEqual([false]);
   });
 
   it("marks an archived season's games not scorable, but while a correction is open for those who may correct games (T-389)", async () => {

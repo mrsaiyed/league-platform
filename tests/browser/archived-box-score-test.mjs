@@ -4,8 +4,8 @@
 // and person is made up. Builds the app first unless given --no-build.
 //
 // - The owner of the archived league (Old Meadow, 300 games all final) opens Games, an
-//   earlier round, and one of its games: the box score page shows the game, not "Page not
-//   found", with the one line saying why nothing can be changed, and no way to change it:
+//   earlier round, and its box-scored game by the list's own "Box score" link: the box
+//   score page shows the game, not "Page not found", with the one line saying why nothing can be changed, and no way to change it:
 //   no save, no reopen, every score box disabled.
 // - Accessibility checks (T-186) and no sideways scrolling at phone width (A-2).
 import {
@@ -88,14 +88,23 @@ if (browser) {
           page.waitForURL((url) => url.searchParams.get('round') === roundTen),
           part(page, 'Earlier games').getByLabel('Round').selectOption(roundTen),
         ]);
+        // Reached by its own link on the list, as the owner would (the review's Medium).
         const first = part(page, 'Earlier games').locator('li[id^="game-"]').first();
         await first.waitFor();
         const gameId = (await first.getAttribute('id'))?.slice(5) ?? '';
-        const response = await page.goto(`${origin}/${league}/admin/games/${gameId}`);
+        const link = first.getByRole('link', { name: 'Box score', exact: true });
+        note("Earlier games links the final game's box score", (await link.count()) === 1);
+        const [response] = await Promise.all([
+          page.waitForResponse(
+            (r) => new URL(r.url()).pathname === `/${league}/admin/games/${gameId}`,
+          ),
+          link.click(),
+        ]);
+        await page.waitForURL((url) => url.pathname === `/${league}/admin/games/${gameId}`);
         note(
           'the box score page answers 200',
-          response?.status() === 200,
-          String(response?.status()),
+          response.status() === 200,
+          String(response.status()),
         );
         const title = await page.getByRole('heading', { level: 1 }).first().textContent();
         note(

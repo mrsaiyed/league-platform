@@ -74,8 +74,8 @@ export async function mayReachFormat(
 
 /**
  * Whether `context` may see a game's format (T-519): whoever mayAskAboutFormat lets in a
- * working league, in any state of the league, so an archived or suspended league's games
- * stay viewable (U-9). The changes still ask mayAskAboutFormat.
+ * working league, an archived league's games too (U-9); a suspended league's only for its
+ * owner and admins (T-520). The changes still ask mayAskAboutFormat.
  */
 export async function mayViewFormat(
   context: CommandContext,
@@ -99,11 +99,10 @@ export async function formatChangeOf(
 ): Promise<FormatChange> {
   const as = await mayReachFormat(context, tx, game);
   if (as === undefined) {
-    // Reached only by someone the read let in (mayViewFormat): in a read-only league.
-    return {
-      may: false,
-      reason: (await readOnlyStateOf(tx)) === null ? 'no-permission' : 'league-read-only',
-    };
+    // Reached only by someone the read let in (mayViewFormat): in a read-only league. A
+    // decided game is over there as anywhere, and says so (T-519).
+    if ((await readOnlyStateOf(tx)) === null) return { may: false, reason: 'no-permission' };
+    return { may: false, reason: isDecided(game.status) ? 'finished' : 'league-read-only' };
   }
   if (isDecided(game.status)) return { may: false, reason: 'finished' };
   if (await tx.games.seasonArchived(game.seasonId)) {

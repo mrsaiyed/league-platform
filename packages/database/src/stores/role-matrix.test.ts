@@ -3401,7 +3401,8 @@ const changeToolReads: ReadonlySet<string> = new Set([
  * a read-only league to whoever could open them before (U-9: "read-only, still
  * viewable"): the box score sheet (locked by the league's state), a game's format (saying
  * the league is read-only) and a tracked game's grid (not correctable). Their changes stay
- * refused. They were in changeToolReads until step 2.253.
+ * refused. They were in changeToolReads until step 2.253. In a suspended league only its
+ * owner and admins view them (T-520).
  */
 const viewReads: ReadonlySet<string> = new Set([
   'games.get_box_score_sheet',
@@ -3467,9 +3468,18 @@ function stillWorksIn(row: Row, state: LeagueState): boolean | string {
   }
 }
 
+/**
+ * Who sees a suspended league's views (T-520): its owner and admins, as only they open the
+ * league (S-126, mayOpenLeague); the rest are refused at the core as at the web gate.
+ */
+const seeSuspended: readonly Actor[] = ['owner', 'admin'];
+
 /** What each allowed actor should get in a read-only league: "ok", "refused" or a code. */
-function stateExpectation(row: Row, state: LeagueState): string {
-  if (readCommands.has(row.command) || viewReads.has(row.command)) return 'ok';
+function stateExpectation(row: Row, state: LeagueState, actor: Actor): string {
+  if (viewReads.has(row.command)) {
+    return state === 'archived' || seeSuspended.includes(actor) ? 'ok' : 'refused';
+  }
+  if (readCommands.has(row.command)) return 'ok';
   if (changeToolReads.has(row.command)) return 'refused';
   const works = stillWorksIn(row, state);
   return works === true ? 'ok' : works === false ? 'refused' : works;
@@ -3498,7 +3508,7 @@ describe('every command in an archived or suspended league (U-9, R-26)', () => {
           outcomes[actor] = stateRefusals.includes(code) ? 'refused' : code;
         }
         const expected = Object.fromEntries(
-          allowed.map((actor) => [actor, stateExpectation(row, state)]),
+          allowed.map((actor) => [actor, stateExpectation(row, state, actor)]),
         );
         expect(outcomes).toEqual(expected);
       });

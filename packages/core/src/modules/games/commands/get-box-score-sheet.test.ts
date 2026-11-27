@@ -200,10 +200,16 @@ describe('getBoxScoreSheet', () => {
       expect(await getBoxScoreSheet(as(ownerId), { gameId: gameUuid(2) }, deps)).toMatchObject({
         value: { locked: status, mayCallOff: false },
       });
-      // Those who could open it before still can; those who could not still cannot.
+      // Those who could open it before still can in an archived league; in a suspended
+      // one only the owner and admins, as the league itself opens only to them (S-126,
+      // T-520). Those who could not still cannot.
       expect(
         await getBoxScoreSheet(as(scorekeeperId), { gameId: gameUuid(1) }, deps),
-      ).toMatchObject({ ok: true, value: { locked: status } });
+      ).toMatchObject(
+        status === 'archived'
+          ? { ok: true, value: { locked: status } }
+          : { ok: false, error: { code: 'not-allowed' } },
+      );
       expect(await getBoxScoreSheet(as(editorId), { gameId: gameUuid(1) }, deps)).toMatchObject({
         error: { code: 'not-allowed' },
       });
