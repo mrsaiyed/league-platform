@@ -214,6 +214,8 @@ export const enTracker = {
   'tracker.format.confirm': 'Confirm and start scoring',
   'tracker.format.halves': '2 halves of {minutes} minutes',
   'tracker.format.intro': 'This game is set up to be played like this. Check it before you start.',
+  'tracker.format.leagueReadOnly':
+    "This league is archived or suspended, so this game's rules cannot be changed.",
   'tracker.format.overtime': 'Overtime periods of {minutes} minutes',
   'tracker.format.quarters': '4 quarters of {minutes} minutes',
   'tracker.format.title': 'Check the game format',

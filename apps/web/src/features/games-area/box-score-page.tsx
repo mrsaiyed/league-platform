@@ -51,6 +51,7 @@ import { CallOffForms } from './call-off-forms.tsx';
 import { putBackChoice, restoreTexts } from './call-off-texts.ts';
 import { waitingListAnchor } from './waiting-anchor.ts';
 import { boxScoreField } from './box-score-form.ts';
+import { calledOffPanelOf, readsTrackedGrid, trackedGridLinkOf } from './box-score-page-parts.ts';
 import { BoxScoreSheetForm, type SheetRow, type SheetTeam } from './box-score-sheet-form.tsx';
 import { sheetScoresId } from './form-state.ts';
 import { putBackProblemKey } from './problem-keys.ts';
@@ -143,12 +144,13 @@ export async function BoxScorePage({
   // admin's frame, in this page's own words (BoxScoreNotFound; step 2.157): a game that is
   // not this league's (another league's among them: nothing of it is said), and one they
   // may not score. The second is not answered as a refusal: who may score is checked before
-  // the game is looked up, so it never tells an existing game from a missing one, and it
-  // covers a league that is archived or suspended, where nobody scores, for which "your role
-  // does not include this page" would be untrue.
+  // the game is looked up, so it never tells an existing game from a missing one. In a
+  // league that is archived or suspended the sheet still shows, to the same people, locked
+  // by the league's state: no reopen, no put back, no save, one line saying why (T-519).
   if (!read.ok) return notFound();
   const sheet = read.value;
   const { game } = sheet;
+  const readOnly = sheet.locked === 'archived' || sheet.locked === 'suspended';
   // The game's own format (step 2.119): shown to whoever may reach it, the admin's
   // "games.manage" or the game's scorekeeper; left out for anyone else.
   const format = await readGameFormat(context, { gameId: game.id }, ports.tracker.deps);
@@ -194,7 +196,7 @@ export async function BoxScorePage({
       : undefined,
     // A result recorded by hand, for someone who may not reopen it as a corrector: their
     // own door within the league's minutes, else who can (step 2.177, S-52).
-    !sheet.mayReopen && (game.status === 'final' || game.status === 'forfeit')
+    !readOnly && !sheet.mayReopen && (game.status === 'final' || game.status === 'forfeit')
       ? await readOwnResultOffer(context, { gameId: game.id }, ports.games.deps).then((own) =>
           own.ok ? own.value : undefined,
         )
@@ -217,15 +219,19 @@ export async function BoxScorePage({
       ? offer.value.code
       : undefined;
   // A game scored with the tracker is edited in its own grid, as plays (step 2.65): the
-  // way there once it is reopened with a reason, else what to do first.
-  const tracked =
-    sheet.locked === 'tracked' && sheet.mayCorrect
-      ? await readTrackedBoxScore(context, { gameId: game.id }, ports.games.deps)
-      : undefined;
+  // way there once it is reopened with a reason, else what to do first. In a read-only
+  // league the grid is viewed there, for whoever its read lets in (T-519).
+  const tracked = readsTrackedGrid(sheet)
+    ? await readTrackedBoxScore(context, { gameId: game.id }, ports.games.deps)
+    : undefined;
   const trackedGrid = tracked !== undefined && tracked.ok ? tracked.value : undefined;
+  const gridLink = trackedGrid === undefined ? null : trackedGridLinkOf(trackedGrid);
+  const gridHref = leagueUrl(here, 'admin-area', { area: 'games', subpath: [game.id, 'edit'] });
   const { timeZone } = await ports.publicSchedule.clockOf(here.id);
   // Postponed or cancelled: no box score, no grid; the way it is put back (step 2.158).
-  const calledOff = sheet.locked === 'cancelled' || sheet.locked === 'postponed';
+  // Said by the game's own state, so a league that is read-only keeps it (T-519).
+  const calledOff = game.status === 'cancelled' || game.status === 'postponed';
+  const calledOffPanel = calledOffPanelOf(game.status, sheet.mayCallOff);
   const named = t('admin.games.game', { away: awayName, home: homeName });
   const calledOffHidden = {
     league,
@@ -355,16 +361,9 @@ export async function BoxScorePage({
       ) : null}
       {trackedGrid === undefined ? null : (
         <div className="staff-panel">
-          {trackedGrid.correctable ? (
+          {gridLink === 'edit' ? (
             <p>
-              <a
-                className="ui-button"
-                data-kind="main"
-                href={leagueUrl(here, 'admin-area', {
-                  area: 'games',
-                  subpath: [game.id, 'edit'],
-                })}
-              >
+              <a className="ui-button" data-kind="main" href={gridHref}>
                 {t('admin.boxScore.tracked.edit')}
               </a>
             </p>
@@ -386,29 +385,38 @@ export async function BoxScorePage({
               }}
             />
           ) : (
-            <p data-grid-closed={trackedGrid.notCorrectable}>
-              {t(
-                `admin.boxScore.tracked.notCorrectable.${trackedGrid.notCorrectable ?? 'game-not-live'}`,
-              )}
-            </p>
+            <>
+              <p data-grid-closed={trackedGrid.notCorrectable}>
+                {t(
+                  `admin.boxScore.tracked.notCorrectable.${trackedGrid.notCorrectable ?? 'game-not-live'}`,
+                )}
+              </p>
+              {gridLink === 'view' ? (
+                <p>
+                  <a className="ui-more" href={gridHref}>
+                    {t('admin.boxScore.tracked.view')}
+                  </a>
+                </p>
+              ) : null}
+            </>
           )}
         </div>
       )}
-      {calledOff ? (
+      {calledOffPanel !== null ? (
         // Its own page puts it back too (step 2.158, S-51, S-75), so a game called off
         // outside this week's list is never stuck: a cancelled one to what it was, a
         // postponed one on its date (asking first), with the way to the games waiting for a
         // new date. For whoever may call it off (games.results); the command checks again.
         // Done, it goes to the games list, where "Saved" names it.
         <div className="staff-panel ui-stack">
-          {sheet.locked === 'postponed' ? (
+          {calledOffPanel.waitingLink ? (
             <p>
               <a className="ui-more" href={`${back}#${waitingListAnchor}`}>
                 {t('admin.games.waiting.link')}
               </a>
             </p>
           ) : null}
-          {!sheet.mayCallOff ? null : sheet.locked === 'cancelled' ? (
+          {calledOffPanel.form === null ? null : calledOffPanel.form === 'put-back' ? (
             <ActionForm
               action={putBackAction}
               permalink={sheetHref}

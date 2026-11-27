@@ -5,12 +5,13 @@
 // nothing, but runs in the same shape as a command (record 014), for whoever may score
 // the game. It also says whether this reader may reopen it here, by the same check
 // games.reopen_game makes, so the page offers only what the command would accept. A
-// game scored with the live tracker is corrected in the tracker, even once final.
+// game scored with the live tracker is corrected in the tracker, even once final. In an
+// archived or suspended league it still shows, locked by the league's state (T-519).
 import { z } from 'zod';
 import { defineCommand, fail, ok, type Result } from '../../../command/index.ts';
 import { boxScoreColumns } from '../box-score-columns.ts';
 import { isDecided } from '../game-fields.ts';
-import { gameScope, mayChangeGames, mayScoreGame } from '../policy.ts';
+import { gameScope, mayChangeGames, mayViewScoring, readOnlyStateOf } from '../policy.ts';
 import type { GameLine, GameRecord, GameRosterPlayer, GamesTx } from '../ports.ts';
 import { effectiveRulesOf } from '../season-rules-of.ts';
 import { scoringNameSettingsOf } from '../queries/read-scoring-name-view.ts';
@@ -39,9 +40,17 @@ export type BoxScoreSheet = {
    * Null when the sheet can be saved; otherwise why not: the game is cancelled,
    * postponed (it waits for a new date and is not played yet: step 2.158), tracked live
    * (corrected in the tracker's grid, even once final), or decided (reopen it to correct
-   * it).
+   * it). An archived or suspended league locks every game, before all else: its games
+   * can be seen but not changed (U-9, T-519).
    */
-  readonly locked: 'decided' | 'cancelled' | 'postponed' | 'tracked' | null;
+  readonly locked:
+    | 'archived'
+    | 'suspended'
+    | 'decided'
+    | 'cancelled'
+    | 'postponed'
+    | 'tracked'
+    | null;
 };
 
 export type GetBoxScoreSheetError = { readonly code: 'game-not-found' };
@@ -50,7 +59,8 @@ export const getBoxScoreSheet = defineCommand({
   name: 'games.get_box_score_sheet',
   permission: 'games.score',
   input: z.object({ gameId: z.uuid() }),
-  allowed: (context, input, tx: GamesTx) => mayScoreGame(context, tx, input.gameId),
+  // A read: open in an archived or suspended league too, where it offers nothing (T-519).
+  allowed: (context, input, tx: GamesTx) => mayViewScoring(context, tx, input.gameId),
   run: async ({ context, input, tx }): Promise<Result<BoxScoreSheet, GetBoxScoreSheetError>> => {
     const game = await tx.games.find(input.gameId);
     if (game === undefined || game.binned) return fail({ code: 'game-not-found' });
@@ -62,16 +72,19 @@ export const getBoxScoreSheet = defineCommand({
     const columns = boxScoreColumns(rules.statistics);
     const saved = lines.flatMap((line) => Object.keys(line.stats));
     const statKeys = [...new Set([...columns.statKeys, ...saved])];
+    const readOnly = await readOnlyStateOf(tx);
     const locked =
-      game.status === 'cancelled'
-        ? 'cancelled'
-        : game.status === 'postponed'
-          ? 'postponed'
-          : tracked
-            ? 'tracked'
-            : isDecided(game.status)
-              ? 'decided'
-              : null;
+      readOnly !== null
+        ? readOnly
+        : game.status === 'cancelled'
+          ? 'cancelled'
+          : game.status === 'postponed'
+            ? 'postponed'
+            : tracked
+              ? 'tracked'
+              : isDecided(game.status)
+                ? 'decided'
+                : null;
     const mayCorrect =
       context.accountId !== null &&
       (await mayChangeGames(context, tx, 'games.correct', await gameScope(tx, game.id)));
