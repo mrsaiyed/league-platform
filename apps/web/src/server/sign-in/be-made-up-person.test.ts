@@ -234,6 +234,22 @@ describe('the code of this ask only', () => {
     expect(proved.ok).toBe(true);
   });
 
+  // GitHub, step 2.234: the watch was told as the email reached memory, before its file was
+  // written, so a busy machine could read the kept emails without it. Told once it is kept.
+  it('gives the code only once its email is kept for the page', async () => {
+    const signIn = standInSignIn(options());
+    signIn.startKeeping();
+    const owner = seedLeagues[0]?.owner.email ?? '';
+    const watch = signIn.watchForCode(owner);
+    expect(
+      (await signIn.signIn.startSignUp({ email: owner, networkAddress: '127.0.0.1' })).ok,
+    ).toBe(true);
+    const code = await watch.code();
+    expect(code).toMatch(/^\d{6}$/);
+    const kept = await signIn.keptEmails();
+    expect(kept.filter((m) => m.to === owner).map((m) => m.code)).toEqual([code]);
+  });
+
   it('sends the browser back to the list with a plain sentence when no new code came', async () => {
     const signIn = standInSignIn(options());
     signIn.startKeeping();
@@ -321,10 +337,13 @@ describe('no code in a log line (T4 §10)', () => {
 
     // As the sign-up page's form sends it: with the bot check's stand-in answer it draws.
     const drawn = botCheckFieldsDrawn(deps.botCheck.widget);
+    // The code email is handed over without waiting: the watch is told once it is kept.
+    if (ports.localTools === null) throw new Error('the stand-in carries no local tools');
+    const watch = ports.localTools.watchForCode(email);
     expect(await askForCode('sign-up', { ...drawn, email }, visit, deps)).toEqual({
       to: platformUrl('enterCode'),
     });
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await watch.code();
     const kept = await readKeptEmails(made.keptEmailsFolder, origin);
     const code = kept.find((m) => m.to === email)?.code;
     expect(code).toMatch(/^\d{6}$/);
