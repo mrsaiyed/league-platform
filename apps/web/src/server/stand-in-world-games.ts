@@ -284,7 +284,7 @@ export function worldGamesStore(s: LeagueWorld, now: () => Date): GamesStore {
           personId: e.personId,
           firstName: p?.firstName ?? '',
           lastName: p?.lastName ?? '',
-          isMinor: p === undefined ? null : minorAt(p, s.timeZone, now()),
+          isMinor: p === undefined ? null : minorAt(p, s.timeZone, now(), s.roster),
           nameRequest: p?.visibility ?? 'none',
           jerseyNumber: e.jerseyNumber,
           left: e.leftOn !== null,

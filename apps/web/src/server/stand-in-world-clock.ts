@@ -39,17 +39,35 @@ export function dayIn(moment: Date, timeZone: string): string {
   return dayAt(`${timeZone}|${moment.getTime()}`);
 }
 
+/** The roster places `minorAt` reads: who was added at a scorer's table (S-136). */
+export type TablePlaces = readonly {
+  readonly personId: string;
+  readonly addedAtGameId: string | null;
+}[];
+
+/**
+ * No roster places: what only the date or the tick says, for whether the league has a
+ * recorded child (S-109, has-recorded-child.ts's `recordedOnly`).
+ */
+export const recordedOnly: TablePlaces = [];
+
 /**
  * Whether a person of the world counts as a child at `moment`, by core's one rule (R-28,
- * isMinorOn): a child if their birth date says so on the league's own day or the tick is on.
+ * isMinorOn): a child if their birth date says so on the league's own day or the tick is on,
+ * or, with neither, if a place of theirs in `roster` was added at a scorer's table (S-136).
  * Every read of the world that says whether someone is a child goes through this.
  */
 export function minorAt(
-  person: { readonly sensitive: MinorFacts },
+  person: { readonly id: string; readonly sensitive: MinorFacts },
   timeZone: string,
   moment: Date,
+  roster: TablePlaces,
 ): boolean | null {
-  return isMinorOn(person.sensitive, dayIn(moment, timeZone));
+  const addedAtTable = roster.some(
+    (place) =>
+      place.personId.toLowerCase() === person.id.toLowerCase() && place.addedAtGameId !== null,
+  );
+  return isMinorOn(person.sensitive, dayIn(moment, timeZone), { addedAtTable });
 }
 
 /** One reader of the wall clock for each zone: making one is the slow part. */

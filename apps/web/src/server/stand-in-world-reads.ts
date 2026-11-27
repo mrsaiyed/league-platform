@@ -248,7 +248,7 @@ export function worldGameSnapshot(
           firstName: p.firstName,
           lastName: p.lastName,
           // R-28: the birth date or the tick (list-people-for-display.ts).
-          isMinor: minorAt(p, s?.timeZone ?? 'UTC', moment),
+          isMinor: minorAt(p, s?.timeZone ?? 'UTC', moment, s?.roster ?? []),
           visibility: p.visibility,
         }));
     },
@@ -311,7 +311,7 @@ export function worldPublicRoster(
             firstName: p?.firstName ?? '',
             lastName: p?.lastName ?? '',
             // R-28: the birth date or the tick (list-public-roster.ts).
-            isMinor: p === undefined ? null : minorAt(p, s.timeZone, now),
+            isMinor: p === undefined ? null : minorAt(p, s.timeZone, now, s.roster),
             nameRequest: p?.visibility ?? 'none',
             personBinned: p === undefined || p.binned,
           },

@@ -174,10 +174,13 @@ export function memoryPeople(state: Partial<MemoryPeople> = {}) {
         },
         isOnRoster: async (id) => s.people.find((p) => p.id === id)?.onRoster === true,
         leagueAudience: async () => s.audience,
-        // R-28 on the league's today: as the database works it out in SQL.
+        // R-28 on the league's today: as the database works it out in SQL. No one is added
+        // at a scorer's table in this world (S-136).
         isMinor: async (id) => {
           const p = s.people.find((x) => x.id === id);
-          return p === undefined ? true : isMinorOn(p.sensitiveFields, s.today);
+          return p === undefined
+            ? true
+            : isMinorOn(p.sensitiveFields, s.today, { addedAtTable: false });
         },
         leagueToday: async () => s.today,
         leagueSettingRows: async (key) =>
@@ -187,7 +190,10 @@ export function memoryPeople(state: Partial<MemoryPeople> = {}) {
         // T-403: one stand-in transaction at a time here, so the lock holds nothing.
         lockLeague: async () => undefined,
         hasRecordedChild: async () =>
-          s.people.some((p) => !p.binned && isMinorOn(p.sensitiveFields, s.today) === true),
+          s.people.some(
+            (p) =>
+              !p.binned && isMinorOn(p.sensitiveFields, s.today, { addedAtTable: false }) === true,
+          ),
         clearLeagueSetting: async (key, version) => {
           if (!Object.hasOwn(s.settings, key) || version !== 1) return false;
           delete s.settings[key];

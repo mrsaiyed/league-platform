@@ -1,5 +1,5 @@
 // The people module (T2 §3). Other modules and packages use only what is here.
-export { adultAge, isMinorOn, type MinorFacts } from './rules/minor-by-age.ts';
+export { adultAge, isMinorOn, type MinorFacts, type MinorOrigin } from './rules/minor-by-age.ts';
 export {
   defaultNamePolicy,
   nameForms,

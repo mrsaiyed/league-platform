@@ -2,9 +2,11 @@
 // of birth says so (under 18 on the league's own today, in its time zone) OR the "minor"
 // tick is on. A date that says adult unticks no one: the admin unticks to show more. A
 // date that cannot be read counts as a child. With no date, the tick says, and with no
-// tick either the league does not know. A child must never be shown in full because a
-// box was left unticked, a birth year was mistyped, or an 18th birthday came with nobody
-// deciding.
+// tick either the league does not know, except for a player typed in at a scorer's table
+// (step 2.146, S-136): they come with no age, so they count as a child until an admin
+// says otherwise, by the tick either way or a date. A child must never be shown in full
+// because a box was left unticked, a birth year was mistyped, an 18th birthday came with
+// nobody deciding, or a child walked up to the scorer's table in an adult league.
 //
 // The rule lives twice (record 080): here, for the made-up world's reads, and in SQL
 // inside the database's own reads and the people store's "is this person a child"
@@ -19,6 +21,15 @@ export type MinorFacts = {
   readonly birthDate: string | null;
   /** The "minor" tick: null where the league does not know. */
   readonly isMinor: boolean | null;
+};
+
+/**
+ * Where the person came from, as far as the rule reads it: whether any roster place of
+ * theirs was added at a game's scorer's table (`roster_entries.added_at_game_id`). A read
+ * of what is recorded only (whether the league has a recorded child, S-109) gives false.
+ */
+export type MinorOrigin = {
+  readonly addedAtTable: boolean;
 };
 
 /** The age at which a person stops counting as a child (R-28: "under 18 today"). */
@@ -43,9 +54,10 @@ function isCalendarDate(value: string): boolean {
  * child until 1 March in a year with no 29th); a birth date after today cannot be saved
  * (T3 §3), and were one ever read the person counts as a child; a date that cannot be read
  * counts as a child too. Without a date: the tick off is an adult, and anything but true
- * or false counts as not known.
+ * or false counts as not known, but a player added at a scorer's table, who came with no
+ * age, counts as a child (S-136).
  */
-export function isMinorOn(person: MinorFacts, today: string): boolean | null {
+export function isMinorOn(person: MinorFacts, today: string, origin: MinorOrigin): boolean | null {
   if (person.isMinor === true) return true;
   if (person.birthDate !== null) {
     if (!isCalendarDate(person.birthDate)) return true;
@@ -56,5 +68,5 @@ export function isMinorOn(person: MinorFacts, today: string): boolean | null {
     return eighteenth > today;
   }
   if (person.isMinor === false) return false;
-  return null;
+  return origin.addedAtTable ? true : null;
 }

@@ -41,7 +41,9 @@ export function childDisagreement(
   today: string,
 ): ChildDisagreement | undefined {
   if (details.birthDate === '') return undefined;
-  const byDate = isMinorOn({ birthDate: details.birthDate, isMinor: null }, today);
+  const byDate = isMinorOn({ birthDate: details.birthDate, isMinor: null }, today, {
+    addedAtTable: false,
+  });
   if (details.child === 'child' && byDate === false) return 'tick-keeps-child';
   if (details.child === 'adult' && byDate === true) return 'date-makes-child';
   return undefined;
@@ -83,7 +85,7 @@ export function treatmentOf(
   const byDate =
     details.birthDate === ''
       ? null
-      : isMinorOn({ birthDate: details.birthDate, isMinor: null }, today);
+      : isMinorOn({ birthDate: details.birthDate, isMinor: null }, today, { addedAtTable: false });
   const choice = details.child;
   if (byDate === true) return choice === 'child' ? 'child-by-both' : 'child-by-date';
   if (choice === 'child') return byDate === false ? 'child-by-choice-over-date' : 'child-by-choice';

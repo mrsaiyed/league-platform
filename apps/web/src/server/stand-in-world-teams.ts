@@ -13,7 +13,7 @@ import type {
   TeamRecord,
   TeamsStore,
 } from '@srleagues/core';
-import { dayIn, minorAt } from './stand-in-world-clock.ts';
+import { dayIn, minorAt, recordedOnly } from './stand-in-world-clock.ts';
 import { newId } from './stand-in-world-ids.ts';
 import { uniqueJerseysOf } from './stand-in-world-games.ts';
 import { replacedAt } from './stand-in-world-rows.ts';
@@ -287,7 +287,7 @@ export function worldPeopleStore(s: LeagueWorld, now: () => Date): PeopleStore {
     // R-28 on the league's own today, by the world's one clock (find-person-is-minor.ts).
     isMinor: async (personId) => {
       const p = s.people.find((x) => x.id === personId);
-      return p === undefined ? true : minorAt(p, s.timeZone, now());
+      return p === undefined ? true : minorAt(p, s.timeZone, now(), s.roster);
     },
     // The league's today in its own zone, by the world's one clock (as the teams store's).
     leagueToday: async () => dayIn(now(), s.timeZone),
@@ -299,7 +299,7 @@ export function worldPeopleStore(s: LeagueWorld, now: () => Date): PeopleStore {
     // T-403: the stand-in runs one save at a time, so the lock holds nothing.
     lockLeague: async () => undefined,
     hasRecordedChild: async () =>
-      s.people.some((p) => !p.binned && minorAt(p, s.timeZone, now()) === true),
+      s.people.some((p) => !p.binned && minorAt(p, s.timeZone, now(), recordedOnly) === true),
     clearLeagueSetting: async (key, version) => {
       const before = s.settings.length;
       s.settings = s.settings.filter(

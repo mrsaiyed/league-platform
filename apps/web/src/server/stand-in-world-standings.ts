@@ -25,7 +25,7 @@ import {
   standInNamesOf,
   standInStatusVersion,
 } from './stand-in-league-states.ts';
-import { minorAt } from './stand-in-world-clock.ts';
+import { minorAt, recordedOnly } from './stand-in-world-clock.ts';
 import { newId } from './stand-in-world-ids.ts';
 import {
   copyWorldSeasonSetup,
@@ -396,7 +396,7 @@ function standingsReadOver(s: ReadWorld | undefined, moment: Date): StandingsRea
           firstName: p.firstName,
           lastName: p.lastName,
           // R-28: the birth date or the tick (list-people-for-display.ts).
-          isMinor: minorAt(p, s?.timeZone ?? 'UTC', moment),
+          isMinor: minorAt(p, s?.timeZone ?? 'UTC', moment, s?.roster ?? []),
           visibility: p.visibility,
         })),
   };
@@ -473,7 +473,7 @@ export function worldLeaguesStores(
     // T-403: the stand-in runs one save at a time, so the lock holds nothing.
     lockLeague: async () => undefined,
     hasRecordedChild: async () =>
-      s.people.some((p) => !p.binned && minorAt(p, s.timeZone, now()) === true),
+      s.people.some((p) => !p.binned && minorAt(p, s.timeZone, now(), recordedOnly) === true),
     // The permission check asks who the league is and whether it may be changed.
     currentLeague: async () => {
       const status = await access.leagueStatus();
