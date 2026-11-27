@@ -226,12 +226,12 @@ describe('sign-up with an emailed code', () => {
       });
       expect(result.ok).toBe(true);
     }
-    expect(await env.sign.startSignUp({ email: 'p200@example.test', networkAddress: here })).toEqual(
-      {
-        ok: false,
-        error: { code: 'too-many-attempts', retryAfterSeconds: 60 * 60 },
-      },
-    );
+    expect(
+      await env.sign.startSignUp({ email: 'p200@example.test', networkAddress: here }),
+    ).toEqual({
+      ok: false,
+      error: { code: 'too-many-attempts', retryAfterSeconds: 60 * 60 },
+    });
     const otherNetwork = await env.sign.startSignUp({
       email: 'p200@example.test',
       networkAddress: elsewhere,
