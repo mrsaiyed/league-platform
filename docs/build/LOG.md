@@ -4,6 +4,8 @@ Moved out of `STATUS.md` on 2026-11-22 so that the status stays short (USAGE.md,
 
 ## Entries
 
+- 2026-11-27 03:19 UTC — Step 2.228 landed (03:18 UTC 2026-11-27, Opus lead): the role matrix tries 19 kinds of person in active, archived and suspended leagues and under assigned games only, and checks every read's fields and rows (T-500 to T-503; S-132 reversed: only a draft league can be removed).
+
 - 2026-11-26 18:52 UTC — Step 2.128 landed (18:52 UTC 2026-11-26, Opus lead): a person's own name, password and email; every account without a name is asked it at its next request; the two own-name queries on the fence's list (T-498, decided for you by the lead under the founder's words of 2026-11-26).
 
 - 2026-11-26 17:08 UTC — Step 2.112 landed (17:10 UTC 2026-11-26, Opus lead): pg-boss's tables are owned by queue_owner; both starts refuse anything that hangs on a migrations' table (T-490 to T-499); two review rounds, three fix rounds, one look by the strongest model.

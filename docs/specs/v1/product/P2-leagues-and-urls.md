@@ -129,7 +129,7 @@ Inside a league, a program or custom page cannot use a name the site already use
 - The same mark is in the footer of every email and on the tracker's opening screen. No league can remove it.
 - A league shows its own sponsors, and can let its teams show theirs on team pages (B-13).
 
-**U-9 (agreed): a league is not visible until its organizer publishes it.** States are: **draft** (only the league's own staff can see it: the owner, admins and everyone with an admin area, so they can prepare before launch), **live**, **archived** (read-only, still viewable), and **suspended** (taken down by us for abuse or non-payment, with notice; data is kept and exportable). We never delete a league's history because a payment failed.
+**U-9 (agreed): a league is not visible until its organizer publishes it.** States are: **draft** (only the league's own staff can see it: the owner, admins and everyone with an admin area, so they can prepare before launch), **live**, **archived** (read-only, still viewable), and **suspended** (taken down by us for abuse or non-payment, with notice; data is kept and exportable). We never delete a league's history because a payment failed. Only a league still in draft can be removed: an archived or suspended league cannot be, even one never published, until it is back in draft (S-132).
 
 **U-14 (decided for you, November 14): the owner and any admin publish, archive and un-archive the league**, and change its name, its short name and whether it is listed (U-10) under League settings → Profile. Admins have the owner's access except for three things (O-7), and none of these is one of them. Only we suspend, as U-9 says.
 
