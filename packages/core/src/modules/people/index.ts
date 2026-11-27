@@ -4,6 +4,7 @@ export {
   defaultNamePolicy,
   nameForms,
   nameRequests,
+  requestShowsLess,
   type NameForm,
   type NamePolicy,
   type NameRequest,

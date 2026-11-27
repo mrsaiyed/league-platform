@@ -4,7 +4,12 @@ import { binView } from '../bin-area/bin-view.ts';
 import { showAsOf } from '../teams-area/index.ts';
 import { peopleRowOf } from './people-view.ts';
 import { peopleRefusalText } from './refusal-text.ts';
-import { nameRequestInputOf, nameRequestRefusalCode, showAsChoices } from './name-request.ts';
+import {
+  nameRequestInputOf,
+  nameRequestRefusalCode,
+  showAsChoices,
+  showAsChoicesFor,
+} from './name-request.ts';
 
 const personId = '0b9c9a43-2f53-4a5e-9d5b-6f2c8e1a7d10';
 
@@ -94,5 +99,21 @@ describe('"Show as" beside the recorded name in the lists (R-33)', () => {
     const [shown] = binView(items, { locale: 'en', timeZone: 'UTC' }).person;
     expect(shown?.title).toBe('Sam Player');
     expect(shown?.facts).toEqual(['Show as: initials']);
+  });
+});
+
+describe('"Show as" in an archived or suspended league (R-26)', () => {
+  it('offers only the request kept now and those that show less', () => {
+    for (const status of ['archived', 'suspended']) {
+      expect(showAsChoicesFor('none', status)).toEqual(['none', 'initials', 'removed']);
+      expect(showAsChoicesFor('initials', status)).toEqual(['initials', 'removed']);
+      expect(showAsChoicesFor('removed', status)).toEqual(['removed']);
+    }
+  });
+
+  it('offers all three in a league that is running', () => {
+    for (const status of ['draft', 'live']) {
+      expect(showAsChoicesFor('removed', status)).toEqual(['none', 'initials', 'removed']);
+    }
   });
 });

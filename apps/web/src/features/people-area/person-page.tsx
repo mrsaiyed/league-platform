@@ -33,7 +33,7 @@ import { personFormWords } from './form-words.ts';
 import { readPerson, type PersonView } from './people-view.ts';
 import { PersonForm } from './person-form.tsx';
 import { NameRequestForm } from './name-request-form.tsx';
-import { showAsChoices } from './name-request.ts';
+import { showAsChoicesFor } from './name-request.ts';
 import { RemoveForm } from './remove-form.tsx';
 import { addToRosterAction } from '../teams-area/index.ts';
 import { currentTeams, currentTeamsByPerson } from './teams-of-people.ts';
@@ -152,7 +152,7 @@ export async function PersonPage({
           }
           words={{
             showAs: t('adminPeople.showAs.label'),
-            choices: showAsChoices.map((value) => ({
+            choices: showAsChoicesFor(requestOf(person.visibility), here.status).map((value) => ({
               value,
               label: t(`adminPeople.showAs.choice.${value}`),
             })),

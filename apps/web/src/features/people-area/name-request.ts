@@ -5,6 +5,7 @@ import {
   nameRequestReasons,
   nameRequests,
   readOnlyLeagueStatuses,
+  requestShowsLess,
   type NameRequest,
   type NameRequestReason,
 } from '@srleagues/core';
@@ -12,6 +13,19 @@ import type { TypedFields } from '../list-forms/form-state.ts';
 
 /** The three choices as the form offers them, "as the league shows everyone" first. */
 export const showAsChoices: readonly NameRequest[] = nameRequests;
+
+/**
+ * The choices the form offers. In an archived or suspended league only the request kept now
+ * and those that show less of the person (R-26, step 2.146): a choice the command would
+ * refuse is not offered. The command's refusal stays the guard for a post made otherwise.
+ */
+export function showAsChoicesFor(
+  current: NameRequest,
+  leagueStatus: string,
+): readonly NameRequest[] {
+  if (!readOnlyLeagueStatuses.includes(leagueStatus)) return showAsChoices;
+  return showAsChoices.filter((choice) => choice === current || requestShowsLess(current, choice));
+}
 
 export type NameRequestInput = {
   readonly personId: string;
