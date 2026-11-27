@@ -40,6 +40,11 @@ export const enAdminSettings = {
   'adminSettings.limits.whole': 'Accepts a whole number from {min} to {max}.',
   'adminSettings.no': 'No',
   'adminSettings.none': 'This league has no settings to change yet.',
+  // Where adults show in full and children do not (step 2.146).
+  'adminSettings.privacy.adultWithChildren':
+    'Players recorded as children are shown by first name and last initial and adults in full, so the names tell who is a child. To show everyone alike, choose first name and last initial.',
+  'adminSettings.privacy.birthdayTells':
+    "A young player's name turns to full on their 18th birthday, so the day it changes tells their age.",
   'adminSettings.privacy.confirm.adultNoChildren':
     'A player recorded as a child is shown by first name and last initial.',
   'adminSettings.privacy.confirm.adultWithChildren':
@@ -64,6 +69,8 @@ export const enAdminSettings = {
   'adminSettings.privacy.now.hidden':
     'Now: nobody is shown by name; players appear by jersey number.',
   'adminSettings.privacy.now.initial': 'Now: everyone is shown by first name and last initial.',
+  'adminSettings.privacy.onePerson':
+    'To show less of one person, open their record in People and choose "Show as".',
   'adminSettings.privacy.unknownAge':
     'In this league, anyone whose record does not say whether they are a child or an adult is shown as a child, coaches too.',
   'adminSettings.profile.audience.adult': 'Adults',

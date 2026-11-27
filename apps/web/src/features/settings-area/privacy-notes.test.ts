@@ -46,6 +46,7 @@ describe('privacyNotes', () => {
     expect(keys(notes('adult'))).toEqual([
       'adminSettings.privacy.intro.adult',
       'adminSettings.privacy.now.full',
+      'adminSettings.privacy.onePerson',
     ]);
     // In a youth or mixed league, why someone with no age recorded shows by initial comes
     // right under "Now".
@@ -54,6 +55,8 @@ describe('privacyNotes', () => {
         `adminSettings.privacy.intro.${audience}`,
         'adminSettings.privacy.now.full',
         'adminSettings.privacy.unknownAge',
+        'adminSettings.privacy.birthdayTells',
+        'adminSettings.privacy.onePerson',
       ]);
     }
     const now = (policy: Partial<NamePolicy>) => keys(notes('youth', { policy }))[1];
@@ -85,9 +88,32 @@ describe('privacyNotes', () => {
       'adminSettings.privacy.intro.youth',
       'adminSettings.privacy.now.hidden',
       'adminSettings.privacy.unknownAge',
+      'adminSettings.privacy.onePerson',
       'adminSettings.privacy.keptNoEffect',
       'adminSettings.privacy.confirmedOn',
     ]);
+  });
+
+  it('says where the names tell who is a child, and that the record shows less of one person (2.146)', () => {
+    // An adult league with children, adults in full: the names tell who is a child.
+    expect(keys(notes('adult', { hasRecordedChild: true }))).toEqual([
+      'adminSettings.privacy.intro.adult',
+      'adminSettings.privacy.now.full',
+      'adminSettings.privacy.adultWithChildren',
+      'adminSettings.privacy.birthdayTells',
+      'adminSettings.privacy.onePerson',
+    ]);
+    // Everyone alike, by initial or in full with the confirmation: nothing to tell.
+    for (const policy of [
+      { names: 'first_name_last_initial' as const },
+      { childrenInFull: true },
+    ]) {
+      const said = keys(notes('adult', { hasRecordedChild: true, policy }));
+      expect(said).not.toContain('adminSettings.privacy.adultWithChildren');
+      expect(said).not.toContain('adminSettings.privacy.birthdayTells');
+      expect(said).toContain('adminSettings.privacy.onePerson');
+    }
+    expect(en['adminSettings.privacy.onePerson']).toContain('Show as');
   });
 
   it('offers the confirmation in youth and mixed leagues, and in an adult league only with a recorded child', () => {

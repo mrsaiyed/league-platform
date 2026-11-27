@@ -58,6 +58,20 @@ export function privacyNotes(input: PrivacyInput): SettingNotes {
   const area: Line[] = [{ key: `adminSettings.privacy.intro.${facts.audience}` }, nowLine(policy)];
   // Right under "Now", so an owner who sees a coach by initial learns why (R-15).
   if (facts.audience !== 'adult') area.push({ key: 'adminSettings.privacy.unknownAge' });
+  // Where adults show in full and children do not (step 2.146): in an adult league with
+  // children, that the difference itself tells who is a child, and that "first name and
+  // last initial" for everyone avoids it; wherever children are about, that the day a name
+  // turns full tells an 18th birthday.
+  const splitByAge =
+    policy.names === 'full_name' &&
+    policy.childrenInFull !== true &&
+    (facts.audience !== 'adult' || facts.hasRecordedChild);
+  if (splitByAge && facts.audience === 'adult') {
+    area.push({ key: 'adminSettings.privacy.adultWithChildren' });
+  }
+  if (splitByAge) area.push({ key: 'adminSettings.privacy.birthdayTells' });
+  // True since "Show as" is on the person's record (step 2.146, R-23).
+  area.push({ key: 'adminSettings.privacy.onePerson' });
   if (given && policy.names !== 'full_name') {
     area.push({ key: 'adminSettings.privacy.keptNoEffect' });
   }
