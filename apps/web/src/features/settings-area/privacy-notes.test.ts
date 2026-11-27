@@ -78,6 +78,21 @@ describe('privacyNotes', () => {
     });
   });
 
+  it('says who gave the confirmation where the activity log tells it (2.146)', () => {
+    const given = privacyNotes({
+      facts: { audience: 'youth', hasRecordedChild: false },
+      policy: { ...defaultNamePolicy, childrenInFull: true },
+      rows: [confirmationRow(true, '2026-11-16T03:00:00.000Z')],
+      timeZone: 'America/Chicago',
+      locale: 'en',
+      confirmedBy: 'Riley Owner',
+    });
+    expect(given.area?.['privacy']?.at(-1)).toEqual({
+      key: 'adminSettings.privacy.confirmedOnBy',
+      params: { date: 'November 15, 2026', name: 'Riley Owner' },
+    });
+  });
+
   it('says a kept confirmation has no effect while names are not on full names', () => {
     const kept = notes('youth', {
       given: true,

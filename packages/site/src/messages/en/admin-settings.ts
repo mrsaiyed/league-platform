@@ -52,6 +52,7 @@ export const enAdminSettings = {
   'adminSettings.privacy.confirm.youthOrMixed':
     "Tick to show the young players' full names too, while names are on full names.",
   'adminSettings.privacy.confirmedOn': 'Confirmed on {date}.',
+  'adminSettings.privacy.confirmedOnBy': 'Confirmed on {date} by {name}.',
   // What the Privacy part says around its settings (step 2.162, R-29, record 065): one
   // opening sentence by who plays, what is in force now, and where the parents'
   // confirmation is offered.

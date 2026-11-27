@@ -7,6 +7,7 @@ import {
   mayEditLeague,
   readLeagueSettings,
   readNamePolicy,
+  searchActivity,
   type LeagueSettingsView,
 } from '@srleagues/core';
 import { EmptyPanel, PageHead } from '@srleagues/ui';
@@ -18,7 +19,8 @@ import { IntoView, takeNotice } from '../list-forms/index.ts';
 import { doneKey, problemKey, statusAnswerOf } from './answer.ts';
 import { profileSaved } from './profile-form-answer.ts';
 import { settingSaved } from './setting-form-answer.ts';
-import { privacyNotes } from './privacy-notes.ts';
+import { confirmedBy, confirmedBySpan } from './confirmed-by.ts';
+import { confirmationKey, privacyNotes } from './privacy-notes.ts';
 import { ProfilePanel } from './profile-panel.tsx';
 import { archiveAsk, publishAsk, PublishPanel } from './publish-panel.tsx';
 import { areaOf, SettingForms, type Say } from './setting-fields.tsx';
@@ -43,7 +45,7 @@ export async function SettingsPage({
   readonly query: Readonly<Record<string, string | string[] | undefined>>;
 }) {
   const view = await loadLeaguePage(league, 'admin', 'settings');
-  const { adminAccess, adminSettings, publicSchedule } = await webPorts();
+  const { adminAccess, adminPeople, adminSettings, publicSchedule } = await webPorts();
   const context = commandContextOf(view.context);
   // What the page draws is one read in core (step 2.227, T-474): it needs `league.settings`
   // for the whole league. An admin limited to one program is refused it and sees only the
@@ -64,6 +66,25 @@ export async function SettingsPage({
   const clock =
     shown === undefined ? undefined : await publicSchedule.clockOf(view.context.league.id);
   const rows: LeagueSettingsView['rows'] = shown?.rows ?? [];
+  // Who gave the parents' confirmation (step 2.146): from the activity log, read where the
+  // activity log page reads it, and only for whoever may read the log; else the day only.
+  const given = rows.find((row) => row.key === confirmationKey);
+  const confirmer =
+    given?.value === true && typeof given.savedAt === 'string'
+      ? await whoConfirmed(given.savedAt)
+      : undefined;
+  async function whoConfirmed(savedAt: string): Promise<string | undefined> {
+    const found = await searchActivity(
+      context,
+      { kind: 'settings', ...confirmedBySpan(savedAt) },
+      adminPeople.putBack,
+    );
+    if (!found.ok) return undefined;
+    const account = confirmedBy(found.value.entries, confirmationKey, savedAt);
+    if (account === undefined) return undefined;
+    const name = (await adminAccess.namesOf(view.context.league.id)).get(account);
+    return name ?? undefined;
+  }
   const notes =
     shown === undefined || clock === undefined
       ? undefined
@@ -73,6 +94,7 @@ export async function SettingsPage({
           rows,
           timeZone: clock.timeZone,
           locale,
+          confirmedBy: confirmer,
         });
   // A Profile form's or a setting's "Saved" (step 2.155 parts 3 and 4): taken once, so a
   // reload says nothing old.

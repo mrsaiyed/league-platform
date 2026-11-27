@@ -38,6 +38,8 @@ export type PrivacyInput = {
   /** The league's time zone, so the date of the confirmation is the league's date. */
   readonly timeZone: string;
   readonly locale: string;
+  /** Who gave the parents' confirmation, from the activity log, where it is known. */
+  readonly confirmedBy?: string | undefined;
 };
 
 function nowLine(policy: NamePolicy): Line {
@@ -80,7 +82,11 @@ export function privacyNotes(input: PrivacyInput): SettingNotes {
       dateStyle: 'long',
       timeZone: input.timeZone,
     }).format(new Date(row.savedAt));
-    area.push({ key: 'adminSettings.privacy.confirmedOn', params: { date } });
+    area.push(
+      input.confirmedBy === undefined
+        ? { key: 'adminSettings.privacy.confirmedOn', params: { date } }
+        : { key: 'adminSettings.privacy.confirmedOnBy', params: { date, name: input.confirmedBy } },
+    );
   }
   // An adult league with nobody recorded as a child has nothing to confirm, and the
   // confirmation means something only under full names (step 2.146): elsewhere it is not

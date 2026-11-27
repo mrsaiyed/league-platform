@@ -224,6 +224,13 @@ if (browser) {
       admin.locator(`${confirmation} button[type=submit]`).first(),
     );
     note('the confirmation is saved', ticked.saved, ticked.text);
+    await admin.goto(`${origin}/harbor-city/admin/settings`);
+    const privacy = await admin.locator('section[data-area="privacy"]').innerText();
+    note(
+      'confirmed: the screen says the day and who gave it, from the activity log',
+      /Confirmed on [A-Z][a-z]+ \d{1,2}, \d{4} by [^.\n]+\./.test(privacy),
+      privacy,
+    );
     const confirmed = await textOf(team);
     note(
       'confirmed: the others in full, the removed child still nameless',
