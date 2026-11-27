@@ -17,10 +17,15 @@ export const listPeople = defineCommand({
     // False for a screen that shows names only (Admin → Teams): the private columns are
     // then not read at all, whoever asks. True gives them to those who may see them.
     privateFields: z.boolean().default(true),
+    // Only those ticked as children who are 18 or over by birth date (step 2.146). Ages
+    // are private (R-16): for a role that may not see them the list is empty.
+    tickedButGrown: z.boolean().default(false),
   }),
   allowed: (context, _input, tx: PeopleTx) => mayReadPeople(context, tx, 'people.read'),
-  run: async ({ context, input, tx }): Promise<Result<readonly PersonRecord[], never>> =>
-    ok(
+  run: async ({ context, input, tx }): Promise<Result<readonly PersonRecord[], never>> => {
+    const sensitive = input.privateFields && (await maySeeSensitive(context, tx));
+    if (input.tickedButGrown && !sensitive) return ok([]);
+    return ok(
       await tx.people.list({
         // Names only; a curly apostrophe (as a phone types "o’neill") is a plain one.
         ...(input.search === undefined
@@ -28,7 +33,9 @@ export const listPeople = defineCommand({
           : { search: input.search.replace(/[\u2018\u2019]/g, "'") }),
         limit: input.limit,
         offset: input.offset,
-        sensitive: input.privateFields && (await maySeeSensitive(context, tx)),
+        sensitive,
+        ...(input.tickedButGrown ? { tickedButGrown: true } : {}),
       }),
-    ),
+    );
+  },
 });

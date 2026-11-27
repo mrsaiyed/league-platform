@@ -159,11 +159,20 @@ describe('what Admin → People reads, role by role (R-16, T-76)', () => {
 
 describe('the list address', () => {
   it('searches a name, and never an email address, which would sit in the address', () => {
-    expect(peopleAskOf({ q: '  Smi ' })).toEqual({ search: 'Smi', emailRefused: false, page: 1 });
+    expect(peopleAskOf({ q: '  Smi ' })).toEqual({
+      search: 'Smi',
+      emailRefused: false,
+      page: 1,
+      tickedButGrown: false,
+    });
+    // Step 2.146: the finder of those ticked as children who are 18 or over.
+    expect(peopleAskOf({ ticked: 'grown' }).tickedButGrown).toBe(true);
+    expect(peopleAskOf({ ticked: 'yes' }).tickedButGrown).toBe(false);
     expect(peopleAskOf({ q: 'jon@example.test' })).toEqual({
       search: undefined,
       emailRefused: true,
       page: 1,
+      tickedButGrown: false,
     });
   });
   it('takes a page from 1, and anything else as the first', () => {

@@ -4,7 +4,13 @@
 // people for the name function, whether the league has a recorded child) reads it so,
 // never returning the birth date.
 import type { PGlite } from '@electric-sql/pglite';
-import { dayIn, defaultNamePolicy, isMinorOn, publicViewer } from '@srleagues/core';
+import {
+  dayIn,
+  defaultNamePolicy,
+  isMinorOn,
+  publicViewer,
+  tickedButGrownOn,
+} from '@srleagues/core';
 import { sql } from 'kysely';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createDatabase } from '../db/create-database.ts';
@@ -25,7 +31,8 @@ import {
 import { hasRecordedChild } from './has-recorded-child.ts';
 import { listPeopleForDisplay } from './list-people-for-display.ts';
 import { listPublicRoster } from './list-public-roster.ts';
-import { isMinorSql, recordedOnly } from './minor-by-age-sql.ts';
+import { listPeople } from './list-people.ts';
+import { isMinorSql, recordedOnly, tickedButGrownSql } from './minor-by-age-sql.ts';
 
 let pglite: PGlite;
 let db: DatabaseHandle;
@@ -113,6 +120,22 @@ describe('isMinorSql gives what core gives (R-28)', () => {
       const database = await sqlAnswer(birthDate, isMinor, today, addedAtTable);
       if (database !== core)
         differ.push(`${birthDate} ${isMinor} ${addedAtTable} on ${today}: ${database} v ${core}`);
+    }
+    expect(differ).toEqual([]);
+  });
+
+  it('finds who is ticked but 18 or over as tickedButGrownOn does (step 2.146)', async () => {
+    const differ: string[] = [];
+    for (const { today, birthDate, isMinor, addedAtTable } of cases) {
+      if (addedAtTable) continue;
+      const core = tickedButGrownOn({ birthDate, isMinor }, today);
+      const { rows } = await withTransaction(db, { leagueId: a.leagueId }, (scope) =>
+        sql<{ grown: boolean }>`
+          select ${tickedButGrownSql(sql<string>`${today}::date`)} as grown
+            from (values (${birthDate}::date, ${isMinor}::boolean))
+              as people (birth_date, is_minor)`.execute(transactionOf(scope)),
+      );
+      if (rows[0]?.grown !== core) differ.push(`${birthDate} ${isMinor} on ${today}`);
     }
     expect(differ).toEqual([]);
   });
@@ -335,6 +358,32 @@ describe('the queries that say whether someone is a child read it through isMino
       walkUp,
     ]);
     expect(await seen()).toMatchObject({ minor: true, recorded: true });
+  });
+
+  it('lists only those ticked as children who are 18 or over by birth date (step 2.146)', async () => {
+    const c = await newLeague(pglite);
+    const today = dayIn('America/Chicago', Date.now());
+    const made = async (firstName: string, birthDate: string | null, isMinor: boolean | null) => {
+      const id = await newPerson(pglite, c.leagueId, { firstName, lastName: 'Finder' });
+      await pglite.query('update people set birth_date = $2, is_minor = $3 where id = $1', [
+        id,
+        birthDate,
+        isMinor,
+      ]);
+      return id;
+    };
+    const grownTicked = await made('Grown', yearsBefore(today, 18), true);
+    await made('Young', yearsBefore(addDays(today, 1), 18), true);
+    await made('Unticked', yearsBefore(today, 30), false);
+    await made('Undated', null, true);
+    const found = await withTransaction(db, { leagueId: c.leagueId }, (scope) =>
+      listPeople(scope, { limit: 10, offset: 0, sensitive: true, tickedButGrown: true }),
+    );
+    expect(found.map((person) => person.id)).toEqual([grownTicked]);
+    const everyone = await withTransaction(db, { leagueId: c.leagueId }, (scope) =>
+      listPeople(scope, { limit: 10, offset: 0, sensitive: false }),
+    );
+    expect(everyone).toHaveLength(4);
   });
 
   it('reads no other league: the people of another league are not there', async () => {

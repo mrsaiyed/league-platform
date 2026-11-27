@@ -9,7 +9,7 @@ import {
 import type { ActivityEntry, Grant } from '../access/index.ts';
 import type { Audience } from '../leagues/index.ts';
 import type { PeopleTx, PersonRecord, PersonSensitiveFields } from './ports.ts';
-import { isMinorOn } from './rules/minor-by-age.ts';
+import { isMinorOn, tickedButGrownOn } from './rules/minor-by-age.ts';
 
 /** A stored person: the record, and the sensitive fields kept beside it. */
 export type StoredPerson = Omit<PersonRecord, 'sensitive'> & {
@@ -107,11 +107,12 @@ export function memoryPeople(state: Partial<MemoryPeople> = {}) {
           const found = s.people.find((p) => p.id === id);
           return found === undefined ? undefined : view(found, sensitive);
         },
-        list: async ({ search, limit, offset, sensitive }) => {
+        list: async ({ search, limit, offset, sensitive, tickedButGrown }) => {
           if (sensitive) s.sensitiveReads += 1;
           const needle = search?.toLowerCase();
           return s.people
             .filter((p) => !p.binned)
+            .filter((p) => tickedButGrown !== true || tickedButGrownOn(p.sensitiveFields, s.today))
             .filter(
               (p) =>
                 needle === undefined ||

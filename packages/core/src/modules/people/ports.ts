@@ -59,6 +59,11 @@ export type PeopleSearch = {
   readonly offset: number;
   /** Whether the sensitive columns are selected at all. */
   readonly sensitive: boolean;
+  /**
+   * Only people ticked as children whose birth date makes them 18 or over (tickedButGrownOn),
+   * worked out where the dates are kept; asked only together with `sensitive`.
+   */
+  readonly tickedButGrown?: boolean;
 };
 
 export type PeopleStore = {

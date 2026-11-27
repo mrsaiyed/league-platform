@@ -24,6 +24,19 @@ const leagueTodayOfPerson: RawBuilder<string> = sql<string>`(
    where minor_league.id = people.league_id
 )`;
 
+/**
+ * Whether the `people` row is ticked as a child though their birth date makes them 18 or
+ * over on `today` (core's tickedButGrownOn): a yes or a no, never the date.
+ */
+export function tickedButGrownSql(
+  today: RawBuilder<string> = leagueTodayOfPerson,
+): RawBuilder<boolean> {
+  return sql<boolean>`(people.is_minor is true and people.birth_date is not null and coalesce(
+    people.birth_date <= (${today} - make_interval(years => ${sql.lit(adultAge)}))::date,
+    false
+  ))`;
+}
+
 /** Whether any roster place of the person was added at a scorer's table (MinorOrigin). */
 const addedAtTableOfPerson: RawBuilder<boolean> = sql<boolean>`exists (
   select 1

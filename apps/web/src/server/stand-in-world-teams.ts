@@ -13,6 +13,7 @@ import type {
   TeamRecord,
   TeamsStore,
 } from '@srleagues/core';
+import { tickedButGrownOn } from '@srleagues/core';
 import { dayIn, minorAt, recordedOnly } from './stand-in-world-clock.ts';
 import { newId } from './stand-in-world-ids.ts';
 import { uniqueJerseysOf } from './stand-in-world-games.ts';
@@ -211,27 +212,32 @@ export function worldPeopleStore(s: LeagueWorld, now: () => Date): PeopleStore {
       const p = s.people.find((x) => x.id === id);
       return p === undefined ? undefined : shown(p, sensitive);
     },
-    list: async ({ search, limit, offset, sensitive }) => {
+    list: async ({ search, limit, offset, sensitive, tickedButGrown }) => {
       const needle = search?.toLowerCase();
-      return s.people
-        .filter((p) => !p.binned)
-        .filter(
-          (p) =>
-            needle === undefined ||
-            `${p.firstName} ${p.lastName}\n${p.publicName ?? ''}`
-              .toLowerCase()
-              .replace(/[\u2018\u2019]/g, "'")
-              .includes(needle),
-        )
-        .sort(
-          (a, b) =>
-            // Without regard to capitals, as the database's lower() order.
-            a.lastName.toLowerCase().localeCompare(b.lastName.toLowerCase()) ||
-            a.firstName.toLowerCase().localeCompare(b.firstName.toLowerCase()) ||
-            a.id.localeCompare(b.id),
-        )
-        .slice(offset, offset + limit)
-        .map((p) => shown(p, sensitive));
+      const today = dayIn(now(), s.timeZone);
+      return (
+        s.people
+          .filter((p) => !p.binned)
+          // Step 2.146: by core's one rule, as list-people.ts asks the database.
+          .filter((p) => tickedButGrown !== true || tickedButGrownOn(p.sensitive, today))
+          .filter(
+            (p) =>
+              needle === undefined ||
+              `${p.firstName} ${p.lastName}\n${p.publicName ?? ''}`
+                .toLowerCase()
+                .replace(/[\u2018\u2019]/g, "'")
+                .includes(needle),
+          )
+          .sort(
+            (a, b) =>
+              // Without regard to capitals, as the database's lower() order.
+              a.lastName.toLowerCase().localeCompare(b.lastName.toLowerCase()) ||
+              a.firstName.toLowerCase().localeCompare(b.firstName.toLowerCase()) ||
+              a.id.localeCompare(b.id),
+          )
+          .slice(offset, offset + limit)
+          .map((p) => shown(p, sensitive))
+      );
     },
     create: async (p) => {
       const id = newId();

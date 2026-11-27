@@ -130,6 +130,10 @@ export const enAdminPeople = {
   'adminPeople.teams.on': 'On {team}',
   'adminPeople.teams.public': 'Its public page',
   'adminPeople.teams.title': 'Teams',
+  'adminPeople.tickedGrown.link': 'Ticked as children, 18 or over',
+  'adminPeople.tickedGrown.none': 'No one ticked as a child is 18 or over by their birth date.',
+  'adminPeople.tickedGrown.on':
+    'Showing only people ticked as children whose birth date makes them 18 or over. Open a record to untick them.',
   'adminPeople.treated.adultByBoth':
     'Treated as an adult: the date of birth and the choice both say so.',
   'adminPeople.treated.adultByChoice': 'Treated as an adult, because they are marked as an adult.',

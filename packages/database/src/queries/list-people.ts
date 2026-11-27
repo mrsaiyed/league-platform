@@ -11,12 +11,15 @@ import {
   publicPersonColumns,
   type PersonSummary,
 } from './person-summary.ts';
+import { tickedButGrownSql } from './minor-by-age-sql.ts';
 
 export type PeopleSearchRow = {
   search?: string;
   limit: number;
   offset: number;
   sensitive: boolean;
+  /** Only people ticked as children and 18 or over by birth date, worked out here (step 2.146). */
+  tickedButGrown?: boolean;
 };
 
 /** Makes `%`, `_` and `\` in what someone typed match themselves. */
@@ -27,7 +30,7 @@ const plain = "''";
 
 export async function listPeople(
   scope: LeagueScope,
-  { search, limit, offset, sensitive }: PeopleSearchRow,
+  { search, limit, offset, sensitive, tickedButGrown }: PeopleSearchRow,
 ): Promise<PersonSummary[]> {
   const pattern = search === undefined ? undefined : likePattern(search);
   const base = transactionOf(scope)
@@ -35,6 +38,7 @@ export async function listPeople(
     .where('league_id', '=', scope.leagueId)
     .where('deleted_at', 'is', null)
     .where('merged_into_id', 'is', null)
+    .$if(tickedButGrown === true, (q) => q.where(tickedButGrownSql()))
     .$if(pattern !== undefined, (q) =>
       q.where((eb) =>
         eb.or([

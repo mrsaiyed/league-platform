@@ -32,6 +32,20 @@ export type MinorOrigin = {
   readonly addedAtTable: boolean;
 };
 
+/**
+ * Whether the person is ticked as a child though their birth date says they are 18 or over
+ * on `today` (step 2.146): the people an admin may want to untick, as the tick is never
+ * taken off by a date (R-28). False with no date or a date that cannot be read. The
+ * database answers it in SQL (tickedButGrownSql), so the date never leaves it.
+ */
+export function tickedButGrownOn(person: MinorFacts, today: string): boolean {
+  if (person.isMinor !== true || person.birthDate === null) return false;
+  return (
+    isMinorOn({ birthDate: person.birthDate, isMinor: null }, today, { addedAtTable: false }) ===
+    false
+  );
+}
+
 /** The age at which a person stops counting as a child (R-28: "under 18 today"). */
 export const adultAge = 18;
 

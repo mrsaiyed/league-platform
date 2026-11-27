@@ -82,6 +82,7 @@ export async function PeoplePage({
       area,
       query: {
         ...(ask.search === undefined ? {} : { q: ask.search }),
+        ...(ask.tickedButGrown ? { ticked: 'grown' } : {}),
         ...(page === 1 ? {} : { page: String(page) }),
       },
     });
@@ -148,6 +149,24 @@ export async function PeoplePage({
             {t('adminPeople.search.noEmail')}
           </p>
         ) : null}
+        {/* Step 2.146: who is ticked as a child but 18 or over by birth date, to untick.
+            Ages are private (R-16): offered only to a role that may see them. */}
+        {!mayEnterPrivate ? null : ask.tickedButGrown ? (
+          <p className="ui-notice" role="status" data-finder="ticked-grown">
+            {t('adminPeople.tickedGrown.on')} <a href={listUrl}>{t('adminPeople.search.clear')}</a>
+          </p>
+        ) : (
+          <p className="staff-buttons">
+            <a
+              className="ui-button"
+              data-kind="quiet"
+              data-finder="ticked-grown"
+              href={leagueUrl(here, 'admin-area', { area, query: { ticked: 'grown' } })}
+            >
+              {t('adminPeople.tickedGrown.link')}
+            </a>
+          </p>
+        )}
       </section>
 
       <List
@@ -199,6 +218,9 @@ function List({
   // A read that fails is said as such, never drawn as an empty league.
   if (!list.ok) return <StaffNotice kind="refused">{t('adminPeople.readFailed')}</StaffNotice>;
   if (list.rows.length === 0) {
+    if (ask.tickedButGrown && ask.page === 1) {
+      return <EmptyPanel text={t('adminPeople.tickedGrown.none')} />;
+    }
     return ask.search === undefined && ask.page === 1 ? (
       <EmptyPanel
         text={t('adminPeople.empty')}

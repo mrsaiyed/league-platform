@@ -31,6 +31,11 @@ export type PeopleAsk = {
   readonly emailRefused: boolean;
   /** The page, from 1. */
   readonly page: number;
+  /**
+   * Only people ticked as children who are 18 or over by birth date (`?ticked=grown`, step
+   * 2.146): the database works it out, so no date reaches the page.
+   */
+  readonly tickedButGrown: boolean;
 };
 
 export function peopleAskOf(query: Query): PeopleAsk {
@@ -41,6 +46,7 @@ export function peopleAskOf(query: Query): PeopleAsk {
     search: typed === '' || emailRefused ? undefined : typed,
     emailRefused,
     page: Number.isInteger(page) && page >= 1 && page <= 10_000 ? page : 1,
+    tickedButGrown: only(query['ticked']) === 'grown',
   };
 }
 
@@ -76,6 +82,7 @@ export async function readPeopleList(
       ...(ask.search === undefined ? {} : { search: ask.search }),
       limit: peoplePageSize + 1,
       offset: (ask.page - 1) * peoplePageSize,
+      tickedButGrown: ask.tickedButGrown,
     },
     deps,
   );
