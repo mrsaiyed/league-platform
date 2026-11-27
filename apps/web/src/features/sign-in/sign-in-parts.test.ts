@@ -9,7 +9,13 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { t } from '../../server/messages.ts';
 import { problems } from '../../server/sign-in/problems.ts';
-import { BotCheckField, fieldRefusal, needsScriptsWords, problemWords } from './sign-in-parts.tsx';
+import {
+  BotCheckField,
+  fieldRefusal,
+  needsScriptsWords,
+  problemWords,
+  tooManyWords,
+} from './sign-in-parts.tsx';
 
 const draw = (
   widget: Parameters<typeof BotCheckField>[0]['widget'],
@@ -121,5 +127,35 @@ describe('fieldRefusal (step 2.102)', () => {
     });
     expect(fieldRefusal(search, 'email')).toEqual({ input: {}, refusal: null });
     expect(fieldRefusal({}, 'email')).toEqual({ input: {}, refusal: null });
+  });
+});
+
+describe('a pause for safety (step 2.234, S-133)', () => {
+  const screens = [false, true].flatMap((forgotHint) =>
+    [false, true].map((google) => ({ forgotHint, google })),
+  );
+
+  it('says the wait in whole minutes, rounded up, never seconds', () => {
+    for (const { forgotHint, google } of screens) {
+      expect(tooManyWords(900, forgotHint, google)).toContain('paused for 15 minutes.');
+      expect(tooManyWords(30, forgotHint, google)).toContain('paused for 1 minute.');
+      expect(tooManyWords(61, forgotHint, google)).toContain('paused for 2 minutes.');
+      expect(tooManyWords(900, forgotHint, google)).not.toMatch(/second/i);
+    }
+  });
+
+  it('never blames the person', () => {
+    for (const { forgotHint, google } of screens) {
+      expect(tooManyWords(900, forgotHint, google)).toMatch(/^For safety, /);
+      expect(tooManyWords(900, forgotHint, google)).not.toMatch(/too many|your tries|you tried/i);
+    }
+  });
+
+  it('names "Continue with Google" only where the screen draws it, and the new password on sign-in', () => {
+    for (const { forgotHint, google } of screens) {
+      const words = tooManyWords(900, forgotHint, google);
+      expect(words.includes('"Continue with Google"')).toBe(google);
+      expect(words.includes('choose a new password')).toBe(forgotHint);
+    }
   });
 });

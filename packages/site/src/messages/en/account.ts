@@ -227,11 +227,17 @@ export const enAccount = {
   'problem.googleOff':
     'This is a test copy, so it does not sign in with Google. Use a made-up email address, such as someone@example.test.',
   'problem.invalidEmail': 'That does not look like an email address.',
-  // The wait in whole minutes, rounded up (record 081), with the way in that does not wait.
+  // The wait in whole minutes, rounded up (record 081), with the ways in that do not wait,
+  // and no blame: a stranger's tries pause it too (step 2.234, S-133). "Reset your
+  // password" is a link drawn after these words; Google is named only where it is drawn.
+  'problem.lockedOutGoogle_one':
+    'For safety, signing in with a password is paused for {count} minute. To get in now, use "Continue with Google" below, or choose a new password:',
+  'problem.lockedOutGoogle_other':
+    'For safety, signing in with a password is paused for {count} minutes. To get in now, use "Continue with Google" below, or choose a new password:',
   'problem.lockedOut_one':
-    'Too many tries. Please wait {count} minute, or tap "Forgot your password?" to choose a new one now.',
+    'For safety, signing in with a password is paused for {count} minute. To get in now, choose a new password:',
   'problem.lockedOut_other':
-    'Too many tries. Please wait {count} minutes, or tap "Forgot your password?" to choose a new one now.',
+    'For safety, signing in with a password is paused for {count} minutes. To get in now, choose a new password:',
   'problem.noPassword': 'Your account has no password. Sign in with Google again instead.',
   // The test copy only (step 2.205): the same words whether or not an account exists.
   'problem.onlyMadeUpAddresses':
@@ -246,9 +252,15 @@ export const enAccount = {
   'problem.signInToScore': 'Sign in to score this game.',
   'problem.signOutEverywhereFailed':
     'We could not sign out your other devices. This one is signed out: sign in and try again.',
-  // The wait in whole minutes, rounded up (record 081).
-  'problem.tooManyAttempts_one': 'Too many tries. Please wait {count} minute and try again.',
-  'problem.tooManyAttempts_other': 'Too many tries. Please wait {count} minutes and try again.',
+  // The wait in whole minutes, rounded up (record 081), and no blame (step 2.234, S-133).
+  'problem.tooManyAttemptsGoogle_one':
+    'For safety, this is paused for {count} minute. Please try again after that, or use "Continue with Google" now.',
+  'problem.tooManyAttemptsGoogle_other':
+    'For safety, this is paused for {count} minutes. Please try again after that, or use "Continue with Google" now.',
+  'problem.tooManyAttempts_one':
+    'For safety, this is paused for {count} minute. Please try again after that.',
+  'problem.tooManyAttempts_other':
+    'For safety, this is paused for {count} minutes. Please try again after that.',
   'problem.wrongEmailOrPassword': 'Wrong email or password.',
   'problem.wrongPassword': 'Wrong password.',
   'role.admin': 'Admin',
@@ -291,6 +303,8 @@ export const enAccount = {
   'signIn.haveAccount': 'Already have an account? Sign in',
   'signIn.or': 'or',
   'signIn.password': 'Password',
+  // The way in drawn inside a lock-out's words (step 2.234): to the forgotten-password route.
+  'signIn.resetPassword': 'Reset your password',
   'signIn.submit': 'Sign in',
   'signUp.intro': 'Enter your email. We will send a 6-digit code to prove it is yours.',
   'signUp.sendCode': 'Email me a code',
