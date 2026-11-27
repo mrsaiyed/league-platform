@@ -82,9 +82,11 @@ export function privacyNotes(input: PrivacyInput): SettingNotes {
     }).format(new Date(row.savedAt));
     area.push({ key: 'adminSettings.privacy.confirmedOn', params: { date } });
   }
-  // An adult league with nobody recorded as a child has nothing to confirm, unless a
-  // confirmation is already stored: then it stays on screen so it can be taken back.
+  // An adult league with nobody recorded as a child has nothing to confirm, and the
+  // confirmation means something only under full names (step 2.146): elsewhere it is not
+  // offered, unless one is already stored: then it stays on screen so it can be taken back.
   const adultWithoutChildren = facts.audience === 'adult' && !facts.hasRecordedChild;
+  const offered = (!adultWithoutChildren && policy.names === 'full_name') || given;
   const before: Line[] =
     facts.audience !== 'adult'
       ? [{ key: 'adminSettings.privacy.confirm.youthOrMixed' }]
@@ -93,6 +95,6 @@ export function privacyNotes(input: PrivacyInput): SettingNotes {
         : [{ key: 'adminSettings.privacy.confirm.adultWithChildren' }];
   return {
     area: { privacy: area },
-    rows: { [confirmationKey]: { before, offered: !adultWithoutChildren || given } },
+    rows: { [confirmationKey]: { before, offered } },
   };
 }

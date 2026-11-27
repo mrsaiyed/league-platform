@@ -135,7 +135,10 @@ export async function PersonPage({
       <section id={showAsAnchor} className="staff-panel admin-team-part" data-show-as="true">
         <h2>{t('adminPeople.showAs.title')}</h2>
         <p className="staff-quiet">{t('adminPeople.showAs.body')}</p>
+        {/* Drawn afresh once a save changes the request, so it starts on the one kept now
+            (a select keeps what it showed while only its starting value changes). */}
         <NameRequestForm
+          key={`${requestOf(person.visibility)}-${person.version}`}
           action={setNameRequestAction}
           permalink={`${pageUrl}#${showAsAnchor}`}
           hidden={{

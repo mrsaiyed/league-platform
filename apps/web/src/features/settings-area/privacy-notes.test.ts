@@ -136,6 +136,16 @@ describe('privacyNotes', () => {
     expect(row(notes('adult', { given: true }))?.offered).toBe(true);
   });
 
+  it('offers the confirmation only while names are on full names, unless one is stored (2.146)', () => {
+    const offered = (n: SettingNotes) => n.rows?.[confirmationKey]?.offered;
+    for (const names of ['hidden', 'first_name_last_initial'] as const) {
+      expect(offered(notes('youth', { policy: { names } }))).toBe(false);
+      expect(offered(notes('adult', { hasRecordedChild: true, policy: { names } }))).toBe(false);
+      expect(offered(notes('youth', { policy: { names }, given: true }))).toBe(true);
+    }
+    expect(offered(notes('youth', { policy: { names: 'full_name' } }))).toBe(true);
+  });
+
   it('uses only words the message file has', () => {
     const all = (['adult', 'youth', 'mixed'] as const).flatMap((audience) =>
       [false, true].flatMap((hasRecordedChild) => {
