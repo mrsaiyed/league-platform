@@ -7,6 +7,7 @@ import {
   personSummary,
   personSummaryWithSensitive,
   publicPersonColumns,
+  walkUpColumn,
   type PersonSummary,
 } from './person-summary.ts';
 
@@ -21,7 +22,7 @@ export async function findPerson(
     .where('id', '=', personId)
     .where('merged_into_id', 'is', null);
   if (sensitive) {
-    const row = await base.select(allPersonColumns).executeTakeFirst();
+    const row = await base.select([...allPersonColumns, walkUpColumn]).executeTakeFirst();
     return row === undefined ? undefined : personSummaryWithSensitive(row);
   }
   const row = await base.select(publicPersonColumns).executeTakeFirst();

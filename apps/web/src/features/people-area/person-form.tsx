@@ -45,6 +45,7 @@ export type PersonFormWords = {
   readonly submit: string;
   /** The tick under an unlikely date of birth shown back before saving (R-28). */
   readonly birthDateChecked: string;
+  readonly wholeNameChecked: string;
   /** The tick under "There is already a … Add another?" (adding someone of a name taken). */
   readonly sameNameChecked: string;
   /** Beside the button when a box is marked: the sentence is up there, by the box. */
@@ -133,7 +134,9 @@ export function PersonForm({
   // A question before saving (an unlikely date of birth, a name someone else has) is not
   // an error: no red, no "invalid", its sentence with its tick under it.
   const question =
-    refused?.code === 'birth-date-check' || refused?.code === 'same-name-check'
+    refused?.code === 'birth-date-check' ||
+    refused?.code === 'same-name-check' ||
+    refused?.code === 'whole-name-check'
       ? refused
       : undefined;
   const questionId = `${id}-question`;
@@ -148,6 +151,7 @@ export function PersonForm({
     const meanwhile = meanwhileOf(name);
     const asked =
       (question?.code === 'birth-date-check' && name === 'birthDate') ||
+      (question?.code === 'whole-name-check' && name === 'firstName') ||
       (question?.code === 'same-name-check' && (name === 'firstName' || name === 'lastName'));
     const describedBy = [
       wrong(name) ? errorId : '',
@@ -295,6 +299,15 @@ export function PersonForm({
                   value={(question.typed['birthDate'] ?? '').trim()}
                 />{' '}
                 {words.birthDateChecked}
+              </>
+            ) : question.code === 'whole-name-check' ? (
+              <>
+                <input
+                  type="checkbox"
+                  name="wholeNameChecked"
+                  value={(question.typed['firstName'] ?? '').trim()}
+                />{' '}
+                {words.wholeNameChecked}
               </>
             ) : (
               <>

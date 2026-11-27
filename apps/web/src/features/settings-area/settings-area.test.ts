@@ -260,7 +260,14 @@ describe('the settings form', () => {
         facts: await readPrivacyFacts(tx),
         policy: await readNamePolicy(tx.leagues),
       }));
-      const notes = privacyNotes({ facts, policy, rows, timeZone: 'UTC', locale: 'en' });
+      const notes = privacyNotes({
+        facts,
+        policy,
+        rows,
+        timeZone: 'UTC',
+        locale: 'en',
+        walkUpsUrl: '/people?added=table',
+      });
       const html = renderToStaticMarkup(
         createElement(SettingForms, {
           rows,
@@ -317,7 +324,14 @@ describe('the settings form', () => {
         facts: await readPrivacyFacts(tx),
         policy: await readNamePolicy(tx.leagues),
       }));
-      const notes = privacyNotes({ facts, policy, rows, timeZone: 'UTC', locale: 'en' });
+      const notes = privacyNotes({
+        facts,
+        policy,
+        rows,
+        timeZone: 'UTC',
+        locale: 'en',
+        walkUpsUrl: '/people?added=table',
+      });
       return renderToStaticMarkup(
         createElement(SettingForms, {
           rows,

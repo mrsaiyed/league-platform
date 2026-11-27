@@ -8,3 +8,6 @@ export const detailsAnchor = 'details';
 
 /** "Remove from the league list" on a person's page, where its refusal is said. */
 export const removeAnchor = 'remove';
+
+/** "Show as" on a person's page (step 2.146), where "Saved" or its refusal is said. */
+export const showAsAnchor = 'show-as';

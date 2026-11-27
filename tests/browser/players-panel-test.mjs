@@ -11,7 +11,8 @@
 //   away on a phone) and, picking starters at 390 x 664, both teams are in reach; both
 //   lineups are set; #12 scores and shows on the tile, the log and the public game page;
 //   another device asking the game's rosters sees the added players; #14's number is
-//   corrected after three plays and shows on the tile, the log and the public page; a
+//   corrected after three plays and shows on the tile, the log and the public page (there by
+//   first name and last initial only: a walk-up of unknown age is shown as a child, S-136); a
 //   take-off is not offered for a league's own player, nor for one with plays, and the
 //   reason is said.
 // - The same with the network off, in a season whose numbers are unique: the adds and the
@@ -475,12 +476,12 @@ async function withSignal(browser) {
       const shown = await until(
         page,
         async () => (lastPublic = await publicWords(browser, origin)),
-        (t) => /#45 Sam Walker/.test(t),
-        'the public page never showed #45 Sam Walker',
+        (t) => /#45 Sam W\./.test(t),
+        'the public page never showed #45 Sam W.',
       ).catch(() => null);
       note(
-        "the walk-on's corrected number reaches the public game page, the old one gone",
-        shown !== null && !/#44\b/.test(shown),
+        "the walk-on's corrected number reaches the public game page, the old one gone, shown as a child's (S-136)",
+        shown !== null && !/#44\b/.test(shown) && !/Walker/.test(shown),
         shown?.slice(0, 300) ?? `timed out: ${lastPublic.slice(0, 300)}`,
       );
       note(

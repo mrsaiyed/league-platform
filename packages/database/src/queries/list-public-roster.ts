@@ -6,7 +6,7 @@
 import { publicRosterLine, type PublicDisplay, type PublicRoster } from '@srleagues/core';
 import { sql } from 'kysely';
 import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
-import { isMinorSql } from './minor-by-age-sql.ts';
+import { isMinorSql, walkUpOfUnknownAgeSql } from './minor-by-age-sql.ts';
 
 export async function listPublicRoster(
   scope: LeagueScope,
@@ -45,6 +45,7 @@ export async function listPublicRoster(
       'people.last_name as last_name',
       // R-28: worked out here, so the birth date never leaves the database.
       isMinorSql().as('is_minor'),
+      walkUpOfUnknownAgeSql().as('walk_up'),
       'people.visibility as visibility',
       'people.deleted_at as person_deleted_at',
     ])
@@ -71,6 +72,7 @@ export async function listPublicRoster(
           firstName: row.first_name,
           lastName: row.last_name,
           isMinor: row.is_minor,
+          ...(row.walk_up === true ? { walkUp: true as const } : {}),
           nameRequest: row.visibility,
           personBinned: row.person_deleted_at !== null,
         },

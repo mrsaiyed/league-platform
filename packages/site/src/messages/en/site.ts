@@ -338,6 +338,8 @@ export const enSite = {
     'A statistic not recorded in every game is averaged over the games where it was.',
   'stats.by.average': 'Per game',
   'stats.by.total': 'Season totals',
+  // A player whose name the league hides (R-24) or never recorded (S-34), by number.
+  'stats.byNumber': '#{number}',
   'stats.col.games': 'GP',
   'stats.col.gamesFull': 'Games played',
   // A leaders board's games: those its statistic was recorded in (S-63; step 2.199).
@@ -399,8 +401,6 @@ export const enSite = {
   'stats.title': 'Statistics',
   'stats.unnamedPlayer': 'A player (name not shown)',
   'team.allTeams': 'All teams',
-  // A child the league shows by number only (R-24).
-  'team.byNumber': '#{number}',
   'team.clearMine': 'Stop using this as my team',
   'team.isMine': 'This is your team on this device.',
   'team.jersey': 'Number',

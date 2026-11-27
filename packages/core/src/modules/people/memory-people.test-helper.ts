@@ -9,13 +9,18 @@ import {
 import type { ActivityEntry, Grant } from '../access/index.ts';
 import type { Audience } from '../leagues/index.ts';
 import type { PeopleTx, PersonRecord, PersonSensitiveFields } from './ports.ts';
-import { isMinorOn } from './rules/minor-by-age.ts';
+import { isMinorOn, tickedButGrownOn, walkUpOfUnknownAgeOn } from './rules/minor-by-age.ts';
 
 /** A stored person: the record, and the sensitive fields kept beside it. */
 export type StoredPerson = Omit<PersonRecord, 'sensitive'> & {
   sensitiveFields: PersonSensitiveFields;
   onRoster: boolean;
+  /** Whether a roster place of theirs was added at a scorer's table (S-136); false if absent. */
+  addedAtTable?: boolean;
 };
+
+const walkUpOf = (p: StoredPerson): boolean =>
+  walkUpOfUnknownAgeOn(p.sensitiveFields, { addedAtTable: p.addedAtTable === true });
 
 export type MemoryPeople = {
   status: string;
@@ -87,7 +92,9 @@ export function memoryPeople(state: Partial<MemoryPeople> = {}) {
       visibility: p.visibility,
       binned: p.binned,
       version: p.version,
-      ...(sensitive ? { sensitive: { ...p.sensitiveFields } } : {}),
+      ...(sensitive
+        ? { sensitive: { ...p.sensitiveFields, ...(walkUpOf(p) ? { walkUp: true as const } : {}) } }
+        : {}),
     });
     return {
       jobs,
@@ -107,11 +114,13 @@ export function memoryPeople(state: Partial<MemoryPeople> = {}) {
           const found = s.people.find((p) => p.id === id);
           return found === undefined ? undefined : view(found, sensitive);
         },
-        list: async ({ search, limit, offset, sensitive }) => {
+        list: async ({ search, limit, offset, sensitive, tickedButGrown, walkUps }) => {
           if (sensitive) s.sensitiveReads += 1;
           const needle = search?.toLowerCase();
           return s.people
             .filter((p) => !p.binned)
+            .filter((p) => tickedButGrown !== true || tickedButGrownOn(p.sensitiveFields, s.today))
+            .filter((p) => walkUps !== true || walkUpOf(p))
             .filter(
               (p) =>
                 needle === undefined ||
@@ -174,10 +183,13 @@ export function memoryPeople(state: Partial<MemoryPeople> = {}) {
         },
         isOnRoster: async (id) => s.people.find((p) => p.id === id)?.onRoster === true,
         leagueAudience: async () => s.audience,
-        // R-28 on the league's today: as the database works it out in SQL.
+        // R-28 on the league's today: as the database works it out in SQL. No one is added
+        // at a scorer's table in this world (S-136).
         isMinor: async (id) => {
           const p = s.people.find((x) => x.id === id);
-          return p === undefined ? true : isMinorOn(p.sensitiveFields, s.today);
+          return p === undefined
+            ? true
+            : isMinorOn(p.sensitiveFields, s.today, { addedAtTable: false });
         },
         leagueToday: async () => s.today,
         leagueSettingRows: async (key) =>
@@ -187,7 +199,10 @@ export function memoryPeople(state: Partial<MemoryPeople> = {}) {
         // T-403: one stand-in transaction at a time here, so the lock holds nothing.
         lockLeague: async () => undefined,
         hasRecordedChild: async () =>
-          s.people.some((p) => !p.binned && isMinorOn(p.sensitiveFields, s.today) === true),
+          s.people.some(
+            (p) =>
+              !p.binned && isMinorOn(p.sensitiveFields, s.today, { addedAtTable: false }) === true,
+          ),
         clearLeagueSetting: async (key, version) => {
           if (!Object.hasOwn(s.settings, key) || version !== 1) return false;
           delete s.settings[key];

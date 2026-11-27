@@ -40,7 +40,7 @@ import { offTheLeagueList, putBackOffer } from './put-back-offer.ts';
 import { FindPersonForm } from './find-person-form.tsx';
 import { pickOf, pickQuery } from './person-pick.ts';
 import { saidOnLine } from './said-on-line.ts';
-import { numbersWornTwice, rosterName } from './roster-name.ts';
+import { numbersWornTwice, rosterName, showAsOf } from './roster-name.ts';
 import {
   addNewPersonAction,
   addFromListAction,
@@ -349,6 +349,12 @@ export async function TeamPage({
                       <a href={personUrl(line.personId)}>{nameOf(line)}</a>
                     )}
                   </strong>
+                  {showAsOf(line) === undefined ? null : (
+                    <span className="staff-quiet" data-show-as={line.nameRequest}>
+                      {' '}
+                      {showAsOf(line)}
+                    </span>
+                  )}
                   {line.needsReview === true ? (
                     <span data-flag="review"> {t('adminTeams.roster.toReview')}</span>
                   ) : null}

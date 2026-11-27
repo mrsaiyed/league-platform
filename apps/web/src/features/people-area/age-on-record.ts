@@ -41,7 +41,9 @@ export function childDisagreement(
   today: string,
 ): ChildDisagreement | undefined {
   if (details.birthDate === '') return undefined;
-  const byDate = isMinorOn({ birthDate: details.birthDate, isMinor: null }, today);
+  const byDate = isMinorOn({ birthDate: details.birthDate, isMinor: null }, today, {
+    addedAtTable: false,
+  });
   if (details.child === 'child' && byDate === false) return 'tick-keeps-child';
   if (details.child === 'adult' && byDate === true) return 'date-makes-child';
   return undefined;
@@ -61,7 +63,8 @@ export function unlikelyYears(birthDate: string, today: string): number | undefi
  * How the record says a person is treated, and because of what (R-28, R-15): by the date
  * of birth, by the choice, by both, or, where neither says, by who plays in the league (a
  * youth or mixed league shows someone whose age is not recorded as a child; an adult
- * league as an adult). Asked of core's isMinorOn alone, as everywhere.
+ * league as an adult), except someone added at a scorer's table with no age, a child in
+ * every league until an admin marks them (S-136 as amended in step 2.146's fix round). Asked of core's isMinorOn alone, as everywhere.
  */
 export type Treatment =
   | 'child-by-both'
@@ -69,13 +72,19 @@ export type Treatment =
   | 'child-by-choice'
   | 'child-by-choice-over-date'
   | 'child-not-recorded'
+  | 'child-walk-up'
   | 'adult-by-both'
   | 'adult-by-date'
   | 'adult-by-choice'
   | 'adult-not-recorded';
 
 export function treatmentOf(
-  details: { readonly birthDate: string; readonly child: '' | 'child' | 'adult' },
+  details: {
+    readonly birthDate: string;
+    readonly child: '' | 'child' | 'adult';
+    /** Added at a scorer's table with no age (S-136): a child until marked, in any league. */
+    readonly walkUp?: true;
+  },
   /** The league's own today, yyyy-mm-dd. */
   today: string,
   audience: 'adult' | 'youth' | 'mixed',
@@ -83,12 +92,13 @@ export function treatmentOf(
   const byDate =
     details.birthDate === ''
       ? null
-      : isMinorOn({ birthDate: details.birthDate, isMinor: null }, today);
+      : isMinorOn({ birthDate: details.birthDate, isMinor: null }, today, { addedAtTable: false });
   const choice = details.child;
   if (byDate === true) return choice === 'child' ? 'child-by-both' : 'child-by-date';
   if (choice === 'child') return byDate === false ? 'child-by-choice-over-date' : 'child-by-choice';
   if (byDate === false) return choice === 'adult' ? 'adult-by-both' : 'adult-by-date';
   if (choice === 'adult') return 'adult-by-choice';
+  if (details.walkUp === true) return 'child-walk-up';
   return audience === 'adult' ? 'adult-not-recorded' : 'child-not-recorded';
 }
 

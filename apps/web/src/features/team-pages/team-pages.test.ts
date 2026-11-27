@@ -247,16 +247,20 @@ describe('a team page', () => {
     );
     // The players by number; since step 2.162 hidden is followed for adults too (R-29), so
     // their coach, a grown-up with no number, is a nameless entry.
+    // The number is printed once, in the number column: never again as the name (2.146).
     expect(roster.current.map((r) => [r.number, r.name])).toEqual([
-      ['6', '#6'],
-      ['13', '#13'],
+      ['6', 'Name not shown'],
+      ['13', 'Name not shown'],
       ['', 'Name not shown'],
     ]);
-    expect(roster.former.map((r) => r.name)).toEqual([expect.stringMatching(/^#1 \(left /)]);
+    expect(roster.former.map((r) => [r.number, r.name])).toEqual([
+      ['1', expect.stringMatching(/^Name not shown \(left /)],
+    ]);
+    expect(JSON.stringify(roster)).not.toMatch(/#\d/);
     expect(JSON.stringify(roster)).not.toMatch(/Noor|Haddad|Jay|Whitaker|Tess|Moreno|Lena|Ortiz/);
   });
 
-  it('shows a player added at the scorer’s table by number only as "#12" (S-34)', () => {
+  it('shows a player added at the scorer’s table by number only by that number, once (S-34)', () => {
     const line = (entryId: string, jerseyNumber: string | null, firstName = '') =>
       publicRosterLine(
         {
@@ -277,7 +281,7 @@ describe('a team page', () => {
       lines: [line('a', '12'), line('b', '7', 'Yusuf'), line('c', null)],
     });
     expect(roster.current.map((r) => [r.number, r.name])).toEqual([
-      ['12', '#12'],
+      ['12', 'Name not shown'],
       ['7', 'Yusuf'],
       // No name and no number cannot be added at the table; were it there, it is nameless.
       ['', 'Name not shown'],

@@ -15,6 +15,13 @@ export interface PersonForDisplay {
   /** Null when the league does not know (it never asked for a date of birth). */
   readonly isMinor: boolean | null;
   readonly nameRequest: NameRequest;
+  /**
+   * Present, and true, only for a player added at a scorer's table with no age
+   * (walkUpOfUnknownAgeOn, S-136): shown as a child whatever the league's confirmation
+   * says, and by an initial alone where only one name was typed. An admin marking them
+   * (adult, child or a date) ends it, so the caller no longer gives it.
+   */
+  readonly walkUp?: true;
 }
 
 export interface WhereShown {
@@ -81,8 +88,14 @@ export function showName(person: PersonForDisplay, where: WhereShown): ShownName
   // R-24, R-29: the league's choice, followed for every player.
   let form = formOf(where.policy.names);
   // R-14: a child in full only once the admin has confirmed it; anything but a plain
-  // true counts as not confirmed.
-  if (shownAsChild(person.isMinor, where.audience) && where.policy.childrenInFull !== true) {
+  // true counts as not confirmed. S-136: the parents' confirmation never covers a
+  // walk-up of unknown age (nobody knows whose parents agreed), so they are shown as a
+  // child whatever it says, until an admin marks them.
+  const walkUp = person.walkUp === true;
+  if (
+    walkUp ||
+    (shownAsChild(person.isMinor, where.audience) && where.policy.childrenInFull !== true)
+  ) {
     form = lesser(form, 'first_last_initial');
   }
   // R-15, R-25: a recorded request for initials takes effect, but never shows more
@@ -92,7 +105,16 @@ export function showName(person: PersonForDisplay, where: WhereShown): ShownName
     case 'full':
       return { shown: true, text: [first, last].filter(Boolean).join(' ') };
     case 'first_last_initial': {
-      const text = first === '' ? initial(last) : last === '' ? first : `${first} ${initial(last)}`;
+      // S-136: a walk-up typed as one word ("Walkington") may be a surname alone, so it is
+      // shown by its initial only; a name typed in two parts keeps its first name.
+      const text =
+        first === ''
+          ? initial(last)
+          : last === ''
+            ? walkUp
+              ? initial(first)
+              : first
+            : `${first} ${initial(last)}`;
       return { shown: true, text };
     }
     case 'initials':
@@ -100,4 +122,19 @@ export function showName(person: PersonForDisplay, where: WhereShown): ShownName
     case 'hidden':
       return { shown: false, why: 'hidden' };
   }
+}
+
+/**
+ * The jersey number a line shows in place of the name `showName` withheld, as "#12" with
+ * the team (R-24, S-34): only for a name the league hides or one never recorded. A person
+ * who asked to be taken off (R-17) stays a nameless line, and a team whose numbers this
+ * viewer may not see shows nothing at all. Null when there is no number to show.
+ */
+export function numberInPlace(
+  shown: ShownName,
+  jerseyNumber: string | null | undefined,
+): string | null {
+  if (shown.shown || (shown.why !== 'hidden' && shown.why !== 'no_name')) return null;
+  const number = (jerseyNumber ?? '').trim();
+  return number === '' ? null : number;
 }

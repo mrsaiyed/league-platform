@@ -11,7 +11,7 @@ import {
   type PeopleTx,
   type PersonRecord,
 } from '@srleagues/core';
-import { rosterName } from '../teams-area/index.ts';
+import { rosterName, showAsOf } from '../teams-area/index.ts';
 
 /** How many people one page of the list shows. */
 export const peoplePageSize = 50;
@@ -31,6 +31,16 @@ export type PeopleAsk = {
   readonly emailRefused: boolean;
   /** The page, from 1. */
   readonly page: number;
+  /**
+   * Only people ticked as children who are 18 or over by birth date (`?ticked=grown`, step
+   * 2.146): the database works it out, so no date reaches the page.
+   */
+  readonly tickedButGrown: boolean;
+  /**
+   * Only people added at a scorer's table with no age recorded (`?added=table`, S-136 as
+   * amended in step 2.146's fix round), shown as children until an admin marks them.
+   */
+  readonly walkUps: boolean;
 };
 
 export function peopleAskOf(query: Query): PeopleAsk {
@@ -41,6 +51,8 @@ export function peopleAskOf(query: Query): PeopleAsk {
     search: typed === '' || emailRefused ? undefined : typed,
     emailRefused,
     page: Number.isInteger(page) && page >= 1 && page <= 10_000 ? page : 1,
+    tickedButGrown: only(query['ticked']) === 'grown',
+    walkUps: only(query['added']) === 'table',
   };
 }
 
@@ -48,10 +60,16 @@ export function peopleAskOf(query: Query): PeopleAsk {
  * One line of the list: who, and nothing else. The list holds names only, for every role:
  * a person's private details are on their own record, for a role that may see them.
  */
-export type PeopleRow = { readonly id: string; readonly name: string };
+export type PeopleRow = {
+  readonly id: string;
+  readonly name: string;
+  /** "Show as: initials" or "Show as: removed" beside the recorded name (R-33); else absent. */
+  readonly showAs?: string;
+};
 
 export function peopleRowOf(person: PersonRecord): PeopleRow {
-  return { id: person.id, name: rosterName(person) };
+  const showAs = showAsOf({ nameRequest: person.visibility });
+  return { id: person.id, name: rosterName(person), ...(showAs === undefined ? {} : { showAs }) };
 }
 
 export type PeopleList =
@@ -70,6 +88,8 @@ export async function readPeopleList(
       ...(ask.search === undefined ? {} : { search: ask.search }),
       limit: peoplePageSize + 1,
       offset: (ask.page - 1) * peoplePageSize,
+      tickedButGrown: ask.tickedButGrown,
+      walkUps: ask.walkUps,
     },
     deps,
   );
@@ -89,6 +109,11 @@ export type PrivateDetails = {
   readonly contactEmail: string;
   readonly birthDate: string;
   readonly child: ChildChoice;
+  /**
+   * Present only for someone shown as a child because they were added at a scorer's table
+   * with no age (S-136): the record says so, and marking them in either way ends it.
+   */
+  readonly walkUp?: true;
 };
 
 /** One person's record as their page draws it. */
@@ -122,6 +147,7 @@ export function personViewOf(person: PersonRecord): PersonView {
       contactEmail: sensitive.contactEmail ?? '',
       birthDate: sensitive.birthDate ?? '',
       child: sensitive.isMinor === null ? '' : sensitive.isMinor ? 'child' : 'adult',
+      ...(sensitive.walkUp === true ? { walkUp: true as const } : {}),
     },
   };
 }

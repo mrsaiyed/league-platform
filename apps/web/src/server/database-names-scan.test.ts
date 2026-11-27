@@ -295,10 +295,18 @@ async function scan(
   const absent = (first: string) => also.absentFromStats?.includes(first) === true;
   // The statistics page, by each player's points: the seed gave place p 10 + 4p. A player
   // of a team whose statistics are its staff's only is not on it at all.
+  // A name the league hides is the player's own number with the team (R-24, step 2.146):
+  // the seed gives place p the number 4 + p (seed-season-under-way.ts).
+  const unnamed = (shown: ShownName, place: number) =>
+    shown.shown
+      ? shown.text
+      : shown.why === 'hidden'
+        ? `#${4 + place}`
+        : 'A player (name not shown)';
   for (const { person, place, shown } of want) {
     const cell = pages.byPoints.get(10 + 4 * place);
     expect(cell, `${slug} ${setting} place ${place}`).toBe(
-      absent(person.firstName) ? undefined : shown.shown ? shown.text : 'A player (name not shown)',
+      absent(person.firstName) ? undefined : unnamed(shown, place),
     );
   }
   // The rosters show every name the rules give, and none other; the leaders only those.
@@ -309,8 +317,11 @@ async function scan(
       .map((s) => (s.shown ? s.text : null))
       .sort(),
   );
+  const leaderWords = want
+    .filter((w) => !absent(w.person.firstName))
+    .map((w) => unnamed(w.shown, w.place));
   for (const name of pages.leaderNames) {
-    expect([...shownNames, 'A player (name not shown)']).toContain(name);
+    expect([...shownNames, ...leaderWords]).toContain(name);
   }
   // A player of a staff-only team: that team's page shows its totals only, no player line.
   for (const { person, shown } of want.filter((w) => absent(w.person.firstName))) {

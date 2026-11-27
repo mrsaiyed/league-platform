@@ -12,6 +12,11 @@ export type PersonSensitiveFields = {
   readonly birthDate: string | null;
   /** Null when the league does not know. */
   readonly isMinor: boolean | null;
+  /**
+   * Present, and true, only for someone who counts as a child because they were added at
+   * a scorer's table with no age (walkUpOfUnknownAgeOn, S-136): their record says why.
+   */
+  readonly walkUp?: true;
 };
 
 /**
@@ -59,6 +64,17 @@ export type PeopleSearch = {
   readonly offset: number;
   /** Whether the sensitive columns are selected at all. */
   readonly sensitive: boolean;
+  /**
+   * Only people ticked as children whose birth date makes them 18 or over (tickedButGrownOn),
+   * worked out where the dates are kept; asked only together with `sensitive`.
+   */
+  readonly tickedButGrown?: boolean;
+  /**
+   * Only people added at a scorer's table with no birth date and no tick
+   * (walkUpOfUnknownAgeOn, S-136), worked out where the dates are kept; asked only together
+   * with `sensitive`.
+   */
+  readonly walkUps?: boolean;
 };
 
 export type PeopleStore = {

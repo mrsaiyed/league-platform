@@ -185,9 +185,17 @@ export const enError = {
     'That person is still on a roster. Mark them as having left their team first, then take them off the list.',
   'error.people.set_name_request.initials-not-offered':
     'This league does not offer initials for adults, so nothing was changed. You can still choose "removed" to take their name off the public pages.',
+  'error.people.set_name_request.league-archived':
+    'This league is archived, so this setting can only be changed to show less.',
+  'error.people.set_name_request.league-suspended':
+    'This league is suspended, so this setting can only be changed to show less.',
   'error.people.set_name_request.person-not-found': 'That person is not in the league list.',
   'error.people.update_person.changed-since-read':
     'Someone else changed this person’s details while you were looking. What you typed is still here; check it against theirs and save again.',
+  'error.people.update_person.league-archived':
+    'This league is archived, so a person’s details, "An adult" or "A child" included, cannot be changed.',
+  'error.people.update_person.league-suspended':
+    'This league is suspended, so a person’s details, "An adult" or "A child" included, cannot be changed.',
   'error.people.update_person.person-not-found': 'That person is not in the league list.',
   'error.people.update_person.sensitive-fields-not-allowed':
     'You are not allowed to change those details.',

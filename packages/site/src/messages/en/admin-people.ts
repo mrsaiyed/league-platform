@@ -98,6 +98,24 @@ export const enAdminPeople = {
   'adminPeople.search.noEmail':
     'Search by a name. An email address is not searched here, so that it never ends up in the page’s address.',
   'adminPeople.search.submit': 'Search',
+  // "Show as" on a person's record (step 2.146, R-23): what they or their guardian asked
+  // for about their name on public pages, with why; beside the recorded name in the lists.
+  'adminPeople.showAs.body':
+    'When a player or their parent or guardian asks for less of their name on public pages, record it here. Removed keeps their numbers, without a name, so team totals still add up.',
+  'adminPeople.showAs.choice.initials': 'Initials',
+  'adminPeople.showAs.choice.none': 'As the league shows everyone',
+  'adminPeople.showAs.choice.removed': 'Removed from public pages',
+  'adminPeople.showAs.label': 'Show as',
+  'adminPeople.showAs.list.initials': 'Show as: initials',
+  'adminPeople.showAs.list.removed': 'Show as: removed',
+  'adminPeople.showAs.reason.choose': 'Choose why',
+  'adminPeople.showAs.reason.guardianAsked': 'A parent or guardian asked',
+  'adminPeople.showAs.reason.label': 'Why',
+  'adminPeople.showAs.reason.leagueDecided': 'The league decided',
+  'adminPeople.showAs.reason.personAsked': 'They asked',
+  'adminPeople.showAs.saved': 'Saved: how {name} is shown on public pages.',
+  'adminPeople.showAs.submit': 'Save Show as',
+  'adminPeople.showAs.title': 'Show as',
   'adminPeople.sub':
     'Everyone in the league, on a team or not. Find someone, fix their details or add someone new.',
   'adminPeople.teams.add': 'Add to a team',
@@ -112,6 +130,10 @@ export const enAdminPeople = {
   'adminPeople.teams.on': 'On {team}',
   'adminPeople.teams.public': 'Its public page',
   'adminPeople.teams.title': 'Teams',
+  'adminPeople.tickedGrown.link': 'Ticked as children, 18 or over',
+  'adminPeople.tickedGrown.none': 'No one ticked as a child is 18 or over by their birth date.',
+  'adminPeople.tickedGrown.on':
+    'Showing only people ticked as children whose birth date makes them 18 or over. Open a record to untick them.',
   'adminPeople.treated.adultByBoth':
     'Treated as an adult: the date of birth and the choice both say so.',
   'adminPeople.treated.adultByChoice': 'Treated as an adult, because they are marked as an adult.',
@@ -123,6 +145,16 @@ export const enAdminPeople = {
   'adminPeople.treated.childByChoice': 'Treated as a child, because they are marked as a child.',
   'adminPeople.treated.childNotRecorded':
     'Treated as a child: nothing records their age, and in this league anyone whose age is not recorded is shown as a child.',
+  // S-136 as amended in step 2.146's fix round: why a walk-up is shown as a child.
+  'adminPeople.treated.childWalkUp':
+    'Treated as a child: they were added at the scorer’s table and nothing records their age. Choose “An adult” or “A child”, or give a date of birth, and this no longer applies.',
+  'adminPeople.walkUps.link': 'Added at the scorer’s table, age not recorded',
+  'adminPeople.walkUps.none': 'No one added at the scorer’s table is without a recorded age.',
+  'adminPeople.walkUps.on':
+    'Showing only people added at the scorer’s table with no date of birth and no child-or-adult choice. They are shown as children until you open a record and mark them.',
+  'adminPeople.wholeName.check':
+    '“{first}” in the first-name box looks like a whole name. Put the last name in its own box; if this is the first name as it is, tick the box and save again.',
+  'adminPeople.wholeName.checked': 'Yes, this is the first name',
   'adminPeople.wrong.birthDate': 'Type a real date of birth: not after today, and not before 1900.',
   'adminPeople.wrong.contactEmail': 'Type a whole email address, such as name@example.com.',
   'adminPeople.wrong.firstName': 'Type a first name, up to 100 letters.',

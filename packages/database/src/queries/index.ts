@@ -7,6 +7,7 @@ export { findCurrentLeague, type CurrentLeague } from './find-current-league.ts'
 export { findLeagueAudience } from './find-league-audience.ts';
 export { findLeagueContactEmail } from './find-league-contact-email.ts';
 export { hasRecordedChild } from './has-recorded-child.ts';
+export { hasWalkUpOfUnknownAge } from './has-walk-up-of-unknown-age.ts';
 export { lockLeagueRow } from './lock-league-row.ts';
 export { findCourt } from './find-court.ts';
 export { findPlaceGames } from './find-place-games.ts';

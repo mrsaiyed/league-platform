@@ -18,6 +18,7 @@ import {
   findPerson,
   findPersonIsMinor,
   hasRecordedChild,
+  hasWalkUpOfUnknownAge,
   lockLeagueRow,
   insertPerson,
   isPersonOnRoster,
@@ -118,27 +119,49 @@ registerIsolationCase({
 });
 
 /**
- * Step 2.224, part 3: in another league's runs the scope's own people are first marked
- * adults with no birth date (in the run's rolled-back transaction, where the fence lets
- * it), so the target's child (the seed's) is the only one anywhere and only the query's
- * league filter keeps the answer "no". In the target's own runs nothing is changed.
+ * In another league's runs, `change` is made to the scope's own people first (in the
+ * run's rolled-back transaction, inside a savepoint, where the fence lets it), so only
+ * the target's rows could make the answer "yes" and only the query's league filter keeps
+ * it "no". In the target's own runs nothing is changed.
  */
-async function noChildInOwnLeague(scope: LeagueScope, target: LeagueRecords) {
+async function setOwnPeopleApart(
+  scope: LeagueScope,
+  target: LeagueRecords,
+  change: { readonly is_minor: boolean; readonly birth_date?: null },
+  onlyUnknownAge: boolean,
+) {
   if (scope.leagueId === target.leagueId) return;
   const trx = transactionOf(scope);
-  await sql`savepoint no_child_here`.execute(trx);
+  await sql`savepoint own_people_apart`.execute(trx);
   try {
-    await trx
-      .updateTable('people')
-      .set({ is_minor: false, birth_date: null })
-      .where('league_id', '=', scope.leagueId)
-      .execute();
-    await sql`release savepoint no_child_here`.execute(trx);
+    let update = trx.updateTable('people').set(change).where('league_id', '=', scope.leagueId);
+    if (onlyUnknownAge) {
+      update = update.where('birth_date', 'is', null).where('is_minor', 'is', null);
+    }
+    await update.execute();
+    await sql`release savepoint own_people_apart`.execute(trx);
   } catch (error) {
     // Rolled back, then thrown: the case must not go on quietly in a weaker form.
-    await sql`rollback to savepoint no_child_here`.execute(trx);
+    await sql`rollback to savepoint own_people_apart`.execute(trx);
     throw error;
   }
+}
+
+/**
+ * Step 2.224, part 3: the scope's own people are marked adults with no birth date, so the
+ * target's child (the seed's) is the only one anywhere.
+ */
+function noChildInOwnLeague(scope: LeagueScope, target: LeagueRecords) {
+  return setOwnPeopleApart(scope, target, { is_minor: false, birth_date: null }, false);
+}
+
+/**
+ * Step 2.146: every league of the harness holds a walk-up of unknown age (`walkUpPersonId`:
+ * no date, no tick, a roster place added at a scorer's table). The scope's own people of
+ * unknown age are ticked adults, so the target's walk-up is the only one anywhere.
+ */
+function noWalkUpInOwnLeague(scope: LeagueScope, target: LeagueRecords) {
+  return setOwnPeopleApart(scope, target, { is_minor: false }, true);
 }
 
 registerIsolationCase({
@@ -147,6 +170,15 @@ registerIsolationCase({
   run: async (scope, target) => {
     await noChildInOwnLeague(scope, target);
     return hasRecordedChild(scope);
+  },
+});
+
+registerIsolationCase({
+  subject: hasWalkUpOfUnknownAge,
+  name: "ask whether anyone in the scope's league is a walk-up with no age (S-136)",
+  run: async (scope, target) => {
+    await noWalkUpInOwnLeague(scope, target);
+    return hasWalkUpOfUnknownAge(scope);
   },
 });
 

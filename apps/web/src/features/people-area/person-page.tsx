@@ -9,6 +9,7 @@
 // other role they are not read, so they are neither drawn nor in the page's data.
 import {
   leagueUrl,
+  nameRequestReasons,
   nameRequests,
   publicViewer,
   showName,
@@ -25,12 +26,14 @@ import { t } from '../../server/messages.ts';
 import { requestTokenField } from '../../server/same-request.ts';
 import { noticeHolderOf, savedNoticesHere } from '../../server/saved-notice.ts';
 import { StaffTrail } from '../staff/index.ts';
-import { removePersonAction, savePersonAction } from './actions.ts';
+import { removePersonAction, savePersonAction, setNameRequestAction } from './actions.ts';
 import { treatedAsChild, treatmentOf, type Treatment } from './age-on-record.ts';
-import { addPersonAnchor, detailsAnchor, removeAnchor } from './anchors.ts';
+import { addPersonAnchor, detailsAnchor, removeAnchor, showAsAnchor } from './anchors.ts';
 import { personFormWords } from './form-words.ts';
 import { readPerson, type PersonView } from './people-view.ts';
 import { PersonForm } from './person-form.tsx';
+import { NameRequestForm } from './name-request-form.tsx';
+import { showAsChoicesFor } from './name-request.ts';
 import { RemoveForm } from './remove-form.tsx';
 import { addToRosterAction } from '../teams-area/index.ts';
 import { currentTeams, currentTeamsByPerson } from './teams-of-people.ts';
@@ -127,6 +130,44 @@ export async function PersonPage({
             </a>
           </p>
         ) : null}
+      </section>
+
+      <section id={showAsAnchor} className="staff-panel admin-team-part" data-show-as="true">
+        <h2>{t('adminPeople.showAs.title')}</h2>
+        <p className="staff-quiet">{t('adminPeople.showAs.body')}</p>
+        {/* Drawn afresh once a save changes the request, so it starts on the one kept now
+            (a select keeps what it showed while only its starting value changes). */}
+        <NameRequestForm
+          key={`${requestOf(person.visibility)}-${person.version}`}
+          action={setNameRequestAction}
+          permalink={`${pageUrl}#${showAsAnchor}`}
+          hidden={{
+            league: here.slug,
+            personId: person.id,
+            version: String(person.version),
+            [requestTokenField]: crypto.randomUUID(),
+          }}
+          current={requestOf(person.visibility)}
+          saved={
+            notice?.said === 'showAsSaved' && notice.thing === person.id
+              ? t('adminPeople.showAs.saved', { name: person.name })
+              : undefined
+          }
+          words={{
+            showAs: t('adminPeople.showAs.label'),
+            choices: showAsChoicesFor(requestOf(person.visibility), here.status).map((value) => ({
+              value,
+              label: t(`adminPeople.showAs.choice.${value}`),
+            })),
+            reason: t('adminPeople.showAs.reason.label'),
+            chooseReason: t('adminPeople.showAs.reason.choose'),
+            reasons: nameRequestReasons.map((value) => ({
+              value,
+              label: t(`adminPeople.showAs.reason.${value}`),
+            })),
+            submit: t('adminPeople.showAs.submit'),
+          }}
+        />
       </section>
 
       <section className="staff-panel admin-team-part" data-person-teams="true">
@@ -228,6 +269,7 @@ const treatedText: Readonly<Record<Treatment, () => string>> = {
   'child-by-choice': () => t('adminPeople.treated.childByChoice'),
   'child-by-choice-over-date': () => t('adminPeople.field.childByTick'),
   'child-not-recorded': () => t('adminPeople.treated.childNotRecorded'),
+  'child-walk-up': () => t('adminPeople.treated.childWalkUp'),
   'adult-by-both': () => t('adminPeople.treated.adultByBoth'),
   'adult-by-date': () => t('adminPeople.treated.adultByDate'),
   'adult-by-choice': () => t('adminPeople.treated.adultByChoice'),
@@ -258,6 +300,7 @@ function treatmentLineOf(
       lastName: person.lastName,
       isMinor: treatedAsChild(treatment),
       nameRequest: requestOf(person.visibility),
+      ...(details.walkUp === true ? { walkUp: true as const } : {}),
     },
     {
       audience: league.audience,

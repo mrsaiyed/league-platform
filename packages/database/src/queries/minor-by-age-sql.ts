@@ -5,11 +5,13 @@
 // the "minor" tick is on or their birth date says so (under 18 on the league's own today,
 // in its time zone, by the database's clock); a date that says adult unticks no one; a
 // date that cannot be read against the league's today (its league row not found) counts
-// as a child; with no date, the tick, and with no tick "not known". Its test runs core's
-// cases through both and finds the same answers.
+// as a child; with no date, the tick, and with no tick "not known", except for a player
+// typed in at a scorer's table (a roster place with `added_at_game_id`), who counts as a
+// child until an admin says otherwise (S-136). Its test runs core's cases through both and
+// finds the same answers.
 //
-// The expression reads `people.birth_date`, `people.is_minor` and `people.league_id`, so it
-// is used in a query whose people table is named `people`. Built here, run by the queries
+// The expression reads `people.birth_date`, `people.is_minor`, `people.league_id` and
+// `people.id`, so it is used in a query whose people table is named `people`. Built here, run by the queries
 // that select it (list-public-roster.ts, list-people-for-display.ts, has-recorded-child.ts,
 // find-person-is-minor.ts).
 import { adultAge } from '@srleagues/core';
@@ -23,15 +25,59 @@ const leagueTodayOfPerson: RawBuilder<string> = sql<string>`(
 )`;
 
 /**
+ * Whether the `people` row is ticked as a child though their birth date makes them 18 or
+ * over on `today` (core's tickedButGrownOn): a yes or a no, never the date.
+ */
+export function tickedButGrownSql(
+  today: RawBuilder<string> = leagueTodayOfPerson,
+): RawBuilder<boolean> {
+  return sql<boolean>`(people.is_minor is true and people.birth_date is not null and coalesce(
+    people.birth_date <= (${today} - make_interval(years => ${sql.lit(adultAge)}))::date,
+    false
+  ))`;
+}
+
+/** Whether any roster place of the person was added at a scorer's table (MinorOrigin). */
+const addedAtTableOfPerson: RawBuilder<boolean> = sql<boolean>`exists (
+  select 1
+    from roster_entries as table_entry
+   where table_entry.league_id = people.league_id
+     and table_entry.person_id = people.id
+     and table_entry.added_at_game_id is not null
+)`;
+
+/**
+ * Whether the `people` row counts as a child only because a roster place of theirs was
+ * added at a scorer's table with no age: no birth date and the tick neither on nor off
+ * (core's walkUpOfUnknownAgeOn, S-136 as amended in step 2.146's fix round). A yes or a no.
+ */
+export function walkUpOfUnknownAgeSql(): RawBuilder<boolean> {
+  return sql<boolean>`(people.birth_date is null and people.is_minor is null and ${addedAtTableOfPerson})`;
+}
+
+/**
+ * What only what is recorded says (the date or the tick), with nobody counted a child for
+ * having been added at a scorer's table: whether the league has a recorded child (S-109).
+ */
+export const recordedOnly: RawBuilder<boolean> = sql<boolean>`false`;
+
+/**
  * True, false or null for the `people` row in the query, on `today` (a date expression;
- * the person's league's own today unless a test gives another). By date, a child while
+ * the person's league's own today unless a test gives another) and with `addedAtTable`
+ * (whether a roster place of theirs was added at a scorer's table, read from
+ * `roster_entries` unless the caller gives `recordedOnly` or a test gives another). By date, a child while
  * their 18th birthday is after today: born after the day 18 years before today, which is
  * 28 February when today is 29 February, so a 29 February child stays one until 1 March.
  * A comparison that gives no answer (no today) is a child's: the careful reading.
  */
 export function isMinorSql(
-  today: RawBuilder<string> = leagueTodayOfPerson,
+  given: {
+    readonly today?: RawBuilder<string>;
+    readonly addedAtTable?: RawBuilder<boolean>;
+  } = {},
 ): RawBuilder<boolean | null> {
+  const today = given.today ?? leagueTodayOfPerson;
+  const addedAtTable = given.addedAtTable ?? addedAtTableOfPerson;
   return sql<boolean | null>`(case
     when people.is_minor is true then true
     when people.birth_date is not null
@@ -39,6 +85,8 @@ export function isMinorSql(
         people.birth_date > (${today} - make_interval(years => ${sql.lit(adultAge)}))::date,
         true
       )
-    else people.is_minor
+    when people.is_minor is false then false
+    when ${addedAtTable} then true
+    else null
   end)`;
 }

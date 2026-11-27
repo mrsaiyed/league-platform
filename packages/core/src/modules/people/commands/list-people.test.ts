@@ -90,4 +90,60 @@ describe('listPeople', () => {
     const found = await listPeople(as(ownerId), { search: 'o’neill' }, deps);
     expect(found.ok && found.value.map((p) => p.lastName)).toEqual(["O'Neill"]);
   });
+
+  // Step 2.146 (fix round, Low 1): the two finders read whether someone counts as a child,
+  // which is private (R-16). A screen that asks without the private fields gets no one,
+  // whatever the store would answer: this fails if list-people.ts's guard is taken out.
+  it('gives no one to either finder when the private fields are not read', async () => {
+    const { db, deps, as } = setUp({
+      people: [
+        person(5, {
+          sensitiveFields: { contactEmail: null, birthDate: '1990-01-02', isMinor: true },
+        }),
+        person(6, {
+          sensitiveFields: { contactEmail: null, birthDate: null, isMinor: null },
+          addedAtTable: true,
+        }),
+      ],
+    });
+    for (const finder of [{ tickedButGrown: true }, { walkUps: true }]) {
+      expect(await listPeople(as(ownerId), { ...finder, privateFields: false }, deps)).toEqual({
+        ok: true,
+        value: [],
+      });
+    }
+    expect(db.state.sensitiveReads).toBe(0);
+    const ids = async (input: object) => {
+      const result = await listPeople(as(registrarId), input, deps);
+      return result.ok ? result.value.map((p) => p.id) : [];
+    };
+    expect(await ids({ tickedButGrown: true })).toEqual([person(5).id]);
+    expect(await ids({ walkUps: true })).toEqual([person(6).id]);
+  });
+
+  it("says on a walk-up's own record why they count as a child, until an admin marks them", async () => {
+    const walkUp = (isMinor: boolean | null, birthDate: string | null = null) =>
+      setUp({
+        people: [
+          person(6, {
+            sensitiveFields: { contactEmail: null, birthDate, isMinor },
+            addedAtTable: true,
+          }),
+        ],
+      });
+    const read = async (state: ReturnType<typeof walkUp>) => {
+      const result = await listPeople(as0(state), { walkUps: true }, state.deps);
+      const all = await listPeople(as0(state), {}, state.deps);
+      return {
+        listed: result.ok ? result.value.length : -1,
+        marked: all.ok ? all.value[0]?.sensitive?.walkUp === true : false,
+      };
+    };
+    const as0 = (state: ReturnType<typeof walkUp>) => state.as(ownerId);
+    expect(await read(walkUp(null))).toEqual({ listed: 1, marked: true });
+    // "An adult", "a child" or a date: the walk-up rule no longer applies to them.
+    expect(await read(walkUp(false))).toEqual({ listed: 0, marked: false });
+    expect(await read(walkUp(true))).toEqual({ listed: 0, marked: false });
+    expect(await read(walkUp(null, '1990-01-02'))).toEqual({ listed: 0, marked: false });
+  });
 });

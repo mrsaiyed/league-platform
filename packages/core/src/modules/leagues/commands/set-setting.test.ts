@@ -563,6 +563,17 @@ describe('"children in full" in an adult league (S-109, T-402)', () => {
     expect(m.db.state.activity).toEqual([]);
   });
 
+  // S-136 as amended (step 2.146's closing round): the confirmation never covers a walk-up
+  // of unknown age, so an adult league whose only children are walk-ups is not given it.
+  it('refuses the yes in an adult league whose only children are walk-ups with no age', async () => {
+    const m = memoryLeagues({ audience: 'adult', recordedChild: false, walkUpOfUnknownAge: true });
+    expect(await setSetting(m.as(ownerId), yes, m.deps)).toEqual({
+      ok: false,
+      error: { code: 'no-child-recorded' },
+    });
+    expect(m.db.state.settings).toEqual([]);
+  });
+
   it('takes the yes once a child is recorded, and in a league for children', async () => {
     for (const m of [league('adult', true), league('youth', false), league('mixed', false)]) {
       expect(await setSetting(m.as(ownerId), yes, m.deps)).toMatchObject({ ok: true });

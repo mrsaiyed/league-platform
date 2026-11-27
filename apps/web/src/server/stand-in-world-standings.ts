@@ -25,7 +25,7 @@ import {
   standInNamesOf,
   standInStatusVersion,
 } from './stand-in-league-states.ts';
-import { minorAt } from './stand-in-world-clock.ts';
+import { minorAt, recordedOnly, walkUpIn } from './stand-in-world-clock.ts';
 import { newId } from './stand-in-world-ids.ts';
 import {
   copyWorldSeasonSetup,
@@ -266,9 +266,17 @@ function standingsReadOver(s: ReadWorld | undefined, moment: Date): StandingsRea
           .filter((r) => teams.has(r.teamId))
           .map((r) => `${r.personId}|${r.teamId}`),
       ];
+      // The roster place's number, a current place's first, as the query takes it.
+      const numbers = new Map<string, string>();
+      for (const r of [...(at()?.roster ?? [])].sort(
+        (a, b) => (a.leftOn === null ? 1 : 0) - (b.leftOn === null ? 1 : 0),
+      )) {
+        const number = (r.jerseyNumber ?? '').trim();
+        if (teams.has(r.teamId) && number !== '') numbers.set(`${r.personId}|${r.teamId}`, number);
+      }
       return [...new Set(links)].sort().map((link) => {
         const [personId = '', teamId = ''] = link.split('|');
-        return { personId, teamId };
+        return { personId, teamId, jerseyNumber: numbers.get(link) ?? null };
       });
     },
     decidedGamesOf: async (seasonId, personIds) => {
@@ -388,7 +396,8 @@ function standingsReadOver(s: ReadWorld | undefined, moment: Date): StandingsRea
           firstName: p.firstName,
           lastName: p.lastName,
           // R-28: the birth date or the tick (list-people-for-display.ts).
-          isMinor: minorAt(p, s?.timeZone ?? 'UTC', moment),
+          isMinor: minorAt(p, s?.timeZone ?? 'UTC', moment, s?.roster ?? []),
+          ...(walkUpIn(p, s?.roster ?? []) ? { walkUp: true as const } : {}),
           visibility: p.visibility,
         })),
   };
@@ -465,7 +474,8 @@ export function worldLeaguesStores(
     // T-403: the stand-in runs one save at a time, so the lock holds nothing.
     lockLeague: async () => undefined,
     hasRecordedChild: async () =>
-      s.people.some((p) => !p.binned && minorAt(p, s.timeZone, now()) === true),
+      s.people.some((p) => !p.binned && minorAt(p, s.timeZone, now(), recordedOnly) === true),
+    hasWalkUpOfUnknownAge: async () => s.people.some((p) => !p.binned && walkUpIn(p, s.roster)),
     // The permission check asks who the league is and whether it may be changed.
     currentLeague: async () => {
       const status = await access.leagueStatus();

@@ -9,6 +9,7 @@ function store(
   values: Readonly<Record<string, unknown>>,
   audience: Audience = 'adult',
   recordedChild = false,
+  walkUpOfUnknownAge = false,
 ): SiteFactsStore {
   return {
     settingRows: async (key) => {
@@ -23,6 +24,7 @@ function store(
     },
     leagueAudience: async () => audience,
     hasRecordedChild: async () => recordedChild,
+    hasWalkUpOfUnknownAge: async () => walkUpOfUnknownAge,
   };
 }
 
@@ -70,6 +72,13 @@ describe('readSiteFacts (step 2.60, U-10, U-18)', () => {
       doNotIndex: true,
     });
     expect(childrenKeepOutOfSearch('adult', true)).toBe(true);
+  });
+
+  // S-136, step 2.146's closing round: a walk-up of unknown age is shown as a child.
+  it('keeps an adult league with a walk-up of unknown age out of search, whatever it chose', async () => {
+    expect(
+      await readSiteFacts(store({ [siteDoNotIndex.key]: false }, 'adult', false, true)),
+    ).toEqual({ notice: '', doNotIndex: true });
   });
 
   it('leaves an adult league with no recorded child to its own setting', async () => {

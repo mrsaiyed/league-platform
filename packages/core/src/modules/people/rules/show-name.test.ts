@@ -7,7 +7,7 @@ import {
   type NamePolicy,
   type NameRequest,
 } from './name-policy.ts';
-import { showName, type PersonForDisplay, type ShownName } from './show-name.ts';
+import { numberInPlace, showName, type PersonForDisplay, type ShownName } from './show-name.ts';
 import { statsVisibilities, type TeamStatsSetting } from './stats-shown.ts';
 import { publicViewer, type Viewer } from './viewer.ts';
 
@@ -302,6 +302,49 @@ describe('showName: every combination of policy, setting and viewer', () => {
   });
 });
 
+describe('showName: a walk-up of unknown age (S-136)', () => {
+  const walkUp = (overrides: Partial<PersonForDisplay> = {}) =>
+    person({ isMinor: true, walkUp: true, ...overrides });
+
+  it("is shown as a child whatever the league's confirmation says, in every league", () => {
+    for (const audience of audiences) {
+      expect(showName(walkUp(), where(audience, confirmedFull)), audience).toEqual(
+        named('Amina Y.'),
+      );
+      // A recorded child with the same confirmation is shown in full: only the walk-up is held.
+      expect(showName(person({ isMinor: true }), where(audience, confirmedFull))).toEqual(
+        named('Amina Yusuf'),
+      );
+    }
+  });
+
+  it('never shows more than the league chooses or the person asked for', () => {
+    expect(showName(walkUp(), where('adult', { names: 'hidden' }))).toEqual({
+      shown: false,
+      why: 'hidden',
+    });
+    expect(showName(walkUp({ nameRequest: 'initials' }), where('adult', confirmedFull))).toEqual(
+      named('A. Y.'),
+    );
+  });
+
+  it('shows a name typed as one word by its initial only; two parts keep the first name', () => {
+    const one = walkUp({ firstName: 'Walkington', lastName: '' });
+    expect(showName(one, where('adult', confirmedFull))).toEqual(named('W.'));
+    expect(showName(one, where('youth', adultStart))).toEqual(named('W.'));
+    expect(showName(walkUp({ firstName: '', lastName: 'Walkington' }), where('adult'))).toEqual(
+      named('W.'),
+    );
+    // "Underhill, Quill": typed in two parts, unchanged.
+    const two = walkUp({ firstName: 'Quill', lastName: 'Underhill' });
+    expect(showName(two, where('adult', confirmedFull))).toEqual(named('Quill U.'));
+    // A recorded child typed as one word keeps that word, as before.
+    expect(
+      showName(person({ isMinor: true, firstName: 'Walkington', lastName: '' }), where('adult')),
+    ).toEqual(named('Walkington'));
+  });
+});
+
 describe('showName: fails closed on values it does not know', () => {
   it('counts an isMinor that is neither true nor false as not known', () => {
     for (const odd of ['true', 'false', 0, 1, undefined, 'yes']) {
@@ -344,5 +387,17 @@ describe('showName: fails closed on values it does not know', () => {
       shown: false,
       why: 'restricted',
     });
+  });
+});
+
+describe('numberInPlace: the number a line shows for a name not shown (R-24, S-34)', () => {
+  it('gives the number only for a hidden name or none recorded', () => {
+    expect(numberInPlace({ shown: false, why: 'hidden' }, '12')).toBe('12');
+    expect(numberInPlace({ shown: false, why: 'no_name' }, ' 7 ')).toBe('7');
+    expect(numberInPlace({ shown: false, why: 'removed' }, '12')).toBeNull();
+    expect(numberInPlace({ shown: false, why: 'restricted' }, '12')).toBeNull();
+    expect(numberInPlace({ shown: true, text: 'Noor H.' }, '12')).toBeNull();
+    expect(numberInPlace({ shown: false, why: 'hidden' }, null)).toBeNull();
+    expect(numberInPlace({ shown: false, why: 'hidden' }, ' ')).toBeNull();
   });
 });

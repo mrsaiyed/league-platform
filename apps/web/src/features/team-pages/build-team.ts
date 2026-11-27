@@ -30,7 +30,7 @@ import {
   hasResult,
   type GameView,
 } from '../schedule-pages/index.ts';
-import { statLabel } from '../stats-pages/index.ts';
+import { playerNameText, statLabel } from '../stats-pages/index.ts';
 
 export type TeamCard = {
   readonly slug: string;
@@ -127,15 +127,10 @@ function dayText(day: string): string {
 }
 
 function nameText(line: PublicRosterLine): string {
-  // A child the league hides (R-24), and a player added at the scorer's table by number
-  // only, who has no name at all (S-34), are shown by their number, like "#12"; with no
-  // number, as a removed person is.
-  const byNumber = !line.name.shown && (line.name.why === 'hidden' || line.name.why === 'no_name');
-  const name = line.name.shown
-    ? line.name.text
-    : byNumber && line.jerseyNumber !== null && line.jerseyNumber !== ''
-      ? t('team.byNumber', { number: line.jerseyNumber })
-      : t('team.nameNotShown');
+  // A name not shown is a nameless entry. A child the league hides (R-24), or a player
+  // added at the scorer's table by number only (S-34), is told apart by the number in the
+  // roster's own number column, printed there once, never again as the name.
+  const name = line.name.shown ? line.name.text : t('team.nameNotShown');
   return line.leftOn === null ? name : t('team.nameLeft', { name, date: dayText(line.leftOn) });
 }
 
@@ -263,7 +258,7 @@ export async function loadTeamStats(
   const playerRows: StatRow[] = players.map((player, index) => ({
     id: `player-${index}`,
     cells: {
-      player: player.name.text ?? t('stats.unnamedPlayer'),
+      player: playerNameText(player.name),
       games: player.gamesPlayed,
       ...Object.fromEntries(
         table.value.statKeys.map((key) => {

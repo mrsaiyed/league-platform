@@ -13,7 +13,8 @@ import type {
   TeamRecord,
   TeamsStore,
 } from '@srleagues/core';
-import { dayIn, minorAt } from './stand-in-world-clock.ts';
+import { tickedButGrownOn } from '@srleagues/core';
+import { dayIn, minorAt, recordedOnly, walkUpIn } from './stand-in-world-clock.ts';
 import { newId } from './stand-in-world-ids.ts';
 import { uniqueJerseysOf } from './stand-in-world-games.ts';
 import { replacedAt } from './stand-in-world-rows.ts';
@@ -130,6 +131,7 @@ export function worldTeamsStore(s: LeagueWorld, now: () => Date): TeamsStore {
             lastName: p?.lastName ?? '',
             publicName: p?.publicName ?? null,
             needsReview: e.needsReview,
+            nameRequest: p?.visibility ?? 'none',
           };
         }),
     addRosterEntry: async (e) => {
@@ -198,9 +200,11 @@ export function worldTeamsStore(s: LeagueWorld, now: () => Date): TeamsStore {
   };
 }
 
-const shown = (p: WorldPerson, sensitive: boolean): PersonRecord => {
+const shown = (p: WorldPerson, sensitive: boolean, roster: LeagueWorld['roster']): PersonRecord => {
   const { sensitive: kept, accountId: _account, ...plain } = p;
-  return sensitive ? { ...plain, sensitive: kept } : plain;
+  // S-136: a walk-up with no age is told apart on their record, as find-person.ts does.
+  const walkUp = walkUpIn(p, roster) ? { walkUp: true as const } : {};
+  return sensitive ? { ...plain, sensitive: { ...kept, ...walkUp } } : plain;
 };
 
 /** The people store over one league's world; `now` is the world's one clock (stand-in-world.ts). */
@@ -208,29 +212,35 @@ export function worldPeopleStore(s: LeagueWorld, now: () => Date): PeopleStore {
   return {
     find: async (id, sensitive) => {
       const p = s.people.find((x) => x.id === id);
-      return p === undefined ? undefined : shown(p, sensitive);
+      return p === undefined ? undefined : shown(p, sensitive, s.roster);
     },
-    list: async ({ search, limit, offset, sensitive }) => {
+    list: async ({ search, limit, offset, sensitive, tickedButGrown, walkUps }) => {
       const needle = search?.toLowerCase();
-      return s.people
-        .filter((p) => !p.binned)
-        .filter(
-          (p) =>
-            needle === undefined ||
-            `${p.firstName} ${p.lastName}\n${p.publicName ?? ''}`
-              .toLowerCase()
-              .replace(/[\u2018\u2019]/g, "'")
-              .includes(needle),
-        )
-        .sort(
-          (a, b) =>
-            // Without regard to capitals, as the database's lower() order.
-            a.lastName.toLowerCase().localeCompare(b.lastName.toLowerCase()) ||
-            a.firstName.toLowerCase().localeCompare(b.firstName.toLowerCase()) ||
-            a.id.localeCompare(b.id),
-        )
-        .slice(offset, offset + limit)
-        .map((p) => shown(p, sensitive));
+      const today = dayIn(now(), s.timeZone);
+      return (
+        s.people
+          .filter((p) => !p.binned)
+          // Step 2.146: by core's one rule, as list-people.ts asks the database.
+          .filter((p) => tickedButGrown !== true || tickedButGrownOn(p.sensitive, today))
+          .filter((p) => walkUps !== true || walkUpIn(p, s.roster))
+          .filter(
+            (p) =>
+              needle === undefined ||
+              `${p.firstName} ${p.lastName}\n${p.publicName ?? ''}`
+                .toLowerCase()
+                .replace(/[\u2018\u2019]/g, "'")
+                .includes(needle),
+          )
+          .sort(
+            (a, b) =>
+              // Without regard to capitals, as the database's lower() order.
+              a.lastName.toLowerCase().localeCompare(b.lastName.toLowerCase()) ||
+              a.firstName.toLowerCase().localeCompare(b.firstName.toLowerCase()) ||
+              a.id.localeCompare(b.id),
+          )
+          .slice(offset, offset + limit)
+          .map((p) => shown(p, sensitive, s.roster))
+      );
     },
     create: async (p) => {
       const id = newId();
@@ -286,7 +296,7 @@ export function worldPeopleStore(s: LeagueWorld, now: () => Date): PeopleStore {
     // R-28 on the league's own today, by the world's one clock (find-person-is-minor.ts).
     isMinor: async (personId) => {
       const p = s.people.find((x) => x.id === personId);
-      return p === undefined ? true : minorAt(p, s.timeZone, now());
+      return p === undefined ? true : minorAt(p, s.timeZone, now(), s.roster);
     },
     // The league's today in its own zone, by the world's one clock (as the teams store's).
     leagueToday: async () => dayIn(now(), s.timeZone),
@@ -298,7 +308,7 @@ export function worldPeopleStore(s: LeagueWorld, now: () => Date): PeopleStore {
     // T-403: the stand-in runs one save at a time, so the lock holds nothing.
     lockLeague: async () => undefined,
     hasRecordedChild: async () =>
-      s.people.some((p) => !p.binned && minorAt(p, s.timeZone, now()) === true),
+      s.people.some((p) => !p.binned && minorAt(p, s.timeZone, now(), recordedOnly) === true),
     clearLeagueSetting: async (key, version) => {
       const before = s.settings.length;
       s.settings = s.settings.filter(

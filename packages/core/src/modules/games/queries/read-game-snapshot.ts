@@ -201,6 +201,7 @@ export async function readGameSnapshot(
         lastName: person.lastName,
         isMinor: person.isMinor,
         nameRequest: person.visibility as 'none' | 'initials' | 'removed',
+        ...(person.walkUp === true ? { walkUp: true as const } : {}),
       },
       {
         audience: viewing.audience,

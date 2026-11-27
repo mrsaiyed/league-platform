@@ -11,7 +11,13 @@ import { startingNamePolicy } from '../../server/name-policy-of.ts';
 import { standInPublicStats } from '../../server/stand-in-public-stats.ts';
 import { testWorld } from '../../server/stand-in-world.test-helper.ts';
 import { buildStandingsViews } from './build-standings.ts';
-import { loadStatsPage, parseBy, statLabel, type StatsPageData } from './build-stats.ts';
+import {
+  loadStatsPage,
+  parseBy,
+  playerNameText,
+  statLabel,
+  type StatsPageData,
+} from './build-stats.ts';
 import { chooseSeason } from './choose-season.ts';
 import { StandingsTables } from './standings-page.tsx';
 import { StatsTables, StatsTablesPart } from './stats-page.tsx';
@@ -651,5 +657,13 @@ describe('the staff request on the statistics page (step 2.46)', () => {
     expect(sent(['Owls'])).toContain(staffAddress);
     // A hidden team with nothing recorded is not in the totals note: no trace of the request.
     expect(sent([])).toBe(JSON.stringify('tables'));
+  });
+});
+
+describe('a statistics line whose name is not shown (R-17, R-24, S-34)', () => {
+  it('reads as the player number where core gives one, else as a nameless player', () => {
+    expect(playerNameText({ text: 'Noor H.', number: null })).toBe('Noor H.');
+    expect(playerNameText({ text: null, number: '12' })).toBe('#12');
+    expect(playerNameText({ text: null, number: null })).toBe('A player (name not shown)');
   });
 });

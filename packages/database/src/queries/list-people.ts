@@ -9,14 +9,20 @@ import {
   personSummary,
   personSummaryWithSensitive,
   publicPersonColumns,
+  walkUpColumn,
   type PersonSummary,
 } from './person-summary.ts';
+import { tickedButGrownSql, walkUpOfUnknownAgeSql } from './minor-by-age-sql.ts';
 
 export type PeopleSearchRow = {
   search?: string;
   limit: number;
   offset: number;
   sensitive: boolean;
+  /** Only people ticked as children and 18 or over by birth date, worked out here (step 2.146). */
+  tickedButGrown?: boolean;
+  /** Only people added at a scorer's table with no age, worked out here (S-136). */
+  walkUps?: boolean;
 };
 
 /** Makes `%`, `_` and `\` in what someone typed match themselves. */
@@ -27,7 +33,7 @@ const plain = "''";
 
 export async function listPeople(
   scope: LeagueScope,
-  { search, limit, offset, sensitive }: PeopleSearchRow,
+  { search, limit, offset, sensitive, tickedButGrown, walkUps }: PeopleSearchRow,
 ): Promise<PersonSummary[]> {
   const pattern = search === undefined ? undefined : likePattern(search);
   const base = transactionOf(scope)
@@ -35,6 +41,8 @@ export async function listPeople(
     .where('league_id', '=', scope.leagueId)
     .where('deleted_at', 'is', null)
     .where('merged_into_id', 'is', null)
+    .$if(tickedButGrown === true, (q) => q.where(tickedButGrownSql()))
+    .$if(walkUps === true, (q) => q.where(walkUpOfUnknownAgeSql()))
     .$if(pattern !== undefined, (q) =>
       q.where((eb) =>
         eb.or([
@@ -53,7 +61,9 @@ export async function listPeople(
     .limit(limit)
     .offset(offset);
   if (sensitive) {
-    return (await base.select(allPersonColumns).execute()).map(personSummaryWithSensitive);
+    return (await base.select([...allPersonColumns, walkUpColumn]).execute()).map(
+      personSummaryWithSensitive,
+    );
   }
   return (await base.select(publicPersonColumns).execute()).map(personSummary);
 }

@@ -82,6 +82,8 @@ export async function PeoplePage({
       area,
       query: {
         ...(ask.search === undefined ? {} : { q: ask.search }),
+        ...(ask.tickedButGrown ? { ticked: 'grown' } : {}),
+        ...(ask.walkUps ? { added: 'table' } : {}),
         ...(page === 1 ? {} : { page: String(page) }),
       },
     });
@@ -148,6 +150,39 @@ export async function PeoplePage({
             {t('adminPeople.search.noEmail')}
           </p>
         ) : null}
+        {/* Step 2.146: who is ticked as a child but 18 or over by birth date, to untick, and
+            (S-136 as amended in its fix round) who was added at a scorer's table with no age,
+            shown as a child until marked. Ages are private (R-16): offered only to a role
+            that may see them. */}
+        {!mayEnterPrivate ? null : ask.tickedButGrown || ask.walkUps ? (
+          <p
+            className="ui-notice"
+            role="status"
+            data-finder={ask.tickedButGrown ? 'ticked-grown' : 'walk-ups'}
+          >
+            {t(ask.tickedButGrown ? 'adminPeople.tickedGrown.on' : 'adminPeople.walkUps.on')}{' '}
+            <a href={listUrl}>{t('adminPeople.search.clear')}</a>
+          </p>
+        ) : (
+          <p className="staff-buttons">
+            <a
+              className="ui-button"
+              data-kind="quiet"
+              data-finder="ticked-grown"
+              href={leagueUrl(here, 'admin-area', { area, query: { ticked: 'grown' } })}
+            >
+              {t('adminPeople.tickedGrown.link')}
+            </a>
+            <a
+              className="ui-button"
+              data-kind="quiet"
+              data-finder="walk-ups"
+              href={leagueUrl(here, 'admin-area', { area, query: { added: 'table' } })}
+            >
+              {t('adminPeople.walkUps.link')}
+            </a>
+          </p>
+        )}
       </section>
 
       <List
@@ -199,6 +234,12 @@ function List({
   // A read that fails is said as such, never drawn as an empty league.
   if (!list.ok) return <StaffNotice kind="refused">{t('adminPeople.readFailed')}</StaffNotice>;
   if (list.rows.length === 0) {
+    if (ask.tickedButGrown && ask.page === 1) {
+      return <EmptyPanel text={t('adminPeople.tickedGrown.none')} />;
+    }
+    if (ask.walkUps && ask.page === 1) {
+      return <EmptyPanel text={t('adminPeople.walkUps.none')} />;
+    }
     return ask.search === undefined && ask.page === 1 ? (
       <EmptyPanel
         text={t('adminPeople.empty')}
@@ -262,6 +303,11 @@ function List({
               >
                 {person.name}
               </a>
+              {person.showAs === undefined ? null : (
+                <span className="staff-quiet" data-show-as-of={person.id}>
+                  {person.showAs}
+                </span>
+              )}
               <span className="staff-quiet" data-teams-of={person.id}>
                 {teamsLineOf(teamsByPerson.get(person.id))}
               </span>

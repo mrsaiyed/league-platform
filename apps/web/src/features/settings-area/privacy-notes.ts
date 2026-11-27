@@ -15,6 +15,8 @@ import type { TextKey } from '../../server/messages.ts';
 export type Line = {
   readonly key: TextKey;
   readonly params?: Readonly<Record<string, string | number>>;
+  /** A link after the sentence: its address and its words. */
+  readonly link?: { readonly href: string; readonly key: TextKey };
 };
 
 /** What the settings form draws around the settings it draws from their declarations. */
@@ -38,6 +40,10 @@ export type PrivacyInput = {
   /** The league's time zone, so the date of the confirmation is the league's date. */
   readonly timeZone: string;
   readonly locale: string;
+  /** Who gave the parents' confirmation, from the activity log, where it is known. */
+  readonly confirmedBy?: string | undefined;
+  /** Admin → People's list of walk-ups with no age (`?added=table`, S-136). */
+  readonly walkUpsUrl: string;
 };
 
 function nowLine(policy: NamePolicy): Line {
@@ -58,6 +64,32 @@ export function privacyNotes(input: PrivacyInput): SettingNotes {
   const area: Line[] = [{ key: `adminSettings.privacy.intro.${facts.audience}` }, nowLine(policy)];
   // Right under "Now", so an owner who sees a coach by initial learns why (R-15).
   if (facts.audience !== 'adult') area.push({ key: 'adminSettings.privacy.unknownAge' });
+  // S-136 as amended in step 2.146's fix and closing rounds: walk-ups with no age are shown
+  // as children whatever the confirmation says, and keep the site out of search, until an
+  // admin marks them, in every league; the list of them is one tap away.
+  if (facts.hasWalkUpOfUnknownAge) {
+    area.push({
+      key: 'adminSettings.privacy.walkUps',
+      link: { href: input.walkUpsUrl, key: 'adminSettings.privacy.walkUps.link' },
+    });
+  }
+  // Someone the confirmation would cover: a recorded child. Never a walk-up with no age
+  // (S-136, step 2.146's closing round): the line above speaks for them.
+  const hasChild = facts.hasRecordedChild;
+  // Where adults show in full and children do not (step 2.146): in an adult league with
+  // children, that the difference itself tells who is a child, and that "first name and
+  // last initial" for everyone avoids it; wherever children are about, that the day a name
+  // turns full tells an 18th birthday.
+  const splitByAge =
+    policy.names === 'full_name' &&
+    policy.childrenInFull !== true &&
+    (facts.audience !== 'adult' || hasChild);
+  if (splitByAge && facts.audience === 'adult') {
+    area.push({ key: 'adminSettings.privacy.adultWithChildren' });
+  }
+  if (splitByAge) area.push({ key: 'adminSettings.privacy.birthdayTells' });
+  // True since "Show as" is on the person's record (step 2.146, R-23).
+  area.push({ key: 'adminSettings.privacy.onePerson' });
   if (given && policy.names !== 'full_name') {
     area.push({ key: 'adminSettings.privacy.keptNoEffect' });
   }
@@ -66,11 +98,17 @@ export function privacyNotes(input: PrivacyInput): SettingNotes {
       dateStyle: 'long',
       timeZone: input.timeZone,
     }).format(new Date(row.savedAt));
-    area.push({ key: 'adminSettings.privacy.confirmedOn', params: { date } });
+    area.push(
+      input.confirmedBy === undefined
+        ? { key: 'adminSettings.privacy.confirmedOn', params: { date } }
+        : { key: 'adminSettings.privacy.confirmedOnBy', params: { date, name: input.confirmedBy } },
+    );
   }
-  // An adult league with nobody recorded as a child has nothing to confirm, unless a
-  // confirmation is already stored: then it stays on screen so it can be taken back.
-  const adultWithoutChildren = facts.audience === 'adult' && !facts.hasRecordedChild;
+  // An adult league with nobody it would cover has nothing to confirm, and the
+  // confirmation means something only under full names (step 2.146): elsewhere it is not
+  // offered, unless one is already stored: then it stays on screen so it can be taken back.
+  const adultWithoutChildren = facts.audience === 'adult' && !hasChild;
+  const offered = (!adultWithoutChildren && policy.names === 'full_name') || given;
   const before: Line[] =
     facts.audience !== 'adult'
       ? [{ key: 'adminSettings.privacy.confirm.youthOrMixed' }]
@@ -79,6 +117,6 @@ export function privacyNotes(input: PrivacyInput): SettingNotes {
         : [{ key: 'adminSettings.privacy.confirm.adultWithChildren' }];
   return {
     area: { privacy: area },
-    rows: { [confirmationKey]: { before, offered: !adultWithoutChildren || given } },
+    rows: { [confirmationKey]: { before, offered } },
   };
 }

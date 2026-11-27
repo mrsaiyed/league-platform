@@ -79,6 +79,22 @@ describe('treatmentOf', () => {
     expect(treatmentOf({ birthDate: '', child: 'adult' }, today, 'youth')).toBe('adult-by-choice');
     expect(treatmentOf({ birthDate: '', child: '' }, today, 'adult')).toBe('adult-not-recorded');
   });
+  // S-136 as amended in step 2.146's fix round: the record of a walk-up with no age says why
+  // they are shown as a child, in an adult league too, until an admin marks them.
+  it('says a walk-up with no age is a child for being added at the scorer’s table', () => {
+    for (const audience of ['adult', 'youth', 'mixed'] as const) {
+      expect(treatmentOf({ birthDate: '', child: '', walkUp: true }, today, audience)).toBe(
+        'child-walk-up',
+      );
+    }
+    expect(treatmentOf({ birthDate: '', child: 'adult', walkUp: true }, today, 'adult')).toBe(
+      'adult-by-choice',
+    );
+    expect(treatmentOf({ birthDate: adult, child: '', walkUp: true }, today, 'adult')).toBe(
+      'adult-by-date',
+    );
+    expect(treatedAsChild('child-walk-up')).toBe(true);
+  });
   it('turns 18 on the birthday itself, on the league’s today', () => {
     expect(treatmentOf({ birthDate: '2008-11-17', child: '' }, today, 'youth')).toBe(
       'adult-by-date',

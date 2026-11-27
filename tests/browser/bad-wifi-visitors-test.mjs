@@ -39,7 +39,8 @@
 //
 // At the end the score and box score on the screen and the box score folded from the
 // server's plays must equal the one counted from the script, the added players included,
-// and the server must hold each added player with the number and name typed.
+// and the server must hold each added player with the number and name typed: the admin's
+// roster screen shows the name in full, the scorer's roster as a child's (S-136).
 //
 // BAD_WIFI_SEED=<n> replays a run's cuts (printed first; the browser's timing still varies);
 // a failing run prints the seed and the order of events, BAD_WIFI_EVENTS=1 a passing one's
@@ -98,6 +99,15 @@ const added = [
   [30, 'Di', 'Own'],
 ];
 const twin = [8, 'Cy', 'Twin'];
+/**
+ * How the scorer's roster shows a player added at the table (S-136): with no age recorded
+ * they count as a child, first name and last initial, a one-word name by its initial alone.
+ */
+const asWalkUp = ([number, first, last]) => [
+  number,
+  last ? `${first} ${last[0]}.` : first ? `${first[0]}.` : '',
+  '',
+];
 /** The add the server refuses (step 2.242): the id the device gives it is not version 4. */
 const refusedAdd = { line: '77', name: 'Ry Refused', id: '018f0000-0000-7000-8000-000000000077' };
 
@@ -344,6 +354,7 @@ async function ownersRoster(browser, origin, teamPage) {
       lines: await open.count(),
       review: await open.filter({ has: page.locator('[data-flag="review"]') }).count(),
       clash: await open.filter({ has: page.locator('[data-flag="clash"]') }).count(),
+      texts: await open.allInnerTexts(),
     };
   } finally {
     await context.close();
@@ -841,9 +852,9 @@ async function oneGame(browser) {
           id: p.personId,
         }));
       const lines = atTable.map((p) => p.line).sort();
-      const wanted = [...added, twin].map((p) => p.join('|')).sort();
+      const wanted = [...added, twin].map((p) => asWalkUp(p).join('|')).sort();
       note(
-        'the server holds each added player with the number and name typed',
+        "the scorer's roster holds each added player with the number typed, the name as a child's (S-136)",
         JSON.stringify(lines) === JSON.stringify(wanted),
         JSON.stringify({ lines, wanted }),
       );
@@ -865,6 +876,12 @@ async function oneGame(browser) {
         "the league's roster screen marks the clash on both #8 for the admin, all seven to review (S-44)",
         roster.lines === 7 && roster.clash === 2 && roster.review === 7,
         JSON.stringify(roster),
+      );
+      const typed = [...added, twin].filter(([, first]) => first).map(([, f, l]) => `${f} ${l}`);
+      note(
+        "the server holds each added player with the name typed: the admin's roster screen shows each once, in full",
+        typed.every((name) => roster.texts.filter((t) => t.includes(name)).length === 1),
+        JSON.stringify({ typed, texts: roster.texts }),
       );
     });
 

@@ -1,9 +1,17 @@
 // The people module (T2 §3). Other modules and packages use only what is here.
-export { adultAge, isMinorOn, type MinorFacts } from './rules/minor-by-age.ts';
+export {
+  adultAge,
+  isMinorOn,
+  tickedButGrownOn,
+  walkUpOfUnknownAgeOn,
+  type MinorFacts,
+  type MinorOrigin,
+} from './rules/minor-by-age.ts';
 export {
   defaultNamePolicy,
   nameForms,
   nameRequests,
+  requestShowsLess,
   type NameForm,
   type NamePolicy,
   type NameRequest,
@@ -17,6 +25,7 @@ export {
   type PrivatePersonFields,
 } from './rules/private-field-scan.ts';
 export {
+  numberInPlace,
   showName,
   type PersonForDisplay,
   type ShownName,

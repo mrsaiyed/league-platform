@@ -105,11 +105,13 @@ describe('GET …/games/{game}/rosters', () => {
         addedAtGameId: games.hawksBears,
         toReview: true,
       },
+      // A walk-up with no age is shown as a child (S-136, step 2.146): the name the public
+      // sees, first name and last initial, whole in firstName (scoring-names.ts).
       {
         teamId: body.awayTeamId,
         personId: walkUp(2),
-        firstName: 'Yusuf',
-        lastName: 'Ali',
+        firstName: 'Yusuf A.',
+        lastName: '',
         jerseyNumber: null,
         left: false,
         addedAtGameId: games.hawksBears,

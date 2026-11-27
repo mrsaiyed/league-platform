@@ -24,6 +24,7 @@ import {
   listPeople,
   removePerson,
   restorePerson,
+  setNameRequest,
   updatePerson,
   type CommandContext,
 } from '@srleagues/core';
@@ -45,8 +46,10 @@ import {
 } from '../list-forms/form-state.ts';
 import { rosterName } from '../teams-area/index.ts';
 import { unlikelyYears } from './age-on-record.ts';
+import { wholeNameInFirst } from './whole-name.ts';
 import { peopleRefusalText } from './refusal-text.ts';
-import { detailsAnchor } from './anchors.ts';
+import { detailsAnchor, showAsAnchor } from './anchors.ts';
+import { nameRequestInputOf, nameRequestRefusalCode } from './name-request.ts';
 import {
   newPersonInput,
   onlyMadeUpEmailCode,
@@ -75,6 +78,8 @@ async function peopleOf(fields: TypedFields) {
   const { adminPeople, publicSchedule, testCopy } = await webPorts();
   return {
     context,
+    /** The league's state: an archived one takes only a change that shows less (R-26). */
+    leagueStatus: league.status,
     /** The test copy takes only a made-up contact email (step 2.205): from the ports. */
     testCopy,
     deps: adminPeople.deps,
@@ -144,6 +149,24 @@ async function showSaved(to: string): Promise<void> {
     return;
   }
   redirect(to);
+}
+
+/**
+ * A whole name typed into the first-name box (step 2.146) is asked about before saving:
+ * nothing is saved, the boxes keep what was typed, and a tick that holds the first name it
+ * was given for saves it as it is. Undefined when there is nothing to ask.
+ */
+function askAboutWholeName(fields: TypedFields): Refused | undefined {
+  const first = (fields['firstName'] ?? '').trim();
+  if (fields['wholeNameChecked'] === first) return undefined;
+  if (!wholeNameInFirst(first, fields['lastName'] ?? '')) return undefined;
+  return {
+    kind: 'refused',
+    code: 'whole-name-check',
+    typed: fields,
+    wrong: [],
+    said: t('adminPeople.wholeName.check', { first }),
+  };
 }
 
 /**
@@ -244,7 +267,10 @@ export async function addPersonAction(_state: FormState, form: FormData): Promis
   const wrong = wrongBoxes(fields, today);
   if (wrong.length > 0) return refused('create_person', 'invalid-input', fields, wrong);
   if (emailNotTakenHere(fields, testCopy)) return onlyMadeUpEmail(fields);
-  const ask = askAboutBirthDate(fields, today) ?? (await askAboutSameName(context, deps, fields));
+  const ask =
+    askAboutWholeName(fields) ??
+    askAboutBirthDate(fields, today) ??
+    (await askAboutSameName(context, deps, fields));
   if (ask !== undefined) return ask;
   const result = await requests().once(requestKeyOf(context, fields), async () => {
     const made = await createPerson(context, newPersonInput(fields), deps);
@@ -265,12 +291,15 @@ export async function addPersonAction(_state: FormState, form: FormData): Promis
 /** "Save details" on a person's page: saved, the page says so beside the details. */
 export async function savePersonAction(_state: FormState, form: FormData): Promise<FormState> {
   const fields = typedOf(form);
-  const { context, deps, list, record, leagueToday, testCopy } = await peopleOf(fields);
+  const { context, deps, list, record, leagueToday, testCopy, leagueStatus } =
+    await peopleOf(fields);
   const personId = (fields['personId'] ?? '').trim().toLowerCase();
   const today = await leagueToday();
   const wrong = wrongBoxes(fields, today);
   if (wrong.length > 0) return refused('update_person', 'invalid-input', fields, wrong);
   if (emailNotTakenHere(fields, testCopy)) return onlyMadeUpEmail(fields);
+  const wholeName = askAboutWholeName(fields);
+  if (wholeName !== undefined) return wholeName;
   // Asked only about a date that is changed: one already saved is not asked about again.
   const typedDate = (fields['birthDate'] ?? '').trim();
   if (typedDate !== '' && fields['birthDateChecked'] !== typedDate) {
@@ -286,12 +315,39 @@ export async function savePersonAction(_state: FormState, form: FormData): Promi
     const saved = await updatePerson(context, personChangeInput(fields), deps);
     return saved.ok
       ? { ok: true, personId, firstChild: saved.value.clearedChildrenInFull === true }
-      : { ok: false, code: saved.error.code };
+      : // An archived or suspended league says so, as "Show as" does (step 2.146, Low 11).
+        { ok: false, code: nameRequestRefusalCode(saved.error.code, leagueStatus) };
   });
   if (!result.ok) return refused('update_person', result.code, fields, []);
   if (!uuidShape.test(personId)) return redirect(list);
   leaveNotice(context, 'person', personId, result.firstChild ? 'saved.firstChild' : 'saved');
   await showSaved(`${record(personId)}#${detailsAnchor}`);
+  return untouched;
+}
+
+/**
+ * "Save Show as" on a person's page (R-23): the person's request about their name on
+ * public pages, with the reason from the fixed list. The command checks people.manage and
+ * the league's state again; a refusal in an archived league says why (R-26). Saved, the
+ * page says so beside the form.
+ */
+export async function setNameRequestAction(_state: FormState, form: FormData): Promise<FormState> {
+  const fields = typedOf(form);
+  const { context, deps, list, record, leagueStatus } = await peopleOf(fields);
+  const input = nameRequestInputOf(fields);
+  if (input === undefined || !uuidShape.test(input.personId)) {
+    return refused('set_name_request', 'invalid-input', fields, []);
+  }
+  const result = await requests().once(requestKeyOf(context, fields), async () => {
+    const saved = await setNameRequest(context, input, deps);
+    return saved.ok
+      ? { ok: true, personId: input.personId }
+      : { ok: false, code: nameRequestRefusalCode(saved.error.code, leagueStatus) };
+  });
+  if (!result.ok) return refused('set_name_request', result.code, fields, []);
+  if (!uuidShape.test(result.personId)) return redirect(list);
+  leaveNotice(context, 'person', result.personId, 'showAsSaved');
+  await showSaved(`${record(result.personId)}#${showAsAnchor}`);
   return untouched;
 }
 

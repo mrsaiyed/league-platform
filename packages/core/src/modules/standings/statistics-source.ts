@@ -6,6 +6,7 @@ import { seasonTotals, type CaptureMode, type StatsGame } from '@srleagues/sport
 import { statisticsKept } from '../games/index.ts';
 import type { Audience } from '../leagues/index.ts';
 import {
+  numberInPlace,
   showName,
   statsShown,
   type NamePolicy,
@@ -41,6 +42,13 @@ export type PlayerName = {
   /** Null when the person asked to be taken off, or no name was recorded. */
   readonly text: string | null;
   readonly hiddenBecause: 'removed' | 'no_name' | null;
+  /**
+   * The jersey number to show in its place, as "#12" with the team, when the league hides
+   * the name (R-24) or none was recorded (S-34): from the player's roster place with the
+   * team whose setting names them. Null when the name is shown, the person asked to be
+   * taken off (R-17), or there is no number.
+   */
+  readonly number: string | null;
 };
 
 export type VisiblePlayer = {
@@ -222,8 +230,11 @@ export async function statisticsSource(
     return setting !== undefined && statsShown(setting, viewing.viewer) === 'player_lines';
   };
   const teamsOf = new Map<string, string[]>();
+  const numbers = new Map<string, string>();
   for (const link of links) {
     teamsOf.set(link.personId, [...(teamsOf.get(link.personId) ?? []), link.teamId]);
+    const number = link.jerseyNumber ?? null;
+    if (number !== null) numbers.set(`${link.personId}|${link.teamId}`, number);
   }
   // A player with no known team is left out (fail closed). A player whose teams are all
   // shown keeps the stored totals. A player on both a shown and a hidden team has the
@@ -277,6 +288,7 @@ export async function statisticsSource(
               lastName: person.lastName,
               isMinor: person.isMinor,
               nameRequest: person.visibility as 'none' | 'initials' | 'removed',
+              ...(person.walkUp === true ? { walkUp: true as const } : {}),
             },
             {
               audience: viewing.audience,
@@ -287,14 +299,16 @@ export async function statisticsSource(
           );
     const name: PlayerName =
       shown === undefined
-        ? { text: null, hiddenBecause: 'no_name' }
+        ? { text: null, hiddenBecause: 'no_name', number: null }
         : shown.shown
-          ? { text: shown.text, hiddenBecause: null }
-          : // A name the league hides (R-24) is worded as a removed one's: no name at all.
+          ? { text: shown.text, hiddenBecause: null, number: null }
+          : // A name the league hides (R-24) is worded as a removed one's, but shows the
+            // player's number in its place, as their roster does (numberInPlace).
             {
               text: null,
               hiddenBecause:
                 shown.why === 'removed' || shown.why === 'hidden' ? 'removed' : 'no_name',
+              number: numberInPlace(shown, numbers.get(`${row.personId}|${row.nameTeamId}`)),
             };
     return {
       personId: row.personId,

@@ -102,6 +102,8 @@ export function setSettingFor(registry: SettingRegistry) {
       if (
         givingYes &&
         (await tx.leagues.leagueAudience()) === 'adult' &&
+        // A walk-up of unknown age is not someone it covers: the confirmation never
+        // reaches them (S-136, step 2.146's closing round), so it is not taken for them.
         !(await tx.leagues.hasRecordedChild())
       ) {
         return fail({ code: 'no-child-recorded' });

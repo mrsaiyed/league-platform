@@ -40,6 +40,11 @@ export const enAdminSettings = {
   'adminSettings.limits.whole': 'Accepts a whole number from {min} to {max}.',
   'adminSettings.no': 'No',
   'adminSettings.none': 'This league has no settings to change yet.',
+  // Where adults show in full and children do not (step 2.146).
+  'adminSettings.privacy.adultWithChildren':
+    'Players recorded as children are shown by first name and last initial and adults in full, so the names tell who is a child. To show everyone alike, choose first name and last initial.',
+  'adminSettings.privacy.birthdayTells':
+    "A young player's name turns to full on their 18th birthday, so the day it changes tells their age.",
   'adminSettings.privacy.confirm.adultNoChildren':
     'A player recorded as a child is shown by first name and last initial.',
   'adminSettings.privacy.confirm.adultWithChildren':
@@ -47,6 +52,7 @@ export const enAdminSettings = {
   'adminSettings.privacy.confirm.youthOrMixed':
     "Tick to show the young players' full names too, while names are on full names.",
   'adminSettings.privacy.confirmedOn': 'Confirmed on {date}.',
+  'adminSettings.privacy.confirmedOnBy': 'Confirmed on {date} by {name}.',
   // What the Privacy part says around its settings (step 2.162, R-29, record 065): one
   // opening sentence by who plays, what is in force now, and where the parents'
   // confirmation is offered.
@@ -64,8 +70,14 @@ export const enAdminSettings = {
   'adminSettings.privacy.now.hidden':
     'Now: nobody is shown by name; players appear by jersey number.',
   'adminSettings.privacy.now.initial': 'Now: everyone is shown by first name and last initial.',
+  'adminSettings.privacy.onePerson':
+    'To show less of one person, open their record in People and choose "Show as".',
   'adminSettings.privacy.unknownAge':
     'In this league, anyone whose record does not say whether they are a child or an adult is shown as a child, coaches too.',
+  // S-136 as amended in step 2.146's fix and closing rounds, with a link to Admin → People's list.
+  'adminSettings.privacy.walkUps':
+    'Players added at the scorer’s table with no date of birth are shown as children, whatever the parents’ confirmation says, and the league’s site is kept out of search engines, until someone marks them on their record as a child or an adult, or gives a date of birth.',
+  'adminSettings.privacy.walkUps.link': 'See who they are',
   'adminSettings.profile.audience.adult': 'Adults',
   'adminSettings.profile.audience.mixed': 'Both adults and under-18s',
   'adminSettings.profile.audience.youth': 'Under-18s',

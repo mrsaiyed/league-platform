@@ -159,11 +159,25 @@ describe('what Admin → People reads, role by role (R-16, T-76)', () => {
 
 describe('the list address', () => {
   it('searches a name, and never an email address, which would sit in the address', () => {
-    expect(peopleAskOf({ q: '  Smi ' })).toEqual({ search: 'Smi', emailRefused: false, page: 1 });
+    expect(peopleAskOf({ q: '  Smi ' })).toEqual({
+      search: 'Smi',
+      emailRefused: false,
+      page: 1,
+      tickedButGrown: false,
+      walkUps: false,
+    });
+    // Step 2.146: the finder of those ticked as children who are 18 or over.
+    expect(peopleAskOf({ ticked: 'grown' }).tickedButGrown).toBe(true);
+    expect(peopleAskOf({ ticked: 'yes' }).tickedButGrown).toBe(false);
+    // Its fix round (S-136 as amended): the list of walk-ups with no age.
+    expect(peopleAskOf({ added: 'table' }).walkUps).toBe(true);
+    expect(peopleAskOf({ added: 'yes' }).walkUps).toBe(false);
     expect(peopleAskOf({ q: 'jon@example.test' })).toEqual({
       search: undefined,
       emailRefused: true,
       page: 1,
+      tickedButGrown: false,
+      walkUps: false,
     });
   });
   it('takes a page from 1, and anything else as the first', () => {
