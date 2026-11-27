@@ -704,7 +704,7 @@ export const migrationCatalog: MigrationCatalog = {
     },
     {
       signature: 'public.erase_account()',
-      body: 'dd8fb4f33679380042be5370aa44aab8f2aa0faa1249dd732d33dbd597d51b4b',
+      body: '99d390927139e2ff9834e01c32330f6e63d303284c18b93fd70c14da0feefe36',
       settings: ['search_path=pg_catalog, pg_temp'],
       owner: 'postgres',
       language: 'plpgsql',

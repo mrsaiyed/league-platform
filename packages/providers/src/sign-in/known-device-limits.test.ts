@@ -1,8 +1,9 @@
-// T-504, T-506, T-507 on both adapters: the local stand-in and the Supabase adapter
-// (against the fake Supabase Auth and the in-memory store) count alike. A stranger's
-// wrong passwords and asks for a code do not shut out a device the app vouches for; the
-// limits for an unknown device against one address stay as they were; one network may
-// ask for many codes; a flood of wrong passwords from a network leaves its codes alone.
+// T-504, T-506, T-507, T-509, T-510 on both adapters: the local stand-in and the
+// Supabase adapter (against the fake Supabase Auth and the in-memory store) count alike.
+// A stranger's wrong passwords and wrong codes do not shut out a device the app vouches
+// for, nor spoil its waiting code; every ask for a code, a known device's too, meets the
+// address's and the network's numbers; one network may ask for many codes; a flood of
+// wrong passwords from a network leaves its codes alone.
 import { describe, expect, it } from 'vitest';
 import type { SignInDevice } from '@srleagues/contracts';
 import * as local from './local/local-sign-in.test-helper.ts';
@@ -105,21 +106,52 @@ describe.each(adapters)('on %s', (_name, setup) => {
     );
   });
 
-  it("a known device's asks for a code are counted apart from strangers' (T-504)", async () => {
+  it('20 made-up device ids send no more codes to one address than an unknown device could (T-509)', async () => {
     const env = await withMember();
-    const asks = [];
-    for (let i = 0; i < 6; i++) {
-      asks.push(outcome(await env.sign.startReset({ email: member, networkAddress: elsewhere })));
+    const asksBy20 = async (networkAddress: string) => {
+      const answers = [];
+      for (let d = 0; d < 20; d++) {
+        const knownDevice = device(500 + d).deviceId;
+        for (let i = 0; i < 6; i++) {
+          const asked = await env.sign.startReset({ email: member, networkAddress, knownDevice });
+          answers.push(outcome(asked));
+        }
+      }
+      return answers;
+    };
+    // With the network's 200 used up, a known device is refused there like a stranger.
+    for (let i = 0; i < 200; i++) {
+      await env.sign.startReset({ email: `p${i}@example.test`, networkAddress: here });
     }
-    expect(asks).toEqual(['ok', 'ok', 'ok', 'ok', 'ok', 'too-many-attempts']);
-    // An unknown device on another network still meets the address's 5 an hour.
     expect(outcome(await env.sign.startReset({ email: member, networkAddress: here }))).toBe(
       'too-many-attempts',
     );
+    expect((await asksBy20(here)).filter((a) => a === 'ok')).toHaveLength(0);
+    // On another network, the 20 together have the address's 5, as one unknown device.
+    expect((await asksBy20(elsewhere)).filter((a) => a === 'ok')).toHaveLength(5);
+    expect(outcome(await env.sign.startReset({ email: member, networkAddress: elsewhere }))).toBe(
+      'too-many-attempts',
+    );
+  });
+
+  it("a stranger neither replaces nor spoils a known device's waiting code (T-510)", async () => {
+    const env = await withMember();
     const vouched = { email: member, networkAddress: here, knownDevice: laptop.deviceId };
     expect(outcome(await env.sign.startReset(vouched))).toBe('ok');
-    const checked = await env.sign.verifyCode({ ...vouched, code: codeFor(env, member) });
-    expect(outcome(checked)).toBe('ok');
+    const owners = codeFor(env, member);
+    // The review's attack: a stranger on another network asks, then types 5 wrong codes.
+    const strangers = { email: member, networkAddress: elsewhere };
+    expect(outcome(await env.sign.startReset(strangers))).toBe('ok');
+    expect(codeFor(env, member)).toBe(owners);
+    const wrong = owners === '000000' ? '111111' : '000000';
+    const typed = [];
+    for (let i = 0; i < 5; i++) {
+      typed.push(outcome(await env.sign.verifyCode({ ...strangers, code: wrong })));
+    }
+    expect(typed).toEqual(Array(5).fill('code-wrong'));
+    // The code is the asking device's own: typed elsewhere, even right, it opens nothing.
+    expect(outcome(await env.sign.verifyCode({ ...strangers, code: owners }))).toBe('code-wrong');
+    expect(outcome(await env.sign.verifyCode({ ...vouched, code: owners }))).toBe('ok');
   });
 
   it('a flood of wrong passwords from one network leaves codes and known devices there (T-506)', async () => {

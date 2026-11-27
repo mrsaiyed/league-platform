@@ -161,16 +161,26 @@ export function createMemorySignInStore(options: MemorySignInStoreOptions): Supa
       async putCode(email, code) {
         codes.set(email, { ...code });
       },
-      async takeCodeAttempt(email, at) {
+      async takeCodeAttempt(email, at, knownDevice) {
         const pending = codes.get(email);
         if (!pending || at.getTime() >= pending.expiresAt.getTime()) return { status: 'none' };
         if (pending.attemptsLeft <= 0) return { status: 'used-up' };
-        pending.attemptsLeft--;
+        // Another's typing at a known device's code takes nothing (T-510).
+        const mine = pending.knownDevice === null || pending.knownDevice === knownDevice;
+        if (mine) pending.attemptsLeft--;
         return {
           status: 'taken',
-          verifyType: pending.verifyType,
+          verifyType: mine ? pending.verifyType : null,
           attemptsLeft: pending.attemptsLeft,
         };
+      },
+      async knownDeviceCodeWaiting(email, at) {
+        const pending = codes.get(email);
+        return (
+          pending !== undefined &&
+          pending.knownDevice !== null &&
+          at.getTime() < pending.expiresAt.getTime()
+        );
       },
       async dropCode(email) {
         codes.delete(email);

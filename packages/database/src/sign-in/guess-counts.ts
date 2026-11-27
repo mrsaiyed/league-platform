@@ -56,10 +56,17 @@ async function recentGuesses(
 ): Promise<Date[]> {
   const trx = signInTransactionOf(scope);
   const windowStart = new Date(at.getTime() - limits.windowMinutes * minute);
+  // Every subject's guesses older than the window go, not only this one's, and every
+  // lock that ran out a window ago (its guesses are older still), so a row naming an
+  // address never outlives its window (T-504). The scope has one set of numbers.
+  await trx
+    .deleteFrom('sign_in.guess_locks')
+    .where('scope', '=', guessScope)
+    .where('locked_until', '<=', windowStart)
+    .execute();
   await trx
     .deleteFrom('sign_in.guesses')
     .where('scope', '=', guessScope)
-    .where('subject', '=', subject)
     .where('counted_at', '<=', windowStart)
     .execute();
   const rows = await trx

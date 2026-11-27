@@ -1,5 +1,7 @@
 // One attempt at the address's code, if it has one that has not run out at `at`. Of
-// two attempts at once, each takes its own: the update is the one step.
+// two attempts at once, each takes its own: the update is the one step. At a code
+// another known device asked for (T-510) nothing is taken, and the attempt is answered
+// as for a code never sent.
 import { sql } from 'kysely';
 import { signInTransactionOf, type SignInScope } from '../db/sign-in-transaction.ts';
 import { verifyTypeOf } from './proof-rows.ts';
@@ -9,15 +11,20 @@ export async function takeCodeAttempt(
   scope: SignInScope,
   email: string,
   at: Date,
+  knownDevice: string | null,
 ): Promise<CodeAttempt> {
   const trx = signInTransactionOf(scope);
+  const mine = sql<boolean>`(known_device is null or known_device = ${knownDevice})`;
   const taken = await trx
     .updateTable('sign_in.codes')
-    .set({ attempts_left: sql<number>`attempts_left - 1` })
+    .set({ attempts_left: sql<number>`attempts_left - case when ${mine} then 1 else 0 end` })
     .where('email', '=', email)
     .where('expires_at', '>', at)
     .where('attempts_left', '>', 0)
-    .returning(['verify_type', 'attempts_left'])
+    .returning([
+      sql<string | null>`case when ${mine} then verify_type end`.as('verify_type'),
+      'attempts_left',
+    ])
     .executeTakeFirst();
   if (taken !== undefined) {
     return {

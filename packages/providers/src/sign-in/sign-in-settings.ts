@@ -26,6 +26,12 @@ export type SignInSettings = {
    * network; one address's own limit is `codesPerHour`.
    */
   readonly codesPerHourPerNetwork: number;
+  /**
+   * T-509: asks to sign up from one network in an hour, counted apart from
+   * `codesPerHourPerNetwork`, which is then the codes for signing in and resetting. Each
+   * may make a user at the sign-in service, so it is lower.
+   */
+  readonly signUpsPerHourPerNetwork: number;
   /** How long the proof from a right code stays good for setting the password. */
   readonly proofValidMinutes: number;
   /** T-85: wrong passwords per address typed. */
@@ -48,6 +54,7 @@ export const signInDefaults: SignInSettings = {
   attemptsPerCode: 5,
   codesPerHour: 5,
   codesPerHourPerNetwork: 200,
+  signUpsPerHourPerNetwork: 60,
   proofValidMinutes: 15,
   guessesPerEmail: {
     windowMinutes: 15,

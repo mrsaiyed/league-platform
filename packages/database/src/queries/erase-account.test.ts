@@ -154,6 +154,27 @@ async function signInRows(signInId: string, email: string, sessionId: string) {
   );
 }
 
+/** A known device's count, guess and lock under its own subject (T-504). */
+async function knownDeviceRows(subject: string) {
+  const guessId = crypto.randomUUID();
+  await pglite.query(
+    `insert into sign_in.code_requests (id, scope, subject, asked_at) values ($1, 'email', $2, now())`,
+    [crypto.randomUUID(), subject],
+  );
+  await pglite.query(
+    `insert into sign_in.guesses (id, ticket, scope, subject, counted_at)
+     values ($1, $2, 'email', $3, now())`,
+    [guessId, crypto.randomUUID(), subject],
+  );
+  await pglite.query(
+    `insert into sign_in.guess_locks (scope, subject, locked_until, by_guess_id)
+     values ('email', $1, now() + interval '15 minutes', $2)`,
+    [subject, guessId],
+  );
+}
+
+const limitTables = ['code_requests', 'guesses', 'guess_locks'];
+
 /** How many rows the sign-in store holds for the sign-in user, its session or the address. */
 async function signInRowsLeft(signInId: string, email: string, sessionId: string) {
   const byUser = ['users', 'devices', 'sessions', 'proofs', 'email_changes'].map((table) =>
@@ -217,6 +238,12 @@ describe('eraseAccount (record 052)', () => {
       [crypto.randomUUID()],
     );
 
+    const knownMine = 'known-device device-made-up-0000000001 Erase-Me@Example.test';
+    const knownOthers = 'known-device device-made-up-0000000002 other-parent@example.test';
+    // Ends like the address, but is another one.
+    const lookalike = 'known-device device-made-up-0000000003 x-erase-me@example.test';
+    for (const subject of [knownMine, knownOthers, lookalike]) await knownDeviceRows(subject);
+
     expect(await erase(account)).toBe('erased');
 
     expect(
@@ -261,6 +288,15 @@ describe('eraseAccount (record 052)', () => {
     // guesses and locks are gone; the network's counts stay.
     expect(await signInRowsLeft(signInId, 'erase-me@example.test', 's-erase')).toBe(0);
     expect(await count("select 1 from sign_in.code_requests where scope = 'network'", [])).toBe(1);
+    // No limit row holds the address any more, a known device's included (T-504).
+    for (const table of limitTables) {
+      const holding = `select 1 from sign_in.${table}
+        where position(' erase-me@example.test' in ' ' || lower(subject)) > 0`;
+      expect(await count(holding, [])).toBe(0);
+      for (const kept of [knownOthers, lookalike]) {
+        expect(await count(`select 1 from sign_in.${table} where subject = $1`, [kept])).toBe(1);
+      }
+    }
 
     // The other parent's account and everything of theirs is untouched.
     expect(

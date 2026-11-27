@@ -42,7 +42,12 @@ import {
 } from '@srleagues/contracts';
 import { fail, ok } from '@srleagues/core';
 import { isAllowedReturnAddress } from '../return-address.ts';
-import { codeGuessSubject, limitSubjects } from '../limit-subjects.ts';
+import {
+  checkedDevice,
+  codeAskLimits,
+  codeGuessSubject,
+  limitSubjects,
+} from '../limit-subjects.ts';
 import { signInDefaults, type SignInSettings } from '../sign-in-settings.ts';
 import type {
   CodePurpose,
@@ -244,15 +249,29 @@ export function createSupabaseSignIn(options: SupabaseSignInOptions): SignInServ
     if (!parsed.success) return fail({ code: 'invalid-email' as const });
     const email = parsed.data;
     // Counted whether or not an account exists, so the limit looks the same (T-68).
-    // A known device's asks are counted on their own (T-504).
-    const counted = limitSubjects(email, network, knownDevice);
-    const limited = await store.limits.countCodeRequest({
-      email: counted.email ?? email,
-      network: counted.network,
-      perEmail: settings.codesPerHour,
-      perNetwork: settings.codesPerHourPerNetwork,
-    });
+    // Every ask, a known device's too, is counted on the address and the network (T-509).
+    const device = checkedDevice(knownDevice) ?? null;
+    const limited = await store.limits.countCodeRequest(
+      codeAskLimits(email, network, purpose, settings),
+    );
     if (limited) return fail(tooMany(limited.retryAfterSeconds));
+    const expiresAt = new Date(now().getTime() + settings.codeValidMinutes * minute);
+    // An unknown device never replaces or spoils a code a known device asked for while it
+    // works (T-510): Supabase is not asked for a code, the asker is answered the same,
+    // and the sender is handed a message with no code, which sends nothing. A known
+    // device has signed in to the address, so it has an account.
+    const waiting = await store.codes.knownDeviceCodeWaiting(email, now());
+    if (waiting && device === null) {
+      const sent = await codeSender.send({
+        to: email,
+        purpose,
+        code: null,
+        accountExists: true,
+        expiresAt,
+      });
+      if (!sent.ok) return fail({ code: 'code-not-sent' as const });
+      return ok({ codeValidMinutes: settings.codeValidMinutes });
+    }
 
     // Sign-up asks for a code that also makes a Supabase user if there is none; a
     // reset asks for one only for an existing user. An account is "ours" once it has
@@ -283,7 +302,6 @@ export function createSupabaseSignIn(options: SupabaseSignInOptions): SignInServ
       code = generated.value.code;
       verifyType = generated.value.verifyType;
     }
-    const expiresAt = new Date(now().getTime() + settings.codeValidMinutes * minute);
     // Every request hands the sender a message, one with no code for a reset with no
     // account, so asking costs the same either way (T-68).
     const sent = await codeSender.send({ to: email, purpose, code, accountExists, expiresAt });
@@ -293,6 +311,7 @@ export function createSupabaseSignIn(options: SupabaseSignInOptions): SignInServ
       verifyType,
       expiresAt,
       attemptsLeft: settings.attemptsPerCode,
+      knownDevice: device,
     });
     return ok({ codeValidMinutes: settings.codeValidMinutes });
   };
@@ -368,7 +387,7 @@ export function createSupabaseSignIn(options: SupabaseSignInOptions): SignInServ
       if ('retryAfterSeconds' in reserved) return fail(tooMany(reserved.retryAfterSeconds));
       const email = signInEmail.safeParse(rawEmail);
       const attempt = email.success
-        ? await store.codes.takeCodeAttempt(email.data, now())
+        ? await store.codes.takeCodeAttempt(email.data, now(), knownDevice ?? null)
         : ({ status: 'none' } as const);
       if (attempt.status !== 'taken') {
         await store.limits.cancelGuess(reserved.ticket);
@@ -729,12 +748,9 @@ export function createSupabaseSignIn(options: SupabaseSignInOptions): SignInServ
       if (answer.session.user.id !== session.accountId) return fail({ code: 'wrong-password' });
       await store.limits.forgiveGuess(reserved.ticket);
       await store.sessions.passwordEntered(session.sessionId, now());
-      const limited = await store.limits.countCodeRequest({
-        email,
-        network,
-        perEmail: settings.codesPerHour,
-        perNetwork: settings.codesPerHourPerNetwork,
-      });
+      const limited = await store.limits.countCodeRequest(
+        codeAskLimits(email, network, 'email-change', settings),
+      );
       if (limited) return fail(tooMany(limited.retryAfterSeconds));
       // T-455: the waiting change is ours alone; Supabase hears nothing until our check of
       // the code has passed. An address our records give another account gets no code and

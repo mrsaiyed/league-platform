@@ -7,6 +7,7 @@ export async function putCode(scope: SignInScope, email: string, code: PendingCo
     verify_type: code.verifyType,
     expires_at: code.expiresAt,
     attempts_left: code.attemptsLeft,
+    known_device: code.knownDevice,
   };
   await signInTransactionOf(scope)
     .insertInto('sign_in.codes')

@@ -1523,29 +1523,60 @@ describe('wrong tries do not lock the wrong person out (T-504, T-505)', () => {
     expect(byCopy.to).toMatch(/problem=tooManyAttempts/);
   });
 
-  it('a known device asks for a reset code on its own count, then gets in with it', async () => {
+  it("a known device's reset code outlives a stranger's ask and wrong codes (T-509, T-510)", async () => {
     const env = setup();
     const ownPhone = browser();
     await signUp(env, ownPhone, member);
     await signOut({}, ownPhone.visit, env.deps);
     env.advanceSeconds(2 * 60 * 60);
-    const intruder = browser('198.51.100.7');
-    for (let i = 0; i < 6; i++) {
-      await askForCode('reset', { email: member }, intruder.visit, env.deps);
-    }
-    const newPhone = browser();
-    const refused = await askForCode('reset', { email: member }, newPhone.visit, env.deps);
-    expect(refused.to).toMatch(/problem=tooManyAttempts/);
     expect(await askForCode('reset', { email: member }, ownPhone.visit, env.deps)).toEqual({
       to: '/signup/code',
     });
-    await enterCode({ code: env.codeFor(member) }, ownPhone.visit, env.deps);
+    const owners = env.codeFor(member);
+    // The review's attack: a stranger on another network asks, then types 5 wrong codes.
+    const intruder = browser('198.51.100.7');
+    expect(await askForCode('reset', { email: member }, intruder.visit, env.deps)).toEqual({
+      to: '/signup/code',
+    });
+    expect(env.codeFor(member)).toBe(owners);
+    const wrong = owners === '000000' ? '111111' : '000000';
+    for (let i = 0; i < 5; i++) {
+      const typed = await enterCode({ code: wrong }, intruder.visit, env.deps);
+      expect(typed.to).toMatch(/problem=codeWrong/);
+    }
+    // The known device's ask was counted on the address with the stranger's (T-509).
+    for (let i = 0; i < 3; i++) {
+      await askForCode('reset', { email: member }, intruder.visit, env.deps);
+    }
+    const refused = await askForCode('reset', { email: member }, ownPhone.visit, env.deps);
+    expect(refused.to).toMatch(/problem=tooManyAttempts/);
+    // The owner's code still works on the device that asked for it.
+    expect(await enterCode({ code: owners }, ownPhone.visit, env.deps)).toEqual({
+      to: '/signup/password',
+    });
     const chosen = await choosePassword(
       { password: 'another good password' },
       ownPhone.visit,
       env.deps,
     );
     expect(chosen).toEqual({ to: platformUrl('account') });
+  });
+
+  it('signed in to its own account, a browser is no known device for another address', async () => {
+    const env = setup();
+    const other = 'other-member@example.test';
+    await signUp(env, browser(), other);
+    const ownPhone = browser();
+    await signUp(env, ownPhone, member);
+    await tenWrong(env, browser('198.51.100.7'), other);
+    // The same browser, vouched for its own address, meets the other address's lock.
+    const tried = await signInWithPassword({ email: other, password }, ownPhone.visit, env.deps);
+    expect(tried.to).toMatch(/problem=tooManyAttempts/);
+    // Its own address it still gets into.
+    await signOut({}, ownPhone.visit, env.deps);
+    expect(await signInWithPassword({ email: member, password }, ownPhone.visit, env.deps)).toEqual(
+      { to: platformUrl('account') },
+    );
   });
 
   it('an address with an account and one without answer alike through the limits (T-68)', async () => {

@@ -59,6 +59,8 @@ export type PendingCode = {
   readonly verifyType: 'signup' | 'magiclink' | 'recovery' | null;
   readonly expiresAt: Date;
   readonly attemptsLeft: number;
+  /** The known device that asked for it (T-510), else null: only its own typing spends it. */
+  readonly knownDevice: string | null;
 };
 
 export type CodeAttempt =
@@ -109,8 +111,18 @@ export type HeldProof = {
 export type SignInCodeStore = {
   /** Replaces any code the address had. */
   readonly putCode: (email: string, code: PendingCode) => Promise<void>;
-  /** Takes one attempt at the address's code, if it has one that has not expired at `at`. */
-  readonly takeCodeAttempt: (email: string, at: Date) => Promise<CodeAttempt>;
+  /**
+   * Takes one attempt at the address's code, if it has one that has not expired at `at`.
+   * At a code another known device asked for (T-510) nothing is taken: the attempt is
+   * answered as for a code never sent (`verifyType` null).
+   */
+  readonly takeCodeAttempt: (
+    email: string,
+    at: Date,
+    knownDevice: string | null,
+  ) => Promise<CodeAttempt>;
+  /** Whether the address's code, unexpired at `at`, was asked for by a known device (T-510). */
+  readonly knownDeviceCodeWaiting: (email: string, at: Date) => Promise<boolean>;
   readonly dropCode: (email: string) => Promise<void>;
   /** Replaces the account's waiting change of email, if it had one: its older code is dead. */
   readonly putEmailChange: (accountId: string, change: PendingEmailChange) => Promise<void>;

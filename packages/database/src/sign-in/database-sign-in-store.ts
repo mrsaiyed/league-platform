@@ -29,6 +29,7 @@ import { hasPassword } from './has-password.ts';
 import { liveSessionsOf } from './live-sessions-of.ts';
 import { passwordEntered } from './password-entered.ts';
 import { peekProof } from './peek-proof.ts';
+import { knownDeviceCodeWaiting } from './known-device-code-waiting.ts';
 import { putCode } from './put-code.ts';
 import { putEmailChange } from './put-email-change.ts';
 import { putProof } from './put-proof.ts';
@@ -68,7 +69,9 @@ export function createDatabaseSignInStore(
     },
     codes: {
       putCode: (email, code) => step((s) => putCode(s, email, code)),
-      takeCodeAttempt: (email, at) => step((s) => takeCodeAttempt(s, email, at)),
+      takeCodeAttempt: (email, at, knownDevice) =>
+        step((s) => takeCodeAttempt(s, email, at, knownDevice)),
+      knownDeviceCodeWaiting: (email, at) => step((s) => knownDeviceCodeWaiting(s, email, at)),
       dropCode: (email) => step((s) => dropCode(s, email)),
       putEmailChange: (userId, change) => step((s) => putEmailChange(s, userId, change)),
       takeEmailChangeAttempt: (userId, at) => step((s) => takeEmailChangeAttempt(s, userId, at)),

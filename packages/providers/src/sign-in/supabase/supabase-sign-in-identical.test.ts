@@ -185,10 +185,11 @@ describe('the same answer and the same calls whether or not an account exists (T
       results.push(
         await sign.signIn({ email, password: wrong, device: laptop, knownDevice: laptop.deviceId }),
       );
-      for (let i = 0; i < 6; i++) {
+      // A known device's ask is counted on the address with strangers' (T-509).
+      results.push(await sign.startReset(vouched));
+      for (let i = 0; i < 5; i++) {
         results.push(await sign.startReset({ email, networkAddress: elsewhere }));
       }
-      results.push(await sign.startReset(vouched));
       results.push(await sign.startReset({ email, networkAddress: here }));
       results.push(await sign.verifyCode({ ...vouched, code: '000000' }));
       return results;
@@ -199,7 +200,6 @@ describe('the same answer and the same calls whether or not an account exists (T
       'wrong-email-or-password',
       ...Array(5).fill('ok'),
       'too-many-attempts',
-      'ok',
       'too-many-attempts',
       'code-wrong',
     ]);

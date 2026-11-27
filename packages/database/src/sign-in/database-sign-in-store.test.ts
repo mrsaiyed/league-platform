@@ -42,6 +42,8 @@ async function emptyTables() {
 let clock = new Date(Date.UTC(2026, 10, 13, 12));
 const at = new Date(Date.UTC(2026, 10, 13, 12));
 const store = () => createDatabaseSignInStore({ db, now: () => clock });
+const count = async (query: string, params: unknown[]) =>
+  (await pglite.query(query, params)).rows.length;
 const session = {
   sessionId: 's-1',
   accountId: 'a-1',
@@ -212,6 +214,7 @@ describe('the database sign-in store: what only the database can do', () => {
       verifyType: 'signup',
       expiresAt: minutes(10),
       attemptsLeft: 5,
+      knownDevice: null,
     });
 
     const after = store();
@@ -219,11 +222,87 @@ describe('the database sign-in store: what only the database can do', () => {
     expect(await after.accounts.hasPassword('a-1')).toBe(true);
     expect(await after.accounts.rememberDevice('a-1', 'device-1')).toBe(false);
     expect((await after.sessions.liveSessionsOf('a-1')).map((x) => x.sessionId)).toEqual(['s-1']);
-    expect(await after.codes.takeCodeAttempt('ana@example.test', at)).toEqual({
+    expect(await after.codes.takeCodeAttempt('ana@example.test', at, null)).toEqual({
       status: 'taken',
       verifyType: 'signup',
       attemptsLeft: 4,
     });
+  });
+
+  it("keeps a known device's code its own: another's typing takes nothing (T-510)", async () => {
+    await emptyTables();
+    const s = store();
+    const laptop = 'device-made-up-0000000001';
+    await s.codes.putCode('ana@example.test', {
+      verifyType: 'recovery',
+      expiresAt: minutes(10),
+      attemptsLeft: 5,
+      knownDevice: laptop,
+    });
+    expect(await s.codes.knownDeviceCodeWaiting('ana@example.test', at)).toBe(true);
+    expect(await s.codes.knownDeviceCodeWaiting('ana@example.test', minutes(10))).toBe(false);
+    expect(await s.codes.knownDeviceCodeWaiting('ben@example.test', at)).toBe(false);
+    for (const other of [null, 'device-made-up-0000000002']) {
+      for (let i = 0; i < 6; i++) {
+        expect(await s.codes.takeCodeAttempt('ana@example.test', at, other)).toEqual({
+          status: 'taken',
+          verifyType: null,
+          attemptsLeft: 5,
+        });
+      }
+    }
+    expect(await s.codes.takeCodeAttempt('ana@example.test', at, laptop)).toEqual({
+      status: 'taken',
+      verifyType: 'recovery',
+      attemptsLeft: 4,
+    });
+  });
+
+  it('removes counts and locks older than their window, whatever their subject (T-504)', async () => {
+    await emptyTables();
+    clock = at;
+    const s = store();
+    const old = 'known-device device-made-up-0000000001 ana@example.test';
+    const limits = {
+      windowMinutes: 15,
+      slowAfter: 5,
+      slowSeconds: 30,
+      lockAfter: 2,
+      lockMinutes: 15,
+    };
+    await s.limits.countCodeRequest({ email: old, network: 'n-old', perEmail: 5, perNetwork: 5 });
+    await s.limits.reserveGuess({
+      email: old,
+      network: 'n-old',
+      perEmail: limits,
+      perNetwork: limits,
+    });
+    await s.limits.reserveGuess({
+      email: old,
+      network: 'n-old',
+      perEmail: limits,
+      perNetwork: limits,
+    });
+    expect(await count(`select 1 from sign_in.guess_locks where subject = $1`, [old])).toBe(1);
+    // Two hours on, another subject is counted: the old subject's rows are gone.
+    clock = minutes(120);
+    await s.limits.countCodeRequest({
+      email: 'ben@example.test',
+      network: 'n-new',
+      perEmail: 5,
+      perNetwork: 5,
+    });
+    await s.limits.reserveGuess({
+      email: 'ben@example.test',
+      network: 'n-new',
+      perEmail: limits,
+      perNetwork: limits,
+    });
+    for (const table of ['code_requests', 'guesses', 'guess_locks']) {
+      expect(
+        await count(`select 1 from sign_in.${table} where subject in ($1, 'n-old')`, [old]),
+      ).toBe(0);
+    }
   });
 
   it('takes code attempts until they are used up, and none once the code has run out', async () => {
@@ -233,19 +312,22 @@ describe('the database sign-in store: what only the database can do', () => {
       verifyType: null,
       expiresAt: minutes(10),
       attemptsLeft: 1,
+      knownDevice: null,
     });
-    expect(await s.codes.takeCodeAttempt('ana@example.test', at)).toEqual({
+    expect(await s.codes.takeCodeAttempt('ana@example.test', at, null)).toEqual({
       status: 'taken',
       verifyType: null,
       attemptsLeft: 0,
     });
-    expect(await s.codes.takeCodeAttempt('ana@example.test', at)).toEqual({ status: 'used-up' });
-    expect(await s.codes.takeCodeAttempt('ana@example.test', minutes(10))).toEqual({
+    expect(await s.codes.takeCodeAttempt('ana@example.test', at, null)).toEqual({
+      status: 'used-up',
+    });
+    expect(await s.codes.takeCodeAttempt('ana@example.test', minutes(10), null)).toEqual({
       status: 'none',
     });
-    expect(await s.codes.takeCodeAttempt('ben@example.test', at)).toEqual({ status: 'none' });
+    expect(await s.codes.takeCodeAttempt('ben@example.test', at, null)).toEqual({ status: 'none' });
     await s.codes.dropProofsFor('ana@example.test');
-    expect(await s.codes.takeCodeAttempt('ana@example.test', at)).toEqual({ status: 'none' });
+    expect(await s.codes.takeCodeAttempt('ana@example.test', at, null)).toEqual({ status: 'none' });
   });
 
   it('slows, then locks, wrong guesses per address, and a right one clears the address', async () => {

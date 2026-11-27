@@ -34,7 +34,12 @@ import type {
   TooManyAttempts,
 } from '../sign-in-service.ts';
 import { signInDefaults, type SignInSettings } from '../sign-in-settings.ts';
-import { codeGuessSubject, limitSubjects } from '../limit-subjects.ts';
+import {
+  checkedDevice,
+  codeAskLimits,
+  codeGuessSubject,
+  limitSubjects,
+} from '../limit-subjects.ts';
 import { createAttemptLimiter } from './attempt-limiter.ts';
 import { sampleLeakedPasswords } from './leaked-passwords.ts';
 import { scryptPasswordHasher, type PasswordHash, type PasswordHasher } from './password-hash.ts';
@@ -99,10 +104,12 @@ type PendingCode = {
   readonly code: string | null;
   readonly expiresAt: number;
   attemptsLeft: number;
+  /** The known device that asked for it (T-510): only its own typing spends the code. */
+  readonly knownDevice: string | null;
 };
 
 /** A change of email asked and not yet confirmed (T-455): the account's own, one at a time. */
-type PendingEmailChange = PendingCode & { readonly newEmail: string };
+type PendingEmailChange = Omit<PendingCode, 'knownDevice'> & { readonly newEmail: string };
 
 type Session = {
   readonly id: string;
@@ -183,11 +190,12 @@ export function createLocalSignInStandIn(options: LocalSignInOptions): LocalSign
   const newCode = () => String(randomInt(0, 1_000_000)).padStart(6, '0');
 
   /** Counts a request for a code against the address and the network (T-225); the wait if over. */
-  const countCodeRequest = (email: string, network: string): number | null => {
+  const countCodeRequest = (counted: ReturnType<typeof codeAskLimits>): number | null => {
+    const { email, network } = counted;
     // Counted whether or not an account exists, so the limit looks the same (T-68).
     const waits = [
-      hourlyWait(codeRequestsByEmail, email, settings.codesPerHour),
-      hourlyWait(codeRequestsByNetwork, network, settings.codesPerHourPerNetwork),
+      hourlyWait(codeRequestsByEmail, email, counted.perEmail),
+      hourlyWait(codeRequestsByNetwork, network, counted.perNetwork),
     ].filter((w) => w !== null);
     if (waits.length) return Math.max(...waits);
     const at = now().getTime();
@@ -206,20 +214,24 @@ export function createLocalSignInStandIn(options: LocalSignInOptions): LocalSign
     const parsed = signInEmail.safeParse(rawEmail);
     if (!parsed.success) return fail({ code: 'invalid-email' as const });
     const email = parsed.data;
-    // A known device's asks are counted on their own (T-504).
-    const counted = limitSubjects(email, network, knownDevice);
-    const wait = countCodeRequest(counted.email ?? email, counted.network);
+    // Every ask, a known device's too, is counted on the address and the network (T-509).
+    const device = checkedDevice(knownDevice) ?? null;
+    const wait = countCodeRequest(codeAskLimits(email, network, purpose, settings));
     if (wait !== null) return fail(tooMany(wait));
     const at = now().getTime();
 
     const account = accounts.get(email);
+    // An unknown device never replaces a code a known device asked for while it works
+    // (T-510): its asker is answered the same, and no code is sent.
+    const waiting = pendingCodes.get(email);
+    const held = device === null && waiting?.knownDevice != null && at < waiting.expiresAt;
     const expiresAt = at + settings.codeValidMinutes * minute;
     // Sign-up always sends a code: to an address that already has an account it is
     // the reset route (T-67). Reset has a code only if there is an account. Either
     // way the sender gets a message (one with no code sends nothing), so asking costs
     // the same work, and the address gets a pending entry, so guessing behaves the
     // same (T-68).
-    const code = purpose === 'sign-up' || account !== undefined ? newCode() : null;
+    const code = !held && (purpose === 'sign-up' || account !== undefined) ? newCode() : null;
     const sent = await options.codeSender.send({
       to: email,
       purpose,
@@ -229,7 +241,10 @@ export function createLocalSignInStandIn(options: LocalSignInOptions): LocalSign
     });
     // A code no one received is not kept.
     if (!sent.ok) return fail({ code: 'code-not-sent' as const });
-    pendingCodes.set(email, { code, expiresAt, attemptsLeft: settings.attemptsPerCode });
+    if (!held) {
+      const attemptsLeft = settings.attemptsPerCode;
+      pendingCodes.set(email, { code, expiresAt, attemptsLeft, knownDevice: device });
+    }
     return ok({ codeValidMinutes: settings.codeValidMinutes });
   };
 
@@ -340,8 +355,10 @@ export function createLocalSignInStandIn(options: LocalSignInOptions): LocalSign
         return fail({ code: 'code-expired' });
       }
       if (pending.attemptsLeft <= 0) return fail({ code: 'too-many-attempts' });
+      // A known device's code is its own (T-510): another's typing is wrong and spends nothing.
+      const mine = pending.knownDevice === null || pending.knownDevice === knownDevice;
       const code = emailCode.safeParse(rawCode);
-      if (pending.code !== null && code.success && code.data === pending.code) {
+      if (mine && pending.code !== null && code.success && code.data === pending.code) {
         pendingCodes.delete(email.data);
         const proof = token();
         const expiresAt = now().getTime() + settings.proofValidMinutes * minute;
@@ -350,7 +367,7 @@ export function createLocalSignInStandIn(options: LocalSignInOptions): LocalSign
         const accountExists = accounts.has(email.data);
         return ok({ proof, proofExpiresAt: new Date(expiresAt), accountExists });
       }
-      pending.attemptsLeft--;
+      if (mine) pending.attemptsLeft--;
       guessesPerNetwork.recordFailure(codeKey);
       return fail({ code: pending.attemptsLeft <= 0 ? 'too-many-attempts' : 'code-wrong' });
     },
@@ -582,7 +599,7 @@ export function createLocalSignInStandIn(options: LocalSignInOptions): LocalSign
       }
       reserved.forgive();
       session.passwordEnteredAt = now();
-      const wait = countCodeRequest(email, network);
+      const wait = countCodeRequest(codeAskLimits(email, network, 'email-change', settings));
       if (wait !== null) return fail(tooMany(wait));
       // Another account's address gets no code and the same answer (T-68): the sender is
       // handed a message either way, and one with no code sends nothing.
