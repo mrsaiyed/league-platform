@@ -72,7 +72,7 @@ export function createDatabaseSignInStore(
       takeCodeAttempt: (email, at, knownDevice) =>
         step((s) => takeCodeAttempt(s, email, at, knownDevice)),
       knownDeviceCodeWaiting: (email, at) => step((s) => knownDeviceCodeWaiting(s, email, at)),
-      dropCode: (email) => step((s) => dropCode(s, email)),
+      dropCode: (email, knownDevice) => step((s) => dropCode(s, email, knownDevice)),
       putEmailChange: (userId, change) => step((s) => putEmailChange(s, userId, change)),
       takeEmailChangeAttempt: (userId, at) => step((s) => takeEmailChangeAttempt(s, userId, at)),
       dropEmailChange: (userId) => step((s) => dropEmailChange(s, userId)),

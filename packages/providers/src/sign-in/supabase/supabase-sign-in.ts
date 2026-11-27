@@ -257,54 +257,51 @@ export function createSupabaseSignIn(options: SupabaseSignInOptions): SignInServ
     if (limited) return fail(tooMany(limited.retryAfterSeconds));
     const expiresAt = new Date(now().getTime() + settings.codeValidMinutes * minute);
     // An unknown device never replaces or spoils a code a known device asked for while it
-    // works (T-510): Supabase is not asked for a code, the asker is answered the same,
-    // and the sender is handed a message with no code, which sends nothing. A known
-    // device has signed in to the address, so it has an account.
+    // works (T-510). Its ask is held (T-511): it gets an entry of its own with no code, its
+    // own attempts and its own expiry, and makes the calls a reset for an address with no
+    // account makes (Supabase is asked about a made-up address), so the asker sees, and
+    // waits, exactly what they would for an address with no account. A known device has
+    // signed in to the address, so it has an account.
     const waiting = await store.codes.knownDeviceCodeWaiting(email, now());
-    if (waiting && device === null) {
-      const sent = await codeSender.send({
-        to: email,
-        purpose,
-        code: null,
-        accountExists: true,
-        expiresAt,
-      });
-      if (!sent.ok) return fail({ code: 'code-not-sent' as const });
-      return ok({ codeValidMinutes: settings.codeValidMinutes });
-    }
+    const held = device === null && waiting;
 
     // Sign-up asks for a code that also makes a Supabase user if there is none; a
     // reset asks for one only for an existing user. An account is "ours" once it has
     // finished signing up through us (the store says): a Supabase user left by a
     // sign-up never finished is not an account, and a reset for it sends no code.
     const generated = await auth.generateCode(
-      purpose === 'sign-up' ? 'magiclink' : 'recovery',
-      email,
+      purpose === 'sign-up' && !held ? 'magiclink' : 'recovery',
+      held ? `${token()}@held.invalid` : email,
     );
     if (!generated.ok) {
       const limit = supabaseLimited(generated.refusal);
       if (limit) return fail(limit);
       // Any other refusal of a reset is read as "no such user": the answer is the same
       // as for an address with an account, and no code is sent.
-      if (purpose === 'sign-up') unexpected('generate_link', generated.refusal);
+      if (purpose === 'sign-up' && !held) unexpected('generate_link', generated.refusal);
     } else if (!emailCode.safeParse(generated.value.code).success) {
       // The project's code length is not 6 (record 018 lists the settings).
       throw new SupabaseAuthUnexpected('generate_link: the code is not 6 digits');
     }
     // Asked either way, with an id that matches nothing when Supabase has no user, so
     // the store sees the same calls whether or not the account exists (T-68).
-    const accountExists =
-      (await store.accounts.accountExists(generated.ok ? generated.value.user.id : token())) &&
-      generated.ok;
+    const user = generated.ok && !held ? generated.value.user.id : null;
+    const accountExists = (await store.accounts.accountExists(user ?? token())) && user !== null;
     let code: string | null = null;
     let verifyType: VerifyType | null = null;
-    if (generated.ok && (purpose === 'sign-up' || accountExists)) {
+    if (generated.ok && !held && (purpose === 'sign-up' || accountExists)) {
       code = generated.value.code;
       verifyType = generated.value.verifyType;
     }
     // Every request hands the sender a message, one with no code for a reset with no
     // account, so asking costs the same either way (T-68).
-    const sent = await codeSender.send({ to: email, purpose, code, accountExists, expiresAt });
+    const sent = await codeSender.send({
+      to: email,
+      purpose,
+      code,
+      accountExists: held || accountExists,
+      expiresAt,
+    });
     // A code no one received is not kept.
     if (!sent.ok) return fail({ code: 'code-not-sent' as const });
     await store.codes.putCode(email, {
@@ -387,7 +384,7 @@ export function createSupabaseSignIn(options: SupabaseSignInOptions): SignInServ
       if ('retryAfterSeconds' in reserved) return fail(tooMany(reserved.retryAfterSeconds));
       const email = signInEmail.safeParse(rawEmail);
       const attempt = email.success
-        ? await store.codes.takeCodeAttempt(email.data, now(), knownDevice ?? null)
+        ? await store.codes.takeCodeAttempt(email.data, now(), checkedDevice(knownDevice) ?? null)
         : ({ status: 'none' } as const);
       if (attempt.status !== 'taken') {
         await store.limits.cancelGuess(reserved.ticket);
@@ -427,7 +424,7 @@ export function createSupabaseSignIn(options: SupabaseSignInOptions): SignInServ
       const made = verified.value;
       if (made === null) return wrong();
       await store.limits.cancelGuess(reserved.ticket);
-      await store.codes.dropCode(email.data);
+      await store.codes.dropCode(email.data, checkedDevice(knownDevice) ?? null);
       const proof = token();
       const proofExpiresAt = new Date(now().getTime() + settings.proofValidMinutes * minute);
       await store.codes.putProof(digest(proof), {

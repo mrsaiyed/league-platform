@@ -4,6 +4,10 @@
 --    (T-510): while that code works, an unknown device's ask does not replace it and
 --    another's typing does not spend its attempts. Codes asked before this step were
 --    asked by no known device (null).
+--    Each asker's entry is its own (T-511): the table is keyed by the address and the
+--    known device that asked, or none (nulls not distinct), so an unknown device's ask
+--    while a known device's code works gets an entry of its own, with its own attempts
+--    and expiry, and each verifier reads and spends only its own.
 -- 2. erase_account also removes the rows a known device's tries left under the address
 --    ('known-device <id> <address>'), so no row in the sign-in store holds an erased
 --    address (T-504, T-52). Otherwise as in 0012; its grants are unchanged.
@@ -13,7 +17,11 @@ alter table sign_in.codes add constraint codes_known_device_length
   check (known_device is null or length(known_device) between 16 and 128);
 
 comment on column sign_in.codes.known_device is
-  'The known device that asked for the code (T-510), or null: only its own typing spends it, and an unknown device''s ask does not replace it while it works.';
+  'The known device that asked for the code (T-510), or null: with the address it keys the entry (T-511), so each asker reads and spends only its own, and an unknown device''s ask does not replace a known device''s code while it works.';
+
+alter table sign_in.codes drop constraint codes_pkey;
+alter table sign_in.codes add constraint codes_email_known_device
+  unique nulls not distinct (email, known_device);
 
 -- Erasing an account (T-52, T-220, record 007): only the account set for this
 -- transaction, as its own request. Its row stays, emptied in place, so history keeps

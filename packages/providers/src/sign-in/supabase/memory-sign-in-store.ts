@@ -52,7 +52,15 @@ export function createMemorySignInStore(options: MemorySignInStoreOptions): Supa
   const limiters = new Map<string, AttemptLimiter>();
   const emailLimiterKeys = new Set<string>();
   const tickets = new Map<string, Ticket>();
-  const codes = new Map<string, PendingCode & { attemptsLeft: number }>();
+  // Each address's codes by the known device that asked, or null (T-511).
+  const codes = new Map<string, Map<string | null, PendingCode & { attemptsLeft: number }>>();
+  const entriesOf = (email: string) => {
+    const found = codes.get(email);
+    if (found) return found;
+    const made = new Map<string | null, PendingCode & { attemptsLeft: number }>();
+    codes.set(email, made);
+    return made;
+  };
   const emailChanges = new Map<string, PendingEmailChange & { attemptsLeft: number }>();
   const proofs = new Map<string, HeldProof>();
   const accounts = new Map<string, { hasPassword: boolean; devices: Set<string> }>();
@@ -159,31 +167,30 @@ export function createMemorySignInStore(options: MemorySignInStoreOptions): Supa
 
     codes: {
       async putCode(email, code) {
-        codes.set(email, { ...code });
+        entriesOf(email).set(code.knownDevice, { ...code });
       },
       async takeCodeAttempt(email, at, knownDevice) {
-        const pending = codes.get(email);
+        // Each asker reads and spends only its own entry (T-511).
+        const pending = codes.get(email)?.get(knownDevice);
         if (!pending || at.getTime() >= pending.expiresAt.getTime()) return { status: 'none' };
         if (pending.attemptsLeft <= 0) return { status: 'used-up' };
-        // Another's typing at a known device's code takes nothing (T-510).
-        const mine = pending.knownDevice === null || pending.knownDevice === knownDevice;
-        if (mine) pending.attemptsLeft--;
+        pending.attemptsLeft--;
         return {
           status: 'taken',
-          verifyType: mine ? pending.verifyType : null,
+          verifyType: pending.verifyType,
           attemptsLeft: pending.attemptsLeft,
         };
       },
       async knownDeviceCodeWaiting(email, at) {
-        const pending = codes.get(email);
-        return (
-          pending !== undefined &&
-          pending.knownDevice !== null &&
-          at.getTime() < pending.expiresAt.getTime()
-        );
+        for (const pending of codes.get(email)?.values() ?? []) {
+          if (pending.knownDevice !== null && at.getTime() < pending.expiresAt.getTime()) {
+            return true;
+          }
+        }
+        return false;
       },
-      async dropCode(email) {
-        codes.delete(email);
+      async dropCode(email, knownDevice) {
+        codes.get(email)?.delete(knownDevice);
       },
       async putEmailChange(accountId, change) {
         emailChanges.set(accountId, { ...change });

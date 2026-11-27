@@ -229,31 +229,49 @@ describe('the database sign-in store: what only the database can do', () => {
     });
   });
 
-  it("keeps a known device's code its own: another's typing takes nothing (T-510)", async () => {
+  it("keeps each asker's code its own: the address and the known device, or none (T-510, T-511)", async () => {
     await emptyTables();
     const s = store();
+    const email = 'ana@example.test';
     const laptop = 'device-made-up-0000000001';
-    await s.codes.putCode('ana@example.test', {
+    await s.codes.putCode(email, {
       verifyType: 'recovery',
       expiresAt: minutes(10),
       attemptsLeft: 5,
       knownDevice: laptop,
     });
-    expect(await s.codes.knownDeviceCodeWaiting('ana@example.test', at)).toBe(true);
-    expect(await s.codes.knownDeviceCodeWaiting('ana@example.test', minutes(10))).toBe(false);
+    expect(await s.codes.knownDeviceCodeWaiting(email, at)).toBe(true);
+    expect(await s.codes.knownDeviceCodeWaiting(email, minutes(10))).toBe(false);
     expect(await s.codes.knownDeviceCodeWaiting('ben@example.test', at)).toBe(false);
+    // Another known device, or none, has no entry yet: nothing of the laptop's is read.
     for (const other of [null, 'device-made-up-0000000002']) {
-      for (let i = 0; i < 6; i++) {
-        expect(await s.codes.takeCodeAttempt('ana@example.test', at, other)).toEqual({
-          status: 'taken',
-          verifyType: null,
-          attemptsLeft: 5,
-        });
-      }
+      expect(await s.codes.takeCodeAttempt(email, at, other)).toEqual({ status: 'none' });
     }
-    expect(await s.codes.takeCodeAttempt('ana@example.test', at, laptop)).toEqual({
+    // An unknown device's held ask: its own entry, no code, its own attempts and expiry.
+    const strangers = { verifyType: null, expiresAt: minutes(15), attemptsLeft: 5 } as const;
+    await s.codes.putCode(email, { ...strangers, knownDevice: null });
+    for (let left = 4; left >= 0; left--) {
+      expect(await s.codes.takeCodeAttempt(email, at, null)).toEqual({
+        status: 'taken',
+        verifyType: null,
+        attemptsLeft: left,
+      });
+    }
+    expect(await s.codes.takeCodeAttempt(email, at, null)).toEqual({ status: 'used-up' });
+    expect(await s.codes.takeCodeAttempt(email, minutes(12), null)).toEqual({ status: 'used-up' });
+    expect(await s.codes.takeCodeAttempt(email, minutes(15), null)).toEqual({ status: 'none' });
+    // The laptop's entry is untouched, and asking again replaces only its own.
+    expect(await s.codes.takeCodeAttempt(email, at, laptop)).toEqual({
       status: 'taken',
       verifyType: 'recovery',
+      attemptsLeft: 4,
+    });
+    await s.codes.putCode(email, { ...strangers, knownDevice: null });
+    await s.codes.dropCode(email, laptop);
+    expect(await s.codes.takeCodeAttempt(email, at, laptop)).toEqual({ status: 'none' });
+    expect(await s.codes.takeCodeAttempt(email, at, null)).toEqual({
+      status: 'taken',
+      verifyType: null,
       attemptsLeft: 4,
     });
   });
@@ -303,6 +321,38 @@ describe('the database sign-in store: what only the database can do', () => {
         await count(`select 1 from sign_in.${table} where subject in ($1, 'n-old')`, [old]),
       ).toBe(0);
     }
+  });
+
+  it('keeps the guesses behind a lock longer than the window while it holds (T-512)', async () => {
+    await emptyTables();
+    clock = at;
+    const s = store();
+    const limits = {
+      windowMinutes: 15,
+      slowAfter: 5,
+      slowSeconds: 30,
+      lockAfter: 2,
+      lockMinutes: 60,
+    };
+    const guess = (email: string, network: string) =>
+      s.limits.reserveGuess({ email, network, perEmail: limits, perNetwork: limits });
+    const rowsOf = async (subject: string) => ({
+      guesses: await count(`select 1 from sign_in.guesses where subject = $1`, [subject]),
+      locks: await count(`select 1 from sign_in.guess_locks where subject = $1`, [subject]),
+    });
+    await guess('ana@example.test', 'n-ana');
+    await guess('ana@example.test', 'n-ana');
+    expect(await rowsOf('ana@example.test')).toEqual({ guesses: 2, locks: 1 });
+    // Half an hour on, past the window but inside the lock, another subject's guess
+    // sweeps: the lock and the guesses behind it stay, and the lock still holds.
+    clock = minutes(30);
+    await guess('ben@example.test', 'n-ben');
+    expect(await rowsOf('ana@example.test')).toEqual({ guesses: 2, locks: 1 });
+    expect(await guess('ana@example.test', 'n-other')).toEqual({ retryAfterSeconds: 30 * 60 });
+    // Past the longer of the two, they go.
+    clock = minutes(121);
+    await guess('ben@example.test', 'n-ben');
+    expect(await rowsOf('ana@example.test')).toEqual({ guesses: 0, locks: 0 });
   });
 
   it('takes code attempts until they are used up, and none once the code has run out', async () => {

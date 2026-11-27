@@ -1523,7 +1523,7 @@ describe('wrong tries do not lock the wrong person out (T-504, T-505)', () => {
     expect(byCopy.to).toMatch(/problem=tooManyAttempts/);
   });
 
-  it("a known device's reset code outlives a stranger's ask and wrong codes (T-509, T-510)", async () => {
+  it("a known device's reset code outlives a stranger's ask and wrong codes (T-509, T-510, T-511)", async () => {
     const env = setup();
     const ownPhone = browser();
     await signUp(env, ownPhone, member);
@@ -1540,9 +1540,10 @@ describe('wrong tries do not lock the wrong person out (T-504, T-505)', () => {
     });
     expect(env.codeFor(member)).toBe(owners);
     const wrong = owners === '000000' ? '111111' : '000000';
+    // Its own entry, as for an address with no account (T-511): 5 attempts, then no more.
     for (let i = 0; i < 5; i++) {
       const typed = await enterCode({ code: wrong }, intruder.visit, env.deps);
-      expect(typed.to).toMatch(/problem=codeWrong/);
+      expect(typed.to).toMatch(i < 4 ? /problem=codeWrong/ : /problem=codeUsedUp/);
     }
     // The known device's ask was counted on the address with the stranger's (T-509).
     for (let i = 0; i < 3; i++) {

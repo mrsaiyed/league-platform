@@ -59,7 +59,7 @@ export type PendingCode = {
   readonly verifyType: 'signup' | 'magiclink' | 'recovery' | null;
   readonly expiresAt: Date;
   readonly attemptsLeft: number;
-  /** The known device that asked for it (T-510), else null: only its own typing spends it. */
+  /** The known device that asked for it (T-510), else null: each asker's entry is its own (T-511). */
   readonly knownDevice: string | null;
 };
 
@@ -109,12 +109,12 @@ export type HeldProof = {
 };
 
 export type SignInCodeStore = {
-  /** Replaces any code the address had. */
+  /** Replaces the code the same asker (the known device, or none) had for the address (T-511). */
   readonly putCode: (email: string, code: PendingCode) => Promise<void>;
   /**
-   * Takes one attempt at the address's code, if it has one that has not expired at `at`.
-   * At a code another known device asked for (T-510) nothing is taken: the attempt is
-   * answered as for a code never sent (`verifyType` null).
+   * Takes one attempt at the code this asker (the known device, or none) has for the
+   * address, if it has one that has not expired at `at`. Each asker reads and spends only
+   * its own entry (T-511).
    */
   readonly takeCodeAttempt: (
     email: string,
@@ -123,7 +123,8 @@ export type SignInCodeStore = {
   ) => Promise<CodeAttempt>;
   /** Whether the address's code, unexpired at `at`, was asked for by a known device (T-510). */
   readonly knownDeviceCodeWaiting: (email: string, at: Date) => Promise<boolean>;
-  readonly dropCode: (email: string) => Promise<void>;
+  /** Forgets this asker's code for the address; the others' entries stay (T-511). */
+  readonly dropCode: (email: string, knownDevice: string | null) => Promise<void>;
   /** Replaces the account's waiting change of email, if it had one: its older code is dead. */
   readonly putEmailChange: (accountId: string, change: PendingEmailChange) => Promise<void>;
   /** Takes one attempt at the account's own waiting change, if it has not expired at `at`. */
