@@ -46,6 +46,7 @@ import {
 } from '../list-forms/form-state.ts';
 import { rosterName } from '../teams-area/index.ts';
 import { unlikelyYears } from './age-on-record.ts';
+import { wholeNameInFirst } from './whole-name.ts';
 import { peopleRefusalText } from './refusal-text.ts';
 import { detailsAnchor, showAsAnchor } from './anchors.ts';
 import { nameRequestInputOf, nameRequestRefusalCode } from './name-request.ts';
@@ -151,6 +152,24 @@ async function showSaved(to: string): Promise<void> {
 }
 
 /**
+ * A whole name typed into the first-name box (step 2.146) is asked about before saving:
+ * nothing is saved, the boxes keep what was typed, and a tick that holds the first name it
+ * was given for saves it as it is. Undefined when there is nothing to ask.
+ */
+function askAboutWholeName(fields: TypedFields): Refused | undefined {
+  const first = (fields['firstName'] ?? '').trim();
+  if (fields['wholeNameChecked'] === first) return undefined;
+  if (!wholeNameInFirst(first, fields['lastName'] ?? '')) return undefined;
+  return {
+    kind: 'refused',
+    code: 'whole-name-check',
+    typed: fields,
+    wrong: [],
+    said: t('adminPeople.wholeName.check', { first }),
+  };
+}
+
+/**
  * A date of birth that makes a player very young or very old is shown back before it is
  * saved (R-28 as changed on 2026-11-17: a wrong year is the mistake that rule guards
  * against). Nothing is saved; the box keeps the date, the sentence says the age it makes,
@@ -248,7 +267,10 @@ export async function addPersonAction(_state: FormState, form: FormData): Promis
   const wrong = wrongBoxes(fields, today);
   if (wrong.length > 0) return refused('create_person', 'invalid-input', fields, wrong);
   if (emailNotTakenHere(fields, testCopy)) return onlyMadeUpEmail(fields);
-  const ask = askAboutBirthDate(fields, today) ?? (await askAboutSameName(context, deps, fields));
+  const ask =
+    askAboutWholeName(fields) ??
+    askAboutBirthDate(fields, today) ??
+    (await askAboutSameName(context, deps, fields));
   if (ask !== undefined) return ask;
   const result = await requests().once(requestKeyOf(context, fields), async () => {
     const made = await createPerson(context, newPersonInput(fields), deps);
@@ -275,6 +297,8 @@ export async function savePersonAction(_state: FormState, form: FormData): Promi
   const wrong = wrongBoxes(fields, today);
   if (wrong.length > 0) return refused('update_person', 'invalid-input', fields, wrong);
   if (emailNotTakenHere(fields, testCopy)) return onlyMadeUpEmail(fields);
+  const wholeName = askAboutWholeName(fields);
+  if (wholeName !== undefined) return wholeName;
   // Asked only about a date that is changed: one already saved is not asked about again.
   const typedDate = (fields['birthDate'] ?? '').trim();
   if (typedDate !== '' && fields['birthDateChecked'] !== typedDate) {

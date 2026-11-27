@@ -141,6 +141,9 @@ export const enAdminPeople = {
   'adminPeople.treated.childByChoice': 'Treated as a child, because they are marked as a child.',
   'adminPeople.treated.childNotRecorded':
     'Treated as a child: nothing records their age, and in this league anyone whose age is not recorded is shown as a child.',
+  'adminPeople.wholeName.check':
+    '“{first}” in the first-name box looks like a whole name. Put the last name in its own box; if this is the first name as it is, tick the box and save again.',
+  'adminPeople.wholeName.checked': 'Yes, this is the first name',
   'adminPeople.wrong.birthDate': 'Type a real date of birth: not after today, and not before 1900.',
   'adminPeople.wrong.contactEmail': 'Type a whole email address, such as name@example.com.',
   'adminPeople.wrong.firstName': 'Type a first name, up to 100 letters.',
