@@ -52,7 +52,15 @@ export function createMemorySignInStore(options: MemorySignInStoreOptions): Supa
   const limiters = new Map<string, AttemptLimiter>();
   const emailLimiterKeys = new Set<string>();
   const tickets = new Map<string, Ticket>();
-  const codes = new Map<string, PendingCode & { attemptsLeft: number }>();
+  // Each address's codes by the known device that asked, or null (T-511).
+  const codes = new Map<string, Map<string | null, PendingCode & { attemptsLeft: number }>>();
+  const entriesOf = (email: string) => {
+    const found = codes.get(email);
+    if (found) return found;
+    const made = new Map<string | null, PendingCode & { attemptsLeft: number }>();
+    codes.set(email, made);
+    return made;
+  };
   const emailChanges = new Map<string, PendingEmailChange & { attemptsLeft: number }>();
   const proofs = new Map<string, HeldProof>();
   const accounts = new Map<string, { hasPassword: boolean; devices: Set<string> }>();
@@ -159,10 +167,11 @@ export function createMemorySignInStore(options: MemorySignInStoreOptions): Supa
 
     codes: {
       async putCode(email, code) {
-        codes.set(email, { ...code });
+        entriesOf(email).set(code.knownDevice, { ...code });
       },
-      async takeCodeAttempt(email, at) {
-        const pending = codes.get(email);
+      async takeCodeAttempt(email, at, knownDevice) {
+        // Each asker reads and spends only its own entry (T-511).
+        const pending = codes.get(email)?.get(knownDevice);
         if (!pending || at.getTime() >= pending.expiresAt.getTime()) return { status: 'none' };
         if (pending.attemptsLeft <= 0) return { status: 'used-up' };
         pending.attemptsLeft--;
@@ -172,8 +181,16 @@ export function createMemorySignInStore(options: MemorySignInStoreOptions): Supa
           attemptsLeft: pending.attemptsLeft,
         };
       },
-      async dropCode(email) {
-        codes.delete(email);
+      async knownDeviceCodeWaiting(email, at) {
+        for (const pending of codes.get(email)?.values() ?? []) {
+          if (pending.knownDevice !== null && at.getTime() < pending.expiresAt.getTime()) {
+            return true;
+          }
+        }
+        return false;
+      },
+      async dropCode(email, knownDevice) {
+        codes.get(email)?.delete(knownDevice);
       },
       async putEmailChange(accountId, change) {
         emailChanges.set(accountId, { ...change });
@@ -211,7 +228,13 @@ export function createMemorySignInStore(options: MemorySignInStoreOptions): Supa
       },
       async dropProofsFor(email) {
         for (const [hash, proof] of proofs) if (proof.email === email) proofs.delete(hash);
-        codes.delete(email);
+        // The owner's own codes (a known device's) end; every other asker's entry stays,
+        // its code removed, its attempts and expiry its own (T-522).
+        const entries = codes.get(email);
+        for (const [asker, pending] of entries ?? []) {
+          if (asker !== null) entries?.delete(asker);
+          else entries?.set(asker, { ...pending, verifyType: null });
+        }
       },
     },
 

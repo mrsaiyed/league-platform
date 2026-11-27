@@ -20,13 +20,26 @@ export type SignInSettings = {
   readonly attemptsPerCode: number;
   /** T-67: a few codes per hour per address (sign-up and reset together). */
   readonly codesPerHour: number;
-  /** T-225: codes asked for from one network in an hour, whatever the addresses. */
+  /**
+   * T-225, T-507: codes asked for from one network in an hour, whatever the addresses.
+   * High, because a school's Wi-Fi or a phone carrier puts many people behind one
+   * network; one address's own limit is `codesPerHour`.
+   */
   readonly codesPerHourPerNetwork: number;
+  /**
+   * T-509: asks to sign up from one network in an hour, counted apart from
+   * `codesPerHourPerNetwork`, which is then the codes for signing in and resetting. Each
+   * may make a user at the sign-in service, so it is lower.
+   */
+  readonly signUpsPerHourPerNetwork: number;
   /** How long the proof from a right code stays good for setting the password. */
   readonly proofValidMinutes: number;
   /** T-85: wrong passwords per address typed. */
   readonly guessesPerEmail: AttemptLimits;
-  /** T-85, T-225: wrong passwords and wrong codes per network. */
+  /**
+   * T-85, T-225: wrong passwords per network, and, counted apart under the same numbers
+   * (T-506), wrong codes per network.
+   */
   readonly guessesPerNetwork: AttemptLimits;
   /**
    * T-68: the least time a password check takes, in milliseconds, so a wrong address
@@ -40,7 +53,8 @@ export const signInDefaults: SignInSettings = {
   codeValidMinutes: 10,
   attemptsPerCode: 5,
   codesPerHour: 5,
-  codesPerHourPerNetwork: 30,
+  codesPerHourPerNetwork: 200,
+  signUpsPerHourPerNetwork: 60,
   proofValidMinutes: 15,
   guessesPerEmail: {
     windowMinutes: 15,

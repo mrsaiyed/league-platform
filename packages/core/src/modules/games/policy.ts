@@ -3,6 +3,7 @@ import type { CommandContext } from '../../command/index.ts';
 import {
   accessOfAccount,
   allows,
+  type AccessHolder,
   hasPermission,
   hasPermissionAnywhere,
   leagueScope,
@@ -10,6 +11,7 @@ import {
   type Permission,
   type Scope,
 } from '../access/index.ts';
+import { maySeeSuspendedLeague } from '../leagues/index.ts';
 import type { GamesTx } from './ports.ts';
 import { mayScoreUnder, scoresWithoutAssignment, scoringRuleOf } from './scoring-access.ts';
 
@@ -38,21 +40,81 @@ export async function mayChangeGames(
  * there is checked league-wide, as for any change to a game; with no game there is
  * no assignment, so a scorekeeper limited to assigned games learns nothing of it.
  */
-export async function mayScoreGame(
+export function mayScoreGame(
   context: CommandContext,
   tx: GamesTx,
   gameId: string,
+): Promise<boolean> {
+  return mayReachScoring(context, tx, gameId, false);
+}
+
+/**
+ * Seeing what scoring a game shows, changing nothing (T-519): whoever mayScoreGame would
+ * let score it in a working league, so an archived league stays viewable (U-9). A
+ * suspended league is seen only by its owner and admins (S-126, mayOpenLeague), so there
+ * only they view it (T-520). Every change still asks mayScoreGame.
+ */
+export function mayViewScoring(
+  context: CommandContext,
+  tx: GamesTx,
+  gameId: string,
+): Promise<boolean> {
+  return mayReachScoring(context, tx, gameId, true);
+}
+
+async function mayReachScoring(
+  context: CommandContext,
+  tx: GamesTx,
+  gameId: string,
+  readOnlyToo: boolean,
 ): Promise<boolean> {
   if (context.accountId === null) return false;
   const scope = await gameScope(tx, gameId);
   const holder = await accessOfAccount(tx, context.accountId);
   if (holder === undefined || !allows(holder, 'games.score', scope)) return false;
   const status = await tx.access.leagueStatus();
-  if (status === undefined || readOnlyLeagueStatuses.includes(status)) return false;
+  if (status === undefined) return false;
+  if (!readOnlyToo && readOnlyLeagueStatuses.includes(status)) return false;
+  if (!mayViewInState(status, holder)) return false;
   if (scoresWithoutAssignment(holder, scope)) return true;
   const rule = await scoringRuleOf(tx);
   const assigned = rule === 'assignedOnly' && (await tx.games.isAssigned(gameId, holder.accountId));
   return mayScoreUnder(holder, scope, rule, assigned);
+}
+
+/**
+ * Seeing what correcting a game shows, changing nothing (T-519): the permission at the
+ * game's program, in an archived league too; in a suspended one only for its owner and
+ * admins (T-520). Every change still asks mayChangeGames.
+ */
+export async function mayViewChanges(
+  context: CommandContext,
+  tx: GamesTx,
+  permission: Permission,
+  scope: Scope,
+): Promise<boolean> {
+  if (!(await hasPermission(context, tx, permission, scope))) return false;
+  const status = await tx.access.leagueStatus();
+  if (status === undefined) return false;
+  if (status !== 'suspended') return true;
+  return (
+    context.accountId !== null &&
+    mayViewInState(status, await accessOfAccount(tx, context.accountId))
+  );
+}
+
+/**
+ * Whether a league in `status` shows its games' views to `holder` (T-520): a suspended
+ * league only to its owner and admins, as it opens only to them (S-126, mayOpenLeague).
+ */
+export function mayViewInState(status: string, holder: AccessHolder | undefined): boolean {
+  return status !== 'suspended' || maySeeSuspendedLeague(holder);
+}
+
+/** The league's state when it is read-only (archived or suspended, U-9), else null. */
+export async function readOnlyStateOf(tx: GamesTx): Promise<'archived' | 'suspended' | null> {
+  const status = await tx.access.leagueStatus();
+  return status === 'archived' || status === 'suspended' ? status : null;
 }
 
 /**

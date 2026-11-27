@@ -44,12 +44,16 @@ export const enAdminGames = {
     'Copy the paper score sheet. Tick each player who played; a player with any number filled in counts as played. Leave a whole column empty if the sheet did not keep that number; it then does not count in that player’s averages. In a column you fill in, an empty box counts as 0.',
   'admin.boxScore.jersey': '#{number}',
   'admin.boxScore.left': '(left the team)',
+  'admin.boxScore.locked.archived':
+    'This league is archived, so its games can be viewed but not changed.',
   'admin.boxScore.locked.cancelled': 'This game was cancelled, so it has no box score.',
   'admin.boxScore.locked.decided':
     'This game is final. To correct it, reopen it with a reason; then enter its result again.',
   // Step 2.158 (M32): a postponed game's own page offers no score entry.
   'admin.boxScore.locked.postponed':
     'This game is postponed, so it has no score yet. It is scored once it is played on its new date.',
+  'admin.boxScore.locked.suspended':
+    'This league is suspended, so its games can be viewed but not changed.',
   'admin.boxScore.locked.tracked':
     'This game was scored with the live tracker. Correct it with “Edit the box score”, or on the scoring screen to take points away; either way its list of plays still explains the numbers.',
   'admin.boxScore.minutes': 'Minutes',
@@ -123,6 +127,8 @@ export const enAdminGames = {
     'This game is final. To edit its box score, reopen it with a reason first.',
   'admin.boxScore.tracked.notCorrectable.game-not-live':
     'This game is not under way, so its box score cannot be edited here.',
+  'admin.boxScore.tracked.notCorrectable.league-read-only':
+    'This league is archived or suspended, so this box score can be viewed but not changed.',
   'admin.boxScore.tracked.notCorrectable.reason-needed':
     'This game is still being scored live. To edit its box score here, end it on the scoring screen, then reopen it with a reason.',
   'admin.boxScore.tracked.refused.basket-not-in-plays':
@@ -154,6 +160,7 @@ export const enAdminGames = {
   'admin.boxScore.tracked.save': 'Save the changes',
   'admin.boxScore.tracked.saved': 'Saved. These plays were added to the game’s list of plays:',
   'admin.boxScore.tracked.title': 'Edit box score: {away} at {home}',
+  'admin.boxScore.tracked.view': 'See the box score as it was tracked',
   // The box score grid (step 2.64).
   'admin.games.boxScore': 'Box score',
   // Step 2.158 (H9; A-5): "Forfeit, postpone or cancel" asks once, naming the game, and only

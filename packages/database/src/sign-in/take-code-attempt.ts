@@ -1,5 +1,7 @@
-// One attempt at the address's code, if it has one that has not run out at `at`. Of
-// two attempts at once, each takes its own: the update is the one step.
+// One attempt at the code the asker has for the address, if it has one that has not
+// run out at `at`. Of two attempts at once, each takes its own: the update is the one
+// step. Each asker reads and spends only its own entry, a known device's or the one no
+// known device asked for (T-511): another's typing never reaches it.
 import { sql } from 'kysely';
 import { signInTransactionOf, type SignInScope } from '../db/sign-in-transaction.ts';
 import { verifyTypeOf } from './proof-rows.ts';
@@ -9,12 +11,14 @@ export async function takeCodeAttempt(
   scope: SignInScope,
   email: string,
   at: Date,
+  knownDevice: string | null,
 ): Promise<CodeAttempt> {
   const trx = signInTransactionOf(scope);
   const taken = await trx
     .updateTable('sign_in.codes')
     .set({ attempts_left: sql<number>`attempts_left - 1` })
     .where('email', '=', email)
+    .where('known_device', 'is not distinct from', knownDevice)
     .where('expires_at', '>', at)
     .where('attempts_left', '>', 0)
     .returning(['verify_type', 'attempts_left'])
@@ -30,6 +34,7 @@ export async function takeCodeAttempt(
     .selectFrom('sign_in.codes')
     .select('expires_at')
     .where('email', '=', email)
+    .where('known_device', 'is not distinct from', knownDevice)
     .executeTakeFirst();
   if (pending === undefined || at.getTime() >= pending.expires_at.getTime()) {
     return { status: 'none' };

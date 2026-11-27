@@ -34,6 +34,12 @@ import type {
   TooManyAttempts,
 } from '../sign-in-service.ts';
 import { signInDefaults, type SignInSettings } from '../sign-in-settings.ts';
+import {
+  checkedDevice,
+  codeAskLimits,
+  codeGuessSubject,
+  limitSubjects,
+} from '../limit-subjects.ts';
 import { createAttemptLimiter } from './attempt-limiter.ts';
 import { sampleLeakedPasswords } from './leaked-passwords.ts';
 import { scryptPasswordHasher, type PasswordHash, type PasswordHasher } from './password-hash.ts';
@@ -98,10 +104,12 @@ type PendingCode = {
   readonly code: string | null;
   readonly expiresAt: number;
   attemptsLeft: number;
+  /** The known device that asked for it (T-510), else null: each asker's entry is its own (T-511). */
+  readonly knownDevice: string | null;
 };
 
 /** A change of email asked and not yet confirmed (T-455): the account's own, one at a time. */
-type PendingEmailChange = PendingCode & { readonly newEmail: string };
+type PendingEmailChange = Omit<PendingCode, 'knownDevice'> & { readonly newEmail: string };
 
 type Session = {
   readonly id: string;
@@ -152,7 +160,8 @@ export function createLocalSignInStandIn(options: LocalSignInOptions): LocalSign
   const returnRules = { allowedOrigins: options.returnOrigins ?? [], allowLocalHttp: true };
 
   const accounts = new Map<string, Account>();
-  const pendingCodes = new Map<string, PendingCode>();
+  // Each address's codes by the known device that asked, or null (T-511).
+  const pendingCodes = new Map<string, Map<string | null, PendingCode>>();
   const codeRequestsByEmail = new Map<string, number[]>();
   const codeRequestsByNetwork = new Map<string, number[]>();
   const proofs = new Map<string, { email: string; expiresAt: number }>();
@@ -182,11 +191,12 @@ export function createLocalSignInStandIn(options: LocalSignInOptions): LocalSign
   const newCode = () => String(randomInt(0, 1_000_000)).padStart(6, '0');
 
   /** Counts a request for a code against the address and the network (T-225); the wait if over. */
-  const countCodeRequest = (email: string, network: string): number | null => {
+  const countCodeRequest = (counted: ReturnType<typeof codeAskLimits>): number | null => {
+    const { email, network } = counted;
     // Counted whether or not an account exists, so the limit looks the same (T-68).
     const waits = [
-      hourlyWait(codeRequestsByEmail, email, settings.codesPerHour),
-      hourlyWait(codeRequestsByNetwork, network, settings.codesPerHourPerNetwork),
+      hourlyWait(codeRequestsByEmail, email, counted.perEmail),
+      hourlyWait(codeRequestsByNetwork, network, counted.perNetwork),
     ].filter((w) => w !== null);
     if (waits.length) return Math.max(...waits);
     const at = now().getTime();
@@ -195,23 +205,37 @@ export function createLocalSignInStandIn(options: LocalSignInOptions): LocalSign
     return null;
   };
 
-  const requestCode = async (rawEmail: string, rawNetwork: string, purpose: CodePurpose) => {
+  const requestCode = async (
+    rawEmail: string,
+    rawNetwork: string,
+    purpose: CodePurpose,
+    knownDevice: string | undefined,
+  ) => {
     const network = parseNetwork(rawNetwork);
     const parsed = signInEmail.safeParse(rawEmail);
     if (!parsed.success) return fail({ code: 'invalid-email' as const });
     const email = parsed.data;
-    const wait = countCodeRequest(email, network);
+    // Every ask, a known device's too, is counted on the address and the network (T-509).
+    const device = checkedDevice(knownDevice) ?? null;
+    const wait = countCodeRequest(codeAskLimits(email, network, purpose, settings));
     if (wait !== null) return fail(tooMany(wait));
     const at = now().getTime();
 
     const account = accounts.get(email);
+    // An unknown device never replaces a code a known device asked for while it works
+    // (T-510). Its ask is held (T-511): it gets an entry of its own with no code, its own
+    // attempts and its own expiry, as a reset for an address with no account does.
+    const entries = pendingCodes.get(email) ?? new Map<string | null, PendingCode>();
+    const held =
+      device === null &&
+      [...entries.values()].some((other) => other.knownDevice !== null && at < other.expiresAt);
     const expiresAt = at + settings.codeValidMinutes * minute;
     // Sign-up always sends a code: to an address that already has an account it is
     // the reset route (T-67). Reset has a code only if there is an account. Either
     // way the sender gets a message (one with no code sends nothing), so asking costs
     // the same work, and the address gets a pending entry, so guessing behaves the
     // same (T-68).
-    const code = purpose === 'sign-up' || account !== undefined ? newCode() : null;
+    const code = !held && (purpose === 'sign-up' || account !== undefined) ? newCode() : null;
     const sent = await options.codeSender.send({
       to: email,
       purpose,
@@ -221,7 +245,18 @@ export function createLocalSignInStandIn(options: LocalSignInOptions): LocalSign
     });
     // A code no one received is not kept.
     if (!sent.ok) return fail({ code: 'code-not-sent' as const });
-    pendingCodes.set(email, { code, expiresAt, attemptsLeft: settings.attemptsPerCode });
+    // A new code ends the others' codes, as Supabase keeps only the newest; their
+    // entries, attempts and expiry stay theirs.
+    if (code !== null) {
+      for (const [asker, other] of entries) entries.set(asker, { ...other, code: null });
+    }
+    entries.set(device, {
+      code,
+      expiresAt,
+      attemptsLeft: settings.attemptsPerCode,
+      knownDevice: device,
+    });
+    pendingCodes.set(email, entries);
     return ok({ codeValidMinutes: settings.codeValidMinutes });
   };
 
@@ -306,31 +341,45 @@ export function createLocalSignInStandIn(options: LocalSignInOptions): LocalSign
     };
   };
 
-  /** Ends other proofs and codes for the address once its password is set. */
+  /**
+   * Ends other proofs for the address once its password is set, and the owner's own codes
+   * (a known device's). Every other asker's entry stays, its code removed and its attempts
+   * and expiry unchanged, so a stranger hears what an address with no account says (T-522).
+   */
   const forgetProofsFor = (email: string) => {
     for (const [proof, held] of proofs) if (held.email === email) proofs.delete(proof);
-    pendingCodes.delete(email);
+    const entries = pendingCodes.get(email);
+    for (const [asker, pending] of entries ?? []) {
+      if (asker !== null) entries?.delete(asker);
+      else entries?.set(asker, { ...pending, code: null });
+    }
   };
 
   const service: SignInService = {
-    startSignUp: ({ email, networkAddress }) => requestCode(email, networkAddress, 'sign-up'),
-    startReset: ({ email, networkAddress }) => requestCode(email, networkAddress, 'reset'),
+    startSignUp: ({ email, networkAddress, knownDevice }) =>
+      requestCode(email, networkAddress, 'sign-up', knownDevice),
+    startReset: ({ email, networkAddress, knownDevice }) =>
+      requestCode(email, networkAddress, 'reset', knownDevice),
 
-    async verifyCode({ email: rawEmail, code: rawCode, networkAddress }) {
+    async verifyCode({ email: rawEmail, code: rawCode, networkAddress, knownDevice }) {
       const network = parseNetwork(networkAddress);
-      const allowed = guessesPerNetwork.check(network);
+      // Wrong codes are counted apart from wrong passwords (T-506).
+      const codeKey = codeGuessSubject(network, knownDevice);
+      const allowed = guessesPerNetwork.check(codeKey);
       if (!allowed.allowed) {
         return fail({ code: 'too-many-attempts', retryAfterSeconds: allowed.retryAfterSeconds });
       }
       const email = signInEmail.safeParse(rawEmail);
-      const pending = email.success ? pendingCodes.get(email.data) : undefined;
+      // Each asker reads and spends only its own entry (T-511).
+      const asker = checkedDevice(knownDevice) ?? null;
+      const pending = email.success ? pendingCodes.get(email.data)?.get(asker) : undefined;
       if (!email.success || !pending || now().getTime() >= pending.expiresAt) {
         return fail({ code: 'code-expired' });
       }
       if (pending.attemptsLeft <= 0) return fail({ code: 'too-many-attempts' });
       const code = emailCode.safeParse(rawCode);
       if (pending.code !== null && code.success && code.data === pending.code) {
-        pendingCodes.delete(email.data);
+        pendingCodes.get(email.data)?.delete(asker);
         const proof = token();
         const expiresAt = now().getTime() + settings.proofValidMinutes * minute;
         proofs.set(proof, { email: email.data, expiresAt });
@@ -339,7 +388,7 @@ export function createLocalSignInStandIn(options: LocalSignInOptions): LocalSign
         return ok({ proof, proofExpiresAt: new Date(expiresAt), accountExists });
       }
       pending.attemptsLeft--;
-      guessesPerNetwork.recordFailure(network);
+      guessesPerNetwork.recordFailure(codeKey);
       return fail({ code: pending.attemptsLeft <= 0 ? 'too-many-attempts' : 'code-wrong' });
     },
 
@@ -385,12 +434,14 @@ export function createLocalSignInStandIn(options: LocalSignInOptions): LocalSign
       });
     },
 
-    async signIn({ email: rawEmail, password, device }) {
+    async signIn({ email: rawEmail, password, device, knownDevice }) {
       const where = parseDevice(device);
       const parsedEmail = signInEmail.safeParse(rawEmail);
       // An address that is not one has no account and no count of its own.
       const email = parsedEmail.success ? parsedEmail.data : null;
-      const reserved = reserveGuess(email, where.networkAddress);
+      // A device that has signed in to this address before is counted on its own (T-504).
+      const counted = limitSubjects(email, where.networkAddress, knownDevice);
+      const reserved = reserveGuess(counted.email, counted.network);
       if ('limited' in reserved) return fail(reserved.limited);
       const attempt = passwordAttempt.safeParse(password);
       const account = email === null ? undefined : accounts.get(email);
@@ -568,7 +619,7 @@ export function createLocalSignInStandIn(options: LocalSignInOptions): LocalSign
       }
       reserved.forgive();
       session.passwordEnteredAt = now();
-      const wait = countCodeRequest(email, network);
+      const wait = countCodeRequest(codeAskLimits(email, network, 'email-change', settings));
       if (wait !== null) return fail(tooMany(wait));
       // Another account's address gets no code and the same answer (T-68): the sender is
       // handed a message either way, and one with no code sends nothing.
@@ -596,7 +647,8 @@ export function createLocalSignInStandIn(options: LocalSignInOptions): LocalSign
       const network = parseNetwork(networkAddress);
       const session = liveSession(accessToken);
       if ('code' in session) return fail(session);
-      const allowed = guessesPerNetwork.check(network);
+      const codeKey = codeGuessSubject(network, undefined);
+      const allowed = guessesPerNetwork.check(codeKey);
       if (!allowed.allowed) {
         return fail({ code: 'too-many-attempts', retryAfterSeconds: allowed.retryAfterSeconds });
       }
@@ -610,7 +662,7 @@ export function createLocalSignInStandIn(options: LocalSignInOptions): LocalSign
       // Taken since it was asked: nothing changes, and the answer is a wrong code's (T-455).
       if (!right || accounts.has(pending.newEmail)) {
         pending.attemptsLeft--;
-        guessesPerNetwork.recordFailure(network);
+        guessesPerNetwork.recordFailure(codeKey);
         return fail({ code: pending.attemptsLeft <= 0 ? 'too-many-attempts' : 'code-wrong' });
       }
       emailChanges.delete(account);

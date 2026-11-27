@@ -59,6 +59,8 @@ export type PendingCode = {
   readonly verifyType: 'signup' | 'magiclink' | 'recovery' | null;
   readonly expiresAt: Date;
   readonly attemptsLeft: number;
+  /** The known device that asked for it (T-510), else null: each asker's entry is its own (T-511). */
+  readonly knownDevice: string | null;
 };
 
 export type CodeAttempt =
@@ -107,11 +109,22 @@ export type HeldProof = {
 };
 
 export type SignInCodeStore = {
-  /** Replaces any code the address had. */
+  /** Replaces the code the same asker (the known device, or none) had for the address (T-511). */
   readonly putCode: (email: string, code: PendingCode) => Promise<void>;
-  /** Takes one attempt at the address's code, if it has one that has not expired at `at`. */
-  readonly takeCodeAttempt: (email: string, at: Date) => Promise<CodeAttempt>;
-  readonly dropCode: (email: string) => Promise<void>;
+  /**
+   * Takes one attempt at the code this asker (the known device, or none) has for the
+   * address, if it has one that has not expired at `at`. Each asker reads and spends only
+   * its own entry (T-511).
+   */
+  readonly takeCodeAttempt: (
+    email: string,
+    at: Date,
+    knownDevice: string | null,
+  ) => Promise<CodeAttempt>;
+  /** Whether the address's code, unexpired at `at`, was asked for by a known device (T-510). */
+  readonly knownDeviceCodeWaiting: (email: string, at: Date) => Promise<boolean>;
+  /** Forgets this asker's code for the address; the others' entries stay (T-511). */
+  readonly dropCode: (email: string, knownDevice: string | null) => Promise<void>;
   /** Replaces the account's waiting change of email, if it had one: its older code is dead. */
   readonly putEmailChange: (accountId: string, change: PendingEmailChange) => Promise<void>;
   /** Takes one attempt at the account's own waiting change, if it has not expired at `at`. */
@@ -126,7 +139,10 @@ export type SignInCodeStore = {
    * for one address, one gets it. Forgets proofs that have run out.
    */
   readonly takeProof: (proofHash: string, at: Date) => Promise<HeldProof | undefined>;
-  /** Ends every proof and code for the address. */
+  /**
+   * Ends every proof for the address and the codes its known devices asked for; every
+   * other asker's entry stays with its code removed, attempts and expiry unchanged (T-522).
+   */
   readonly dropProofsFor: (email: string) => Promise<void>;
 };
 

@@ -201,6 +201,77 @@ describe('the same answer whether or not an account exists (T-68)', () => {
     expect(b).toEqual(a);
   });
 
+  it('when a stranger locks the address and a device the app vouches for tries (T-504)', async () => {
+    const [a, b] = await both(async (sign, email, env) => {
+      const elsewhere = '198.51.100.7';
+      const intruder = {
+        ...laptop,
+        deviceId: 'device-intruder-000000003',
+        networkAddress: elsewhere,
+      };
+      const wrong = 'not the password';
+      const vouched = { email, networkAddress: here, knownDevice: laptop.deviceId };
+      const results = [];
+      for (let i = 0; i < 11; i++) {
+        results.push(await sign.signIn({ email, password: wrong, device: intruder }));
+        env.advanceSeconds(30);
+      }
+      results.push(
+        await sign.signIn({ email, password: wrong, device: laptop, knownDevice: laptop.deviceId }),
+      );
+      // A known device's ask is counted on the address with strangers' (T-509).
+      results.push(await sign.startReset(vouched));
+      for (let i = 0; i < 5; i++) {
+        results.push(await sign.startReset({ email, networkAddress: elsewhere }));
+      }
+      results.push(await sign.startReset({ email, networkAddress: here }));
+      results.push(await sign.verifyCode({ ...vouched, code: '000000' }));
+      return results;
+    });
+    expect(codes(a ?? [])).toEqual([
+      ...Array(10).fill('wrong-email-or-password'),
+      'too-many-attempts',
+      'wrong-email-or-password',
+      ...Array(5).fill('ok'),
+      'too-many-attempts',
+      'too-many-attempts',
+      'code-wrong',
+    ]);
+    expect(b).toEqual(a);
+  });
+
+  it('when the member is mid-reset on a device the app vouches for (T-511)', async () => {
+    const [a, b] = await both(async (sign, email, env) => {
+      // The member asks on the laptop; five minutes on, a stranger elsewhere asks for
+      // the address the run is about and types wrong codes until its entry runs out.
+      const vouched = { email: member, networkAddress: here, knownDevice: laptop.deviceId };
+      const results: Parameters<typeof codes>[0][number][] = [await sign.startReset(vouched)];
+      env.advanceSeconds(5 * 60);
+      const strangers = { email, networkAddress: '198.51.100.7' };
+      const verify = () => sign.verifyCode({ ...strangers, code: '000000' });
+      results.push(await sign.startSignUp(strangers));
+      for (let i = 0; i < 3; i++) results.push(await verify());
+      results.push(await sign.startReset(strangers));
+      for (let i = 0; i < 6; i++) results.push(await verify());
+      env.advanceSeconds(5 * 60 + 1);
+      results.push(await verify());
+      env.advanceSeconds(5 * 60);
+      results.push(await verify());
+      return [...codes(results), results];
+    });
+    // '000000' could be a real code once in a million runs.
+    expect(a?.slice(0, 14)).toEqual([
+      'ok',
+      'ok',
+      ...Array(3).fill('code-wrong'),
+      'ok',
+      ...Array(4).fill('code-wrong'),
+      ...Array(3).fill('too-many-attempts'),
+      'code-expired',
+    ]);
+    expect(b).toEqual(a);
+  });
+
   it('and only the mailbox learns the difference', async () => {
     const env = setup();
     await signUp(env, member);

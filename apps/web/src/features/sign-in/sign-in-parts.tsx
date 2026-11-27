@@ -5,11 +5,13 @@ import { botCheckDidNotLoad, type BotCheckAction, type BotCheckWidget } from '@s
 import type { ReactNode } from 'react';
 import { webPorts } from '../../server/container.ts';
 import { t, type TextKey } from '../../server/messages.ts';
+import { safeReturnPath } from '../../server/sign-in/device.ts';
 import {
   noticeOf,
   notices,
   problemOf,
   problems,
+  screenUrl,
   type Problem,
 } from '../../server/sign-in/problems.ts';
 import { StandalonePage, TestCopyLine } from '../shell/index.ts';
@@ -79,13 +81,17 @@ export type SearchProps = {
 type Search = Readonly<Record<string, string | string[] | undefined>>;
 
 /**
- * "Too many tries" in the words people use (M28): the wait in whole minutes (record 081);
- * on a screen with "Forgot your password?" (`forgotHint`), with the way in that does not
- * wait.
+ * A pause for safety in the words people use (M28): the wait in whole minutes (record 081),
+ * never blaming the person, since a stranger's tries pause it too (step 2.234, S-133). On a
+ * screen with "Forgot your password?" (`forgotHint`) it is a lock-out of the password, and
+ * a link "Reset your password" follows the words; "Continue with Google" is named only on a
+ * screen that draws it (`google`, M27). The same words whether or not an address has an
+ * account (T-68).
  */
-function tooManyWords(seconds: number, forgotHint: boolean): string {
+export function tooManyWords(seconds: number, forgotHint: boolean, google: boolean): string {
   const count = minutesOf(seconds);
-  return t.plural(forgotHint ? 'problem.lockedOut' : 'problem.tooManyAttempts', count, { count });
+  const base = forgotHint ? 'problem.lockedOut' : 'problem.tooManyAttempts';
+  return t.plural(google ? `${base}Google` : base, count, { count });
 }
 
 export async function SignInScreen({
@@ -145,8 +151,19 @@ export async function SignInScreen({
             data-ask={problem.name in asksToSignIn ? '' : undefined}
           >
             {problem.name === 'tooManyAttempts'
-              ? tooManyWords(problem.wait, forgotHint)
+              ? tooManyWords(problem.wait, forgotHint, google)
               : t(problemWords(problem.name, google))}
+            {problem.name === 'tooManyAttempts' && forgotHint ? (
+              <>
+                {' '}
+                <a
+                  href={screenUrl('forgotPassword', { next: safeReturnPath(search['next']) })}
+                  data-way-in="reset"
+                >
+                  {t('signIn.resetPassword')}
+                </a>
+              </>
+            ) : null}
           </p>
         )}
         {children}

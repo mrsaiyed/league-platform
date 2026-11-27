@@ -5,6 +5,7 @@ import { cookies, headers } from 'next/headers';
 import { getConfig } from '../config.ts';
 import { webPorts } from '../container.ts';
 import { networkAddressOf, type Visit } from './device.ts';
+import { knownDevicesFrom } from './known-device.ts';
 import type { FlowDeps } from './flows.ts';
 
 export async function nextVisit(): Promise<Visit> {
@@ -54,6 +55,7 @@ export async function flowDeps(): Promise<FlowDeps> {
     testCopy: ports.testCopy,
     now: () => new Date(),
     google: googleSetUp(),
+    knownDevices: knownDevicesFrom(getConfig()),
   };
 }
 

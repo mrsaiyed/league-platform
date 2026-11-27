@@ -4,6 +4,10 @@ Moved out of `STATUS.md` on 2026-11-22 so that the status stays short (USAGE.md,
 
 ## Entries
 
+- 2026-11-27 06:07 UTC — Step 2.234 landed (second Opus lead, 2026-11-27): limits on wrong sign-in and reset tries, a known device spared strangers' wrong tries, each asker's code entry its own (T-504 to T-512, T-522, S-133; migration 0033). Two builders, a review by attack, two fix rounds, two confirming looks by the strongest model (the first found two Highs, mended), a closing helper with one more mend, a fix of a race in the test stand-in's kept emails.
+
+- 2026-11-27 06:04 UTC — Step 2.253 landed (second Opus lead, 2026-11-27): in an archived league the admin's box score sheet, a game's format and the tracked grid are viewable with every change refused (T-519 to T-521); in a suspended league only the owner and admins; Earlier games links them. One builder, a review (1 Medium, 5 Lows), a fix round.
+
 - 2026-11-27 03:19 UTC — Step 2.228 landed (03:18 UTC 2026-11-27, Opus lead): the role matrix tries 19 kinds of person in active, archived and suspended leagues and under assigned games only, and checks every read's fields and rows (T-500 to T-503; S-132 reversed: only a draft league can be removed).
 
 - 2026-11-26 18:52 UTC — Step 2.128 landed (18:52 UTC 2026-11-26, Opus lead): a person's own name, password and email; every account without a name is asked it at its next request; the two own-name queries on the fence's list (T-498, decided for you by the lead under the founder's words of 2026-11-26).

@@ -988,7 +988,9 @@ const historySeason = (programId: string): SeasonSpec => {
         away: ids[(2 * k + 1 + round) % count] ?? '',
         status: 'final',
         score: [home, away === home ? away + 1 : away],
-        capture: 'final',
+        // The tenth round's first game was scored on a box score sheet, so Earlier games
+        // links its sheet in the archived league (step 2.253, T-519).
+        capture: round === 9 && k === 0 ? 'box' : 'final',
         venue: historyHall,
         court: court(31),
         number: n + 1,

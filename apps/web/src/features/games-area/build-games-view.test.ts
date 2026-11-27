@@ -23,6 +23,7 @@ const game = (over: Partial<MyGame>): MyGame => ({
   scorable: true,
   inArchivedSeason: false,
   leagueScores: true,
+  viewable: true,
   hasPlays: false,
   version: 2,
   forfeitScore: { winner: 20, loser: 0 },
@@ -56,6 +57,19 @@ describe('buildGameRows', () => {
     expect(rowOf({ inArchivedSeason: true, status: 'cancelled' })).toMatchObject({
       canPutBack: false,
     });
+  });
+
+  it("links a final game's box score in an archived league, where nothing is scorable (T-519, U-9)", () => {
+    const archived = { scorable: false, leagueScores: false, recording: 'box-score' } as const;
+    expect(rowOf({ ...archived, status: 'final' })).toMatchObject({
+      boxScoreLink: true,
+      canScore: false,
+      canCancel: false,
+    });
+    expect(rowOf({ ...archived, status: 'forfeit' }).boxScoreLink).toBe(true);
+    // Not a game still to play, and not for whoever may not view it (T-520).
+    expect(rowOf({ ...archived, status: 'scheduled' }).boxScoreLink).toBe(false);
+    expect(rowOf({ ...archived, status: 'final', viewable: false }).boxScoreLink).toBe(false);
   });
 
   it("shows an archived season's decided game how it is corrected, but nothing in an archived league (O-12, T-381, U-9)", () => {

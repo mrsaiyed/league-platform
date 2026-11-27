@@ -25,6 +25,8 @@ export type PendingCode = {
   readonly verifyType: VerifyType | null;
   readonly expiresAt: Date;
   readonly attemptsLeft: number;
+  /** The known device that asked for it (T-510), else null: each asker's entry is its own (T-511). */
+  readonly knownDevice: string | null;
 };
 
 export type CodeAttempt =
@@ -113,8 +115,13 @@ export type DatabaseSignInStore = {
   };
   readonly codes: {
     readonly putCode: (email: string, code: PendingCode) => Promise<void>;
-    readonly takeCodeAttempt: (email: string, at: Date) => Promise<CodeAttempt>;
-    readonly dropCode: (email: string) => Promise<void>;
+    readonly takeCodeAttempt: (
+      email: string,
+      at: Date,
+      knownDevice: string | null,
+    ) => Promise<CodeAttempt>;
+    readonly knownDeviceCodeWaiting: (email: string, at: Date) => Promise<boolean>;
+    readonly dropCode: (email: string, knownDevice: string | null) => Promise<void>;
     readonly putEmailChange: (accountId: string, change: PendingEmailChange) => Promise<void>;
     readonly takeEmailChangeAttempt: (accountId: string, at: Date) => Promise<EmailChangeAttempt>;
     readonly dropEmailChange: (accountId: string) => Promise<void>;

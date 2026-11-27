@@ -297,13 +297,17 @@ const cases = [
   ],
   ['visitor', '/signin?problem=wrongEmailOrPassword', 200, ['Wrong email or password.']],
   ['visitor', '/signin?problem=%3Cscript%3E', 200, ['Sign in'], ['role="alert"']],
-  // A lock-out is said in minutes, with the way in that does not wait (step 2.163, M28).
+  // A lock-out is said in minutes, with the way in that does not wait (step 2.163, M28),
+  // as a link, and without blaming the person (step 2.234, S-133).
   [
     'visitor',
     '/signin?problem=tooManyAttempts&wait=900',
     200,
-    ['Please wait 15 minutes, or tap &quot;Forgot your password?&quot; to choose a new one now.'],
-    ['900 seconds'],
+    [
+      'For safety, signing in with a password is paused for 15 minutes. To get in now, choose a new password:',
+      'data-way-in="reset">Reset your password</a>',
+    ],
+    ['900 seconds', 'Too many tries'],
   ],
   ['visitor', '/signup', 200, ['Create your account', 'Email me a code'], ['Continue with Google']],
   // The forgotten-password route is "Choose a new password", with a way back (step 2.163).

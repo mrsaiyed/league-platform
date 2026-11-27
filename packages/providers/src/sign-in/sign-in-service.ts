@@ -275,17 +275,35 @@ export type SignInService = {
   readonly startSignUp: (input: {
     readonly email: string;
     readonly networkAddress: string;
+    /**
+     * This device's id when the app vouches that it has signed in to this address
+     * before (its signed cookie, T-505): its tries are then counted apart from
+     * strangers' (T-504). Trusted for nothing more.
+     */
+    readonly knownDevice?: string | undefined;
   }) => Promise<Result<CodeRequested, CodeRequestError>>;
   /** The forgotten-password route: the same code, sent only if the address has an account. */
   readonly startReset: (input: {
     readonly email: string;
     readonly networkAddress: string;
+    /**
+     * This device's id when the app vouches that it has signed in to this address
+     * before (its signed cookie, T-505): its tries are then counted apart from
+     * strangers' (T-504). Trusted for nothing more.
+     */
+    readonly knownDevice?: string | undefined;
   }) => Promise<Result<CodeRequested, CodeRequestError>>;
-  /** Checks a code; a few attempts per code, and wrong codes are limited per network (T-67, T-225). */
+  /** Checks a code; a few attempts per code, and wrong codes are limited per network apart from wrong passwords (T-67, T-225, T-506). */
   readonly verifyCode: (input: {
     readonly email: string;
     readonly code: string;
     readonly networkAddress: string;
+    /**
+     * This device's id when the app vouches that it has signed in to this address
+     * before (its signed cookie, T-505): its tries are then counted apart from
+     * strangers' (T-504). Trusted for nothing more.
+     */
+    readonly knownDevice?: string | undefined;
   }) => Promise<Result<CodeProof, VerifyCodeError>>;
   /** Creates the account, or replaces its password, and signs this device in. */
   readonly setPassword: (input: {
@@ -298,6 +316,12 @@ export type SignInService = {
     readonly email: string;
     readonly password: string;
     readonly device: SignInDevice;
+    /**
+     * This device's id when the app vouches that it has signed in to this address
+     * before (its signed cookie, T-505): its tries are then counted apart from
+     * strangers' (T-504). Trusted for nothing more.
+     */
+    readonly knownDevice?: string | undefined;
   }) => Promise<Result<SignedIn, SignInError>>;
   /** Where to send the browser for Google (T-67). The return address must be one of ours. */
   readonly startExternalSignIn: (input: {

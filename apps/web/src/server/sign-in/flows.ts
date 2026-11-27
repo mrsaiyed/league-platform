@@ -47,6 +47,7 @@ import {
   type CookieJar,
 } from './cookies.ts';
 import { deviceOf, safeReturnPath, type Visit } from './device.ts';
+import type { KnownDevices } from './known-device.ts';
 import { screenUrl, withNotice, type Problem } from './problems.ts';
 import type { SignInMail } from './sign-in-mail.ts';
 
@@ -71,6 +72,8 @@ export type FlowDeps = {
    * Left out, it is.
    */
   readonly google?: boolean;
+  /** Which devices have signed in to an address before (T-504, T-505). */
+  readonly knownDevices: KnownDevices;
 };
 
 /** Where to send the browser next: one of our paths, or Google's address. */
@@ -190,7 +193,11 @@ async function sendCode(
   visit: Visit,
   deps: FlowDeps,
 ): Promise<FlowAnswer> {
-  const input = { email: address, networkAddress: visit.networkAddress };
+  const input = {
+    email: address,
+    networkAddress: visit.networkAddress,
+    knownDevice: vouched(address, visit, deps),
+  };
   const asked =
     purpose === 'sign-up'
       ? await deps.signIn.startSignUp(input)
@@ -215,6 +222,15 @@ async function sendCode(
   return goTo(platformUrl('enterCode'));
 }
 
+/**
+ * This device's id when it has signed in to `address` before (T-504): read, never made,
+ * so asking for a code or typing one sets no device cookie.
+ */
+function vouched(address: string, visit: Visit, deps: FlowDeps): string | undefined {
+  const deviceId = visit.jar.get(cookieNames.device);
+  return deviceId === undefined ? undefined : deps.knownDevices.vouch(visit.jar, address, deviceId);
+}
+
 /** The 6-digit code from the email. */
 export async function enterCode(fields: Fields, visit: Visit, deps: FlowDeps): Promise<FlowAnswer> {
   const flow = readFlow(visit.jar);
@@ -223,6 +239,7 @@ export async function enterCode(fields: Fields, visit: Visit, deps: FlowDeps): P
     email: flow.email,
     code: fields['code'] ?? '',
     networkAddress: visit.networkAddress,
+    knownDevice: vouched(flow.email, visit, deps),
   });
   if (!checked.ok) {
     const error = checked.error;
@@ -254,10 +271,11 @@ export async function choosePassword(
 ): Promise<FlowAnswer> {
   const flow = readFlow(visit.jar);
   if (flow?.proof === undefined) return goTo(screenUrl('signup', { problem: 'proofInvalid' }));
+  const device = deviceOf(visit, deps.secureCookies);
   const set = await deps.signIn.setPassword({
     proof: flow.proof,
     password: fields['password'] ?? '',
-    device: deviceOf(visit, deps.secureCookies),
+    device,
   });
   if (!set.ok) {
     switch (set.error.code) {
@@ -277,6 +295,7 @@ export async function choosePassword(
     }
   }
   await startSession(visit.jar, set.value.session, deps);
+  deps.knownDevices.remember(visit.jar, flow.email, device.deviceId, deps.secureCookies);
   // A changed password has ended every other session: the account hears of it (T-85),
   // at the address the service holds for it, never one read from a cookie. A new
   // account has nothing to warn about.
@@ -298,10 +317,12 @@ export async function signInWithPassword(
   const refused = await botCheckProblem('sign-in', fields, visit, deps);
   if (refused !== undefined) return goTo(screenUrl('signin', { problem: refused, next }));
   const device = deviceOf(visit, deps.secureCookies);
+  const typed = fields['email'] ?? '';
   const signed = await deps.signIn.signIn({
-    email: fields['email'] ?? '',
+    email: typed,
     password: fields['password'] ?? '',
     device,
+    knownDevice: deps.knownDevices.vouch(visit.jar, typed, device.deviceId),
   });
   if (!signed.ok) {
     const error = signed.error;
@@ -315,6 +336,7 @@ export async function signInWithPassword(
     );
   }
   await startSession(visit.jar, signed.value.session, deps);
+  deps.knownDevices.remember(visit.jar, typed, device.deviceId, deps.secureCookies);
   // To the address the service holds for the account, never the one typed (T-70).
   if (signed.value.newDevice) {
     const who = await deps.signIn.identify({ accessToken: signed.value.session.accessToken });
@@ -367,9 +389,12 @@ export async function finishGoogle(
   });
   if (!done.ok) return goTo(screenUrl('signin', { problem: 'googleFailed', next: flow.next }));
   await startSession(visit.jar, done.value.session, deps);
-  if (done.value.newDevice && done.value.outcome === 'signed-in') {
-    const who = await deps.signIn.identify({ accessToken: done.value.session.accessToken });
-    if (who.ok) await deps.mail.newDevice(who.value.email, device.label, deps.now());
+  const who = await deps.signIn.identify({ accessToken: done.value.session.accessToken });
+  if (who.ok) {
+    deps.knownDevices.remember(visit.jar, who.value.email, device.deviceId, deps.secureCookies);
+    if (done.value.newDevice && done.value.outcome === 'signed-in') {
+      await deps.mail.newDevice(who.value.email, device.label, deps.now());
+    }
   }
   return afterSignIn(flow.next);
 }
