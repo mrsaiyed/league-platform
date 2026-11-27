@@ -34,6 +34,7 @@ import type {
   TooManyAttempts,
 } from '../sign-in-service.ts';
 import { signInDefaults, type SignInSettings } from '../sign-in-settings.ts';
+import { codeGuessSubject, limitSubjects } from '../limit-subjects.ts';
 import { createAttemptLimiter } from './attempt-limiter.ts';
 import { sampleLeakedPasswords } from './leaked-passwords.ts';
 import { scryptPasswordHasher, type PasswordHash, type PasswordHasher } from './password-hash.ts';
@@ -195,12 +196,19 @@ export function createLocalSignInStandIn(options: LocalSignInOptions): LocalSign
     return null;
   };
 
-  const requestCode = async (rawEmail: string, rawNetwork: string, purpose: CodePurpose) => {
+  const requestCode = async (
+    rawEmail: string,
+    rawNetwork: string,
+    purpose: CodePurpose,
+    knownDevice: string | undefined,
+  ) => {
     const network = parseNetwork(rawNetwork);
     const parsed = signInEmail.safeParse(rawEmail);
     if (!parsed.success) return fail({ code: 'invalid-email' as const });
     const email = parsed.data;
-    const wait = countCodeRequest(email, network);
+    // A known device's asks are counted on their own (T-504).
+    const counted = limitSubjects(email, network, knownDevice);
+    const wait = countCodeRequest(counted.email ?? email, counted.network);
     if (wait !== null) return fail(tooMany(wait));
     const at = now().getTime();
 
@@ -313,12 +321,16 @@ export function createLocalSignInStandIn(options: LocalSignInOptions): LocalSign
   };
 
   const service: SignInService = {
-    startSignUp: ({ email, networkAddress }) => requestCode(email, networkAddress, 'sign-up'),
-    startReset: ({ email, networkAddress }) => requestCode(email, networkAddress, 'reset'),
+    startSignUp: ({ email, networkAddress, knownDevice }) =>
+      requestCode(email, networkAddress, 'sign-up', knownDevice),
+    startReset: ({ email, networkAddress, knownDevice }) =>
+      requestCode(email, networkAddress, 'reset', knownDevice),
 
-    async verifyCode({ email: rawEmail, code: rawCode, networkAddress }) {
+    async verifyCode({ email: rawEmail, code: rawCode, networkAddress, knownDevice }) {
       const network = parseNetwork(networkAddress);
-      const allowed = guessesPerNetwork.check(network);
+      // Wrong codes are counted apart from wrong passwords (T-506).
+      const codeKey = codeGuessSubject(network, knownDevice);
+      const allowed = guessesPerNetwork.check(codeKey);
       if (!allowed.allowed) {
         return fail({ code: 'too-many-attempts', retryAfterSeconds: allowed.retryAfterSeconds });
       }
@@ -339,7 +351,7 @@ export function createLocalSignInStandIn(options: LocalSignInOptions): LocalSign
         return ok({ proof, proofExpiresAt: new Date(expiresAt), accountExists });
       }
       pending.attemptsLeft--;
-      guessesPerNetwork.recordFailure(network);
+      guessesPerNetwork.recordFailure(codeKey);
       return fail({ code: pending.attemptsLeft <= 0 ? 'too-many-attempts' : 'code-wrong' });
     },
 
@@ -385,12 +397,14 @@ export function createLocalSignInStandIn(options: LocalSignInOptions): LocalSign
       });
     },
 
-    async signIn({ email: rawEmail, password, device }) {
+    async signIn({ email: rawEmail, password, device, knownDevice }) {
       const where = parseDevice(device);
       const parsedEmail = signInEmail.safeParse(rawEmail);
       // An address that is not one has no account and no count of its own.
       const email = parsedEmail.success ? parsedEmail.data : null;
-      const reserved = reserveGuess(email, where.networkAddress);
+      // A device that has signed in to this address before is counted on its own (T-504).
+      const counted = limitSubjects(email, where.networkAddress, knownDevice);
+      const reserved = reserveGuess(counted.email, counted.network);
       if ('limited' in reserved) return fail(reserved.limited);
       const attempt = passwordAttempt.safeParse(password);
       const account = email === null ? undefined : accounts.get(email);
@@ -596,7 +610,8 @@ export function createLocalSignInStandIn(options: LocalSignInOptions): LocalSign
       const network = parseNetwork(networkAddress);
       const session = liveSession(accessToken);
       if ('code' in session) return fail(session);
-      const allowed = guessesPerNetwork.check(network);
+      const codeKey = codeGuessSubject(network, undefined);
+      const allowed = guessesPerNetwork.check(codeKey);
       if (!allowed.allowed) {
         return fail({ code: 'too-many-attempts', retryAfterSeconds: allowed.retryAfterSeconds });
       }
@@ -610,7 +625,7 @@ export function createLocalSignInStandIn(options: LocalSignInOptions): LocalSign
       // Taken since it was asked: nothing changes, and the answer is a wrong code's (T-455).
       if (!right || accounts.has(pending.newEmail)) {
         pending.attemptsLeft--;
-        guessesPerNetwork.recordFailure(network);
+        guessesPerNetwork.recordFailure(codeKey);
         return fail({ code: pending.attemptsLeft <= 0 ? 'too-many-attempts' : 'code-wrong' });
       }
       emailChanges.delete(account);

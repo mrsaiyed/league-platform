@@ -217,23 +217,23 @@ describe('sign-up with an emailed code', () => {
     expect(env.capture.messages()).toHaveLength(7);
   });
 
-  it('sends at most 30 codes an hour to one network, whatever the addresses (T-225)', async () => {
+  it('sends at most 200 codes an hour to one network, whatever the addresses (T-225, T-507)', async () => {
     const env = setup();
-    for (let i = 0; i < 30; i++) {
+    for (let i = 0; i < 200; i++) {
       const result = await env.sign.startSignUp({
         email: `p${i}@example.test`,
         networkAddress: here,
       });
       expect(result.ok).toBe(true);
     }
-    expect(await env.sign.startSignUp({ email: 'p30@example.test', networkAddress: here })).toEqual(
+    expect(await env.sign.startSignUp({ email: 'p200@example.test', networkAddress: here })).toEqual(
       {
         ok: false,
         error: { code: 'too-many-attempts', retryAfterSeconds: 60 * 60 },
       },
     );
     const otherNetwork = await env.sign.startSignUp({
-      email: 'p30@example.test',
+      email: 'p200@example.test',
       networkAddress: elsewhere,
     });
     expect(otherNetwork.ok).toBe(true);

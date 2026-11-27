@@ -17,6 +17,7 @@ import { standInPeople, standInMember, standInPorts, standInSignIn } from '../st
 import { beMadeUpPerson } from './be-made-up-person.ts';
 import { cookieNames, type CookieJar } from './cookies.ts';
 import type { Visit } from './device.ts';
+import { knownDevicesUnder } from './known-device.ts';
 import {
   askForCode,
   botCheckFieldsDrawn,
@@ -71,6 +72,7 @@ const flowDepsOf = (made: Pick<FlowDeps, 'signIn' | 'mail'>): FlowDeps => ({
   siteOrigin: origin,
   testCopy: false,
   now: () => new Date(),
+  knownDevices: knownDevicesUnder('made-up secret for tests'),
 });
 
 async function onTheStandIn() {

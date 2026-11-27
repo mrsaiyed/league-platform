@@ -25,6 +25,8 @@ export const cookieNames = {
   session: sessionCookieName,
   renew: 'srl_renew',
   device: 'srl_device',
+  /** Which addresses this device has signed in to, as tags only the server can make (T-505). */
+  knownDevice: 'srl_known',
   flow: 'srl_flow',
   google: 'srl_google',
   typed: 'srl_typed',

@@ -42,6 +42,7 @@ import {
 } from '@srleagues/contracts';
 import { fail, ok } from '@srleagues/core';
 import { isAllowedReturnAddress } from '../return-address.ts';
+import { codeGuessSubject, limitSubjects } from '../limit-subjects.ts';
 import { signInDefaults, type SignInSettings } from '../sign-in-settings.ts';
 import type {
   CodePurpose,
@@ -232,15 +233,22 @@ export function createSupabaseSignIn(options: SupabaseSignInOptions): SignInServ
     if (renewed.ok) await auth.signOut(renewed.value.accessToken, 'local');
   };
 
-  const requestCode = async (rawEmail: string, rawNetwork: string, purpose: CodePurpose) => {
+  const requestCode = async (
+    rawEmail: string,
+    rawNetwork: string,
+    purpose: CodePurpose,
+    knownDevice: string | undefined,
+  ) => {
     const network = parseNetwork(rawNetwork);
     const parsed = signInEmail.safeParse(rawEmail);
     if (!parsed.success) return fail({ code: 'invalid-email' as const });
     const email = parsed.data;
     // Counted whether or not an account exists, so the limit looks the same (T-68).
+    // A known device's asks are counted on their own (T-504).
+    const counted = limitSubjects(email, network, knownDevice);
     const limited = await store.limits.countCodeRequest({
-      email,
-      network,
+      email: counted.email ?? email,
+      network: counted.network,
       perEmail: settings.codesPerHour,
       perNetwork: settings.codesPerHourPerNetwork,
     });
@@ -347,14 +355,16 @@ export function createSupabaseSignIn(options: SupabaseSignInOptions): SignInServ
   };
 
   const service: SignInService = {
-    startSignUp: ({ email, networkAddress }) => requestCode(email, networkAddress, 'sign-up'),
-    startReset: ({ email, networkAddress }) => requestCode(email, networkAddress, 'reset'),
+    startSignUp: ({ email, networkAddress, knownDevice }) =>
+      requestCode(email, networkAddress, 'sign-up', knownDevice),
+    startReset: ({ email, networkAddress, knownDevice }) =>
+      requestCode(email, networkAddress, 'reset', knownDevice),
 
-    async verifyCode({ email: rawEmail, code: rawCode, networkAddress }) {
+    async verifyCode({ email: rawEmail, code: rawCode, networkAddress, knownDevice }) {
       const network = parseNetwork(networkAddress);
       // Wrong codes count against the network (T-225); a try that turns out not to be
       // a wrong code is taken back.
-      const reserved = await reserveGuess(null, network);
+      const reserved = await reserveGuess(null, codeGuessSubject(network, knownDevice));
       if ('retryAfterSeconds' in reserved) return fail(tooMany(reserved.retryAfterSeconds));
       const email = signInEmail.safeParse(rawEmail);
       const attempt = email.success
@@ -486,12 +496,14 @@ export function createSupabaseSignIn(options: SupabaseSignInOptions): SignInServ
       });
     },
 
-    async signIn({ email: rawEmail, password, device }) {
+    async signIn({ email: rawEmail, password, device, knownDevice }) {
       const where = parseDevice(device);
       const parsedEmail = signInEmail.safeParse(rawEmail);
       // An address that is not one has no account and no count of its own.
       const email = parsedEmail.success ? parsedEmail.data : null;
-      const reserved = await reserveGuess(email, where.networkAddress);
+      // A device that has signed in to this address before is counted on its own (T-504).
+      const counted = limitSubjects(email, where.networkAddress, knownDevice);
+      const reserved = await reserveGuess(counted.email, counted.network);
       if ('retryAfterSeconds' in reserved) return fail(tooMany(reserved.retryAfterSeconds));
       const answer = await checkPassword(email, password, reserved.ticket);
       if ('limited' in answer) return fail(answer.limited);
@@ -754,7 +766,7 @@ export function createSupabaseSignIn(options: SupabaseSignInOptions): SignInServ
       const live = await liveSession(accessToken);
       if ('code' in live) return fail(live);
       const { session, user } = live;
-      const reserved = await reserveGuess(null, network);
+      const reserved = await reserveGuess(null, codeGuessSubject(network, undefined));
       if ('retryAfterSeconds' in reserved) return fail(tooMany(reserved.retryAfterSeconds));
       // Only this account's own waiting change, by the session's account, never by address.
       const attempt = await store.codes.takeEmailChangeAttempt(session.accountId, now());

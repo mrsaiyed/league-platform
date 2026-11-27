@@ -220,7 +220,7 @@ describe('sign-up with an emailed code', () => {
     ).toEqual(fail({ code: 'code-expired' }));
   });
 
-  it('sends 5 codes an hour per address and 30 per network (T-225)', async () => {
+  it('sends 5 codes an hour per address and 200 per network (T-225, T-507)', async () => {
     const env = setup();
     const results = [];
     for (let i = 0; i < 6; i++) {
@@ -230,14 +230,14 @@ describe('sign-up with an emailed code', () => {
     }
     expect(results).toEqual(['ok', 'ok', 'ok', 'ok', 'ok', 'too-many-attempts']);
     const network = [];
-    for (let i = 0; i < 26; i++) {
+    for (let i = 0; i < 196; i++) {
       network.push(
         errorCode(
           await env.sign.startSignUp({ email: `p${i}@example.test`, networkAddress: here }),
         ),
       );
     }
-    expect(network.filter((r) => r === 'ok')).toHaveLength(25);
+    expect(network.filter((r) => r === 'ok')).toHaveLength(195);
     expect(network.at(-1)).toBe('too-many-attempts');
   });
 
