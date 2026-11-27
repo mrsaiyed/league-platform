@@ -208,8 +208,8 @@ if (browser) {
     await admin.goto(settings('harbor-city'));
     const confirmed = await admin.locator('section[data-area="privacy"]').innerText();
     note(
-      'youth: the screen says the confirmation is in force and since when',
-      /Confirmed on [A-Z][a-z]+ \d{1,2}, \d{4}\./.test(confirmed) &&
+      'youth: the screen says the confirmation is in force, since when and who gave it',
+      /Confirmed on [A-Z][a-z]+ \d{1,2}, \d{4} by [^.\n]+\./.test(confirmed) &&
         confirmed.includes('Now: everyone is shown by full name, children too.'),
     );
     note(
