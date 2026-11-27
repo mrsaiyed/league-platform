@@ -2945,11 +2945,17 @@ const notTheirs: Readonly<Record<string, { actors: readonly Actor[]; code: strin
   'games.reopen_tracked_game': { actors: ['program_scorekeeper'], code: 'not-ended-by-you' },
 };
 
+/**
+ * What runs after a row's input is made: the matrix's league, the input, and the id of
+ * the league the call is about (the row's own, such as a league it removes, or the matrix's).
+ */
+type Before = (league: League, input: unknown, about: string) => Promise<void>;
+
 /** One row as one actor, in a league of its own; `before` runs after the input is made. */
 async function runRow(
   row: Row,
   actor: Actor,
-  before: (league: League, input: unknown) => Promise<void> = async () => {},
+  before: Before = async () => {},
   accountOf: (league: League) => string | null = (league) => league.accountOf(actor),
 ): Promise<string> {
   return (await runRowFor(row, actor, before, accountOf)).code;
@@ -2959,23 +2965,20 @@ async function runRow(
 async function runRowFor(
   row: Row,
   actor: Actor,
-  before: (league: League, input: unknown) => Promise<void> = async () => {},
+  before: Before = async () => {},
   accountOf: (league: League) => string | null = (league) => league.accountOf(actor),
-): Promise<{ readonly code: string; readonly value: unknown }> {
+): Promise<{ readonly code: string; readonly value: unknown; readonly leagueId: string }> {
   const league = await leagueWithActors();
   const { input, leagueId } = await row.prepare(league);
   const team = await teamOfInput(input);
   if (team !== null) await moveTeamGrantsTo(league, team);
-  await before(league, input);
-  const context = {
-    leagueId: leagueId ?? league.leagueId,
-    accountId: accountOf(league),
-    requestId: 'matrix',
-  };
+  const about = leagueId ?? league.leagueId;
+  await before(league, input, about);
+  const context = { leagueId: about, accountId: accountOf(league), requestId: 'matrix' };
   const result = await row.run(context, input);
   return result.ok
-    ? { code: 'ok', value: result.value }
-    : { code: result.error?.code ?? 'failed', value: undefined };
+    ? { code: 'ok', value: result.value, leagueId: league.leagueId }
+    : { code: result.error?.code ?? 'failed', value: undefined, leagueId: league.leagueId };
 }
 
 /**
@@ -3030,9 +3033,9 @@ function fieldsOf(value: unknown, path = ''): string[] {
  * Puts the league in a state as our staff would, without counting a change of the
  * league's version (0002), so an input made for the league's first version still fits.
  */
-async function putLeagueIn(league: League, status: 'archived' | 'suspended') {
+async function putLeagueIn(leagueId: string, status: 'archived' | 'suspended') {
   await pglite.exec(`begin; set local session_replication_role = replica;
-    update leagues set status = '${status}' where id = '${league.leagueId}'; commit;`);
+    update leagues set status = '${status}' where id = '${leagueId}'; commit;`);
 }
 
 /**
@@ -3129,10 +3132,11 @@ function stillWorksIn(row: Row, state: LeagueState): boolean | string {
     // Making a league changes no league that exists.
     case 'leagues.create':
       return true;
-    // S-132: a league never published and never used is nobody's history; our staff
-    // may still remove it, archived or suspended (the command refuses one that was).
+    // S-132: only a league still in draft can be removed (0020, "one still in draft");
+    // an archived or suspended one is refused, never published or not, and the admin
+    // un-archives it first. The row's own league is the one put in the state.
     case 'leagues.remove_draft':
-      return true;
+      return 'league-in-use';
     // U-9: the owner or an admin un-archives ("publish" from archived goes back to
     // live); only our staff lift a suspension, and that returns the league to draft,
     // so publishing a suspended league is refused. Only we suspend, an archived league
@@ -3169,7 +3173,10 @@ describe('every command in an archived or suspended league (U-9, R-26)', () => {
         const allowed = expectedActors(row.needs, row.scope ?? 'league');
         const outcomes: Partial<Record<Actor, string>> = {};
         for (const actor of allowed) {
-          const code = await runRow(row, actor, (league) => putLeagueIn(league, state));
+          // The league the call is about is the one put in the state (S-132).
+          const code = await runRow(row, actor, (_league, _input, about) =>
+            putLeagueIn(about, state),
+          );
           outcomes[actor] = stateRefusals.includes(code) ? 'refused' : code;
         }
         const expected = Object.fromEntries(
@@ -3189,7 +3196,7 @@ describe('every command in an archived or suspended league (U-9, R-26)', () => {
   it('archived: names on public pages move toward less, never toward more (R-26)', async () => {
     const set = setSettingFor(declaredSettings);
     const league = await leagueWithActors();
-    await putLeagueIn(league, 'archived');
+    await putLeagueIn(league.leagueId, 'archived');
     const as = { leagueId: league.leagueId, accountId: league.ownerId, requestId: 'matrix' };
     const to = (value: string, version: number | null) =>
       set(as, { level: 'league', key: 'privacy.publicNames', value, version }, leaguesDeps);
