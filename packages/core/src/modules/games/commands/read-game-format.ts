@@ -16,7 +16,7 @@ import {
 } from '@srleagues/contracts';
 import { z } from 'zod';
 import { defineCommand, fail, ok, type Result } from '../../../command/index.ts';
-import { formatChangeOf, mayAskAboutFormat, type FormatChange } from '../game-format.ts';
+import { formatChangeOf, mayViewFormat, type FormatChange } from '../game-format.ts';
 import type { TrackerTx } from '../ports.ts';
 import { effectiveRulesOf, seasonRulesOf } from '../season-rules-of.ts';
 import { lowerId } from '../scoring-session.ts';
@@ -43,7 +43,8 @@ export const readGameFormat = defineCommand({
   name: 'games.read_game_format',
   permission: 'games.score',
   input: z.object({ gameId: lowerId }),
-  allowed: (context, input, tx: TrackerTx) => mayAskAboutFormat(context, tx, input.gameId),
+  // Open in an archived or suspended league too, where it says why nothing changes (T-519).
+  allowed: (context, input, tx: TrackerTx) => mayViewFormat(context, tx, input.gameId),
   run: async ({ context, input, tx }): Promise<Result<GameFormatView, ReadGameFormatError>> => {
     const game = await tx.games.find(input.gameId);
     if (game === undefined || game.binned) return fail({ code: 'game-not-found' });

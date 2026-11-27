@@ -15,6 +15,7 @@ import {
   seasonId,
 } from '../memory-games.test-helper.ts';
 import { getBoxScoreSheet } from './get-box-score-sheet.ts';
+import { setBoxScore } from './set-box-score.ts';
 
 const personId = '01900000-0000-7000-8000-0000000d0001';
 const roster = [
@@ -173,5 +174,48 @@ describe('getBoxScoreSheet', () => {
     expect(await getBoxScoreSheet(as(editorId), { gameId: gameUuid(1) }, deps)).toMatchObject({
       error: { code: 'not-allowed' },
     });
+  });
+
+  it('shows the sheet in an archived or suspended league, with nothing to change (T-519)', async () => {
+    for (const status of ['archived', 'suspended'] as const) {
+      const { deps, as } = memoryGames({
+        games: [finalGame(1), game(2, { status: 'cancelled' })],
+        roster,
+        grants: [scorekeeperGrant, editorGrant],
+        status,
+      });
+      // The admin opens a final game's box score: the sheet, locked by the league's state,
+      // offering no reopen, no correction and no putting back.
+      expect(await getBoxScoreSheet(as(ownerId), { gameId: gameUuid(1) }, deps)).toMatchObject({
+        ok: true,
+        value: {
+          game: { id: gameUuid(1) },
+          players: [roster[0]],
+          locked: status,
+          mayReopen: false,
+          mayCorrect: false,
+          mayCallOff: false,
+        },
+      });
+      expect(await getBoxScoreSheet(as(ownerId), { gameId: gameUuid(2) }, deps)).toMatchObject({
+        value: { locked: status, mayCallOff: false },
+      });
+      // Those who could open it before still can; those who could not still cannot.
+      expect(
+        await getBoxScoreSheet(as(scorekeeperId), { gameId: gameUuid(1) }, deps),
+      ).toMatchObject({ ok: true, value: { locked: status } });
+      expect(await getBoxScoreSheet(as(editorId), { gameId: gameUuid(1) }, deps)).toMatchObject({
+        error: { code: 'not-allowed' },
+      });
+      // Every change stays refused: saving the sheet of a game not yet decided.
+      const open = memoryGames({ games: [game(3)], roster, status });
+      expect(
+        await setBoxScore(
+          open.as(ownerId),
+          { gameId: gameUuid(3), version: 1, homeScore: 50, awayScore: 40, lines: [] },
+          open.deps,
+        ),
+      ).toMatchObject({ ok: false, error: { code: 'not-allowed' } });
+    }
   });
 });

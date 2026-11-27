@@ -143,12 +143,13 @@ export async function BoxScorePage({
   // admin's frame, in this page's own words (BoxScoreNotFound; step 2.157): a game that is
   // not this league's (another league's among them: nothing of it is said), and one they
   // may not score. The second is not answered as a refusal: who may score is checked before
-  // the game is looked up, so it never tells an existing game from a missing one, and it
-  // covers a league that is archived or suspended, where nobody scores, for which "your role
-  // does not include this page" would be untrue.
+  // the game is looked up, so it never tells an existing game from a missing one. In a
+  // league that is archived or suspended the sheet still shows, to the same people, locked
+  // by the league's state: no reopen, no put back, no save, one line saying why (T-519).
   if (!read.ok) return notFound();
   const sheet = read.value;
   const { game } = sheet;
+  const readOnly = sheet.locked === 'archived' || sheet.locked === 'suspended';
   // The game's own format (step 2.119): shown to whoever may reach it, the admin's
   // "games.manage" or the game's scorekeeper; left out for anyone else.
   const format = await readGameFormat(context, { gameId: game.id }, ports.tracker.deps);
@@ -194,7 +195,7 @@ export async function BoxScorePage({
       : undefined,
     // A result recorded by hand, for someone who may not reopen it as a corrector: their
     // own door within the league's minutes, else who can (step 2.177, S-52).
-    !sheet.mayReopen && (game.status === 'final' || game.status === 'forfeit')
+    !readOnly && !sheet.mayReopen && (game.status === 'final' || game.status === 'forfeit')
       ? await readOwnResultOffer(context, { gameId: game.id }, ports.games.deps).then((own) =>
           own.ok ? own.value : undefined,
         )
@@ -225,7 +226,8 @@ export async function BoxScorePage({
   const trackedGrid = tracked !== undefined && tracked.ok ? tracked.value : undefined;
   const { timeZone } = await ports.publicSchedule.clockOf(here.id);
   // Postponed or cancelled: no box score, no grid; the way it is put back (step 2.158).
-  const calledOff = sheet.locked === 'cancelled' || sheet.locked === 'postponed';
+  // Said by the game's own state, so a league that is read-only keeps it (T-519).
+  const calledOff = game.status === 'cancelled' || game.status === 'postponed';
   const named = t('admin.games.game', { away: awayName, home: homeName });
   const calledOffHidden = {
     league,

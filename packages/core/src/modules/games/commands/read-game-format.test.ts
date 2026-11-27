@@ -193,3 +193,21 @@ describe("reading a game's format (step 2.119)", () => {
     }
   });
 });
+
+describe('a game format in an archived or suspended league (T-519)', () => {
+  it('is shown to whoever could see it before, saying it cannot be changed', async () => {
+    for (const status of ['archived', 'suspended']) {
+      const t = setUp({ status });
+      for (const who of [schedulerId, scorekeeperId]) {
+        expect(await readGameFormat(t.as(who), { gameId }, t.deps)).toMatchObject({
+          ok: true,
+          value: { change: { may: false, reason: 'league-read-only' } },
+        });
+      }
+      expect(await readGameFormat(t.as(strangerId), { gameId }, t.deps)).toMatchObject({
+        ok: false,
+        error: { code: 'not-allowed' },
+      });
+    }
+  });
+});

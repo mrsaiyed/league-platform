@@ -3,12 +3,13 @@
 // replayed), both teams' rosters on the game's day with no line yet as zeros, the number
 // of the game's last event (handed back with the save, games.correct_tracked_box_score)
 // and whether the grid may be saved now: reopened with a reason, that reopen still open.
-// Minutes are the clock's, shown and never typed. For whoever may correct the game.
+// Minutes are the clock's, shown and never typed. For whoever may correct the game; in an
+// archived or suspended league it is shown and not correctable (T-519).
 import { z } from 'zod';
 import { defineCommand, fail, ok, type Result } from '../../../command/index.ts';
 import { isDecided } from '../game-fields.ts';
 import { settledLines, readState } from '../live-game.ts';
-import { gameScope, mayChangeGames } from '../policy.ts';
+import { gameScope, mayViewChanges, readOnlyStateOf } from '../policy.ts';
 import type { TrackerTx } from '../ports.ts';
 
 export type TrackedGridRow = {
@@ -29,8 +30,11 @@ export type TrackedBoxScore = {
   readonly sequence: number;
   /** Reopened with a reason and not ended again: the save is taken. */
   readonly correctable: boolean;
-  /** Why not, when it is not: still final, never ended, or not live at all. */
-  readonly notCorrectable?: 'game-final' | 'reason-needed' | 'game-not-live';
+  /**
+   * Why not, when it is not: the league is archived or suspended (shown, never changed:
+   * T-519), still final, never ended, or not live at all.
+   */
+  readonly notCorrectable?: 'league-read-only' | 'game-final' | 'reason-needed' | 'game-not-live';
   readonly lines: readonly TrackedGridRow[];
 };
 
@@ -43,7 +47,7 @@ export const readTrackedBoxScore = defineCommand({
   permission: 'games.correct',
   input: z.object({ gameId: z.uuid() }),
   allowed: async (context, input, tx: TrackerTx) =>
-    mayChangeGames(context, tx, 'games.correct', await gameScope(tx, input.gameId)),
+    mayViewChanges(context, tx, 'games.correct', await gameScope(tx, input.gameId)),
   run: async ({ input, tx }): Promise<Result<TrackedBoxScore, ReadTrackedBoxScoreError>> => {
     const gameId = input.gameId.toLowerCase();
     const game = await tx.games.find(gameId);
@@ -54,13 +58,16 @@ export const readTrackedBoxScore = defineCommand({
     }
     const sequence = Math.max(saved.seq, await tx.liveGames.lastEventSeq(gameId));
     const [newest] = await tx.games.correctionsNewestFirst(gameId);
-    const notCorrectable = isDecided(game.status)
-      ? ('game-final' as const)
-      : game.status !== 'live'
-        ? ('game-not-live' as const)
-        : newest === undefined || newest.after.status !== 'live'
-          ? ('reason-needed' as const)
-          : undefined;
+    const notCorrectable =
+      (await readOnlyStateOf(tx)) !== null
+        ? ('league-read-only' as const)
+        : isDecided(game.status)
+          ? ('game-final' as const)
+          : game.status !== 'live'
+            ? ('game-not-live' as const)
+            : newest === undefined || newest.after.status !== 'live'
+              ? ('reason-needed' as const)
+              : undefined;
     const players = await tx.liveGames.players(gameId);
     const lines = [...settledLines(game, players, readState(saved.state)).values()].map(
       (line): TrackedGridRow => ({

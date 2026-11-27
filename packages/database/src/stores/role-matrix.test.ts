@@ -3379,30 +3379,41 @@ const readCommands: ReadonlySet<string> = new Set([
 
 /**
  * T-501, by hand: the reads that are the first step of a change and answer only someone
- * who may make it: the sheet a score is typed on, the tracker's state and rosters, a
- * game's format for the tracker, the grid a tracked game is corrected in, whether a
- * result or a sheet can be reopened or put back, the preview of new season rules and
- * the list adjustments are added on. In a read-only league no one may make the change
- * (U-9), so they are refused with it; the league's pages still show what they show.
+ * who may make it: the tracker's state and rosters, whether a result or a sheet can be
+ * reopened or put back, the preview of new season rules and the list adjustments are
+ * added on. In a read-only league no one may make the change (U-9), so they are refused
+ * with it; the league's pages still show what they show. The box score sheet, a game's
+ * format and the tracked grid were here until step 2.253: they are viewReads (T-519).
  */
 const changeToolReads: ReadonlySet<string> = new Set([
-  'games.get_box_score_sheet',
-  'games.read_game_format',
   'games.read_own_result_offer',
   'games.read_own_result_offers',
   'games.read_reopen_offer',
   'games.read_sheet_put_back_offer',
-  'games.read_tracked_box_score',
   'games.read_tracker_rosters',
   'games.read_tracker_state',
   'leagues.preview_season_rules',
   'standings.list_adjustments',
 ]);
 
+/**
+ * T-519, by hand: the reads of a change's screen that also only show, and so stay open in
+ * a read-only league to whoever could open them before (U-9: "read-only, still
+ * viewable"): the box score sheet (locked by the league's state), a game's format (saying
+ * the league is read-only) and a tracked game's grid (not correctable). Their changes stay
+ * refused. They were in changeToolReads until step 2.253.
+ */
+const viewReads: ReadonlySet<string> = new Set([
+  'games.get_box_score_sheet',
+  'games.read_game_format',
+  'games.read_tracked_box_score',
+]);
+
 /** Every read: what each one gives each kind of person is checked (T-76). */
 const readsGiven: ReadonlySet<string> = new Set([
   ...readCommands,
   ...changeToolReads,
+  ...viewReads,
   'access.read_invitation',
 ]);
 
@@ -3458,7 +3469,7 @@ function stillWorksIn(row: Row, state: LeagueState): boolean | string {
 
 /** What each allowed actor should get in a read-only league: "ok", "refused" or a code. */
 function stateExpectation(row: Row, state: LeagueState): string {
-  if (readCommands.has(row.command)) return 'ok';
+  if (readCommands.has(row.command) || viewReads.has(row.command)) return 'ok';
   if (changeToolReads.has(row.command)) return 'refused';
   const works = stillWorksIn(row, state);
   return works === true ? 'ok' : works === false ? 'refused' : works;

@@ -231,6 +231,11 @@ export function GameFormatPanel({
           {t('tracker.format.archived')}
         </p>
       ) : null}
+      {!change.may && change.reason === 'league-read-only' ? (
+        <p className={look.quiet} data-format-read-only="">
+          {t('tracker.format.leagueReadOnly')}
+        </p>
+      ) : null}
       {offered && !editing ? (
         <p>
           <button

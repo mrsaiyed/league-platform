@@ -11,7 +11,14 @@ import { hasPermissionAnywhere } from '../access/index.ts';
 import { lookupSetting, scorekeepersMayChangeFormat } from '../leagues/index.ts';
 import { isDecided } from './game-fields.ts';
 import { readState } from './live-game.ts';
-import { mayChangeGames, mayScoreGame, seasonScope } from './policy.ts';
+import {
+  mayChangeGames,
+  mayScoreGame,
+  mayViewChanges,
+  mayViewScoring,
+  readOnlyStateOf,
+  seasonScope,
+} from './policy.ts';
 import type { GameRecord, GamesTx, TrackerTx } from './ports.ts';
 
 /** Why this person may not change the game's format now. */
@@ -21,7 +28,9 @@ export type FormatRefusal =
   | 'under-way'
   | 'finished'
   /** Its season is archived (O-12, step 2.130): the commands are refused there too. */
-  | 'season-archived';
+  | 'season-archived'
+  /** The league is archived or suspended (U-9, T-519): the format is shown, never changed. */
+  | 'league-read-only';
 
 /** Whether this person may change the game's format now, and as whom; else why not. */
 export type FormatChange =
@@ -63,6 +72,25 @@ export async function mayReachFormat(
   return undefined;
 }
 
+/**
+ * Whether `context` may see a game's format (T-519): whoever mayAskAboutFormat lets in a
+ * working league, in any state of the league, so an archived or suspended league's games
+ * stay viewable (U-9). The changes still ask mayAskAboutFormat.
+ */
+export async function mayViewFormat(
+  context: CommandContext,
+  tx: GamesTx,
+  gameId: string,
+): Promise<boolean> {
+  const game = await tx.games.find(gameId);
+  if (game === undefined) return mayAskAboutFormat(context, tx, gameId);
+  const scope = await seasonScope(tx, game.seasonId);
+  return (
+    (await mayViewChanges(context, tx, 'games.manage', scope)) ||
+    (await mayViewScoring(context, tx, game.id))
+  );
+}
+
 /** The one rule the commands and the read follow, so a form is never offered and then refused. */
 export async function formatChangeOf(
   context: CommandContext,
@@ -70,7 +98,13 @@ export async function formatChangeOf(
   game: GameRecord,
 ): Promise<FormatChange> {
   const as = await mayReachFormat(context, tx, game);
-  if (as === undefined) return { may: false, reason: 'no-permission' };
+  if (as === undefined) {
+    // Reached only by someone the read let in (mayViewFormat): in a read-only league.
+    return {
+      may: false,
+      reason: (await readOnlyStateOf(tx)) === null ? 'no-permission' : 'league-read-only',
+    };
+  }
   if (isDecided(game.status)) return { may: false, reason: 'finished' };
   if (await tx.games.seasonArchived(game.seasonId)) {
     return { may: false, reason: 'season-archived' };
