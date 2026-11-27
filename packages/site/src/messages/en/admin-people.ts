@@ -98,6 +98,24 @@ export const enAdminPeople = {
   'adminPeople.search.noEmail':
     'Search by a name. An email address is not searched here, so that it never ends up in the page’s address.',
   'adminPeople.search.submit': 'Search',
+  // "Show as" on a person's record (step 2.146, R-23): what they or their guardian asked
+  // for about their name on public pages, with why; beside the recorded name in the lists.
+  'adminPeople.showAs.body':
+    'When a player or their parent or guardian asks for less of their name on public pages, record it here. Removed keeps their numbers, without a name, so team totals still add up.',
+  'adminPeople.showAs.choice.initials': 'Initials',
+  'adminPeople.showAs.choice.none': 'As the league shows everyone',
+  'adminPeople.showAs.choice.removed': 'Removed from public pages',
+  'adminPeople.showAs.label': 'Show as',
+  'adminPeople.showAs.list.initials': 'Show as: initials',
+  'adminPeople.showAs.list.removed': 'Show as: removed',
+  'adminPeople.showAs.reason.choose': 'Choose why',
+  'adminPeople.showAs.reason.guardianAsked': 'A parent or guardian asked',
+  'adminPeople.showAs.reason.label': 'Why',
+  'adminPeople.showAs.reason.leagueDecided': 'The league decided',
+  'adminPeople.showAs.reason.personAsked': 'They asked',
+  'adminPeople.showAs.saved': 'Saved: how {name} is shown on public pages.',
+  'adminPeople.showAs.submit': 'Save Show as',
+  'adminPeople.showAs.title': 'Show as',
   'adminPeople.sub':
     'Everyone in the league, on a team or not. Find someone, fix their details or add someone new.',
   'adminPeople.teams.add': 'Add to a team',

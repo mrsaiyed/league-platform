@@ -18,6 +18,19 @@ export function rosterName(person: {
     : t('adminTeams.byNumber', { number: person.jerseyNumber });
 }
 
+/**
+ * "Show as: initials" or "Show as: removed", said beside the recorded name on the admin's
+ * lists (R-33, step 2.146): what the person or their guardian asked for on public pages.
+ * Undefined when they asked for nothing, or it was not read: the name alone is the line.
+ */
+export function showAsOf(person: {
+  readonly nameRequest?: string | undefined;
+}): string | undefined {
+  if (person.nameRequest === 'initials') return t('adminPeople.showAs.list.initials');
+  if (person.nameRequest === 'removed') return t('adminPeople.showAs.list.removed');
+  return undefined;
+}
+
 /** Whether the person has a name, so a row can say their number before it without saying it twice. */
 export const hasName = (person: { readonly firstName: string; readonly lastName: string }) =>
   `${person.firstName}${person.lastName}`.trim() !== '';

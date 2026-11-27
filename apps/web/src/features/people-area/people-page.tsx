@@ -262,6 +262,11 @@ function List({
               >
                 {person.name}
               </a>
+              {person.showAs === undefined ? null : (
+                <span className="staff-quiet" data-show-as-of={person.id}>
+                  {person.showAs}
+                </span>
+              )}
               <span className="staff-quiet" data-teams-of={person.id}>
                 {teamsLineOf(teamsByPerson.get(person.id))}
               </span>

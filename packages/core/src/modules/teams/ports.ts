@@ -96,6 +96,12 @@ export type RosterLine = RosterEntryRecord & {
   readonly publicName: string | null;
   /** Added at a scorer's table and waiting for an admin's review (S-6); absent where not read. */
   readonly needsReview?: boolean;
+  /**
+   * What the person asked for about their name on public pages (R-23): none, initials or
+   * removed. Admin → Teams says it beside the recorded name (R-33, step 2.146); absent
+   * where not read.
+   */
+  readonly nameRequest?: string;
 };
 
 export type NewRosterEntry = {

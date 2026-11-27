@@ -9,6 +9,7 @@
 import type { BinKind, BinListing } from '@srleagues/core';
 import { gameWhenText, leagueDayText, type LeagueTimes } from '../../server/game-when.ts';
 import { t } from '../../server/messages.ts';
+import { showAsOf } from '../teams-area/index.ts';
 
 export type BinKindShown = BinKind;
 
@@ -74,7 +75,9 @@ export function binView(items: readonly BinListing[], times: LeagueTimes): BinVi
     }
     if (item.kind === 'person') {
       const title = item.name === '' ? t('admin.bin.person.unnamed') : item.name;
-      return { ...row, title, facts: [] };
+      // "Show as" beside the recorded name (R-33, step 2.146), when they asked for less.
+      const showAs = showAsOf({ nameRequest: details.nameRequest });
+      return { ...row, title, facts: showAs === undefined ? [] : [showAs] };
     }
     if (item.kind === 'division') return { ...row, facts: season };
     if (item.kind === 'venue') return { ...row, facts: [] };

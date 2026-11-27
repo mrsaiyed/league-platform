@@ -130,6 +130,7 @@ export function worldTeamsStore(s: LeagueWorld, now: () => Date): TeamsStore {
             lastName: p?.lastName ?? '',
             publicName: p?.publicName ?? null,
             needsReview: e.needsReview,
+            nameRequest: p?.visibility ?? 'none',
           };
         }),
     addRosterEntry: async (e) => {

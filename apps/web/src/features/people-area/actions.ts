@@ -24,6 +24,7 @@ import {
   listPeople,
   removePerson,
   restorePerson,
+  setNameRequest,
   updatePerson,
   type CommandContext,
 } from '@srleagues/core';
@@ -46,7 +47,8 @@ import {
 import { rosterName } from '../teams-area/index.ts';
 import { unlikelyYears } from './age-on-record.ts';
 import { peopleRefusalText } from './refusal-text.ts';
-import { detailsAnchor } from './anchors.ts';
+import { detailsAnchor, showAsAnchor } from './anchors.ts';
+import { nameRequestInputOf, nameRequestRefusalCode } from './name-request.ts';
 import {
   newPersonInput,
   onlyMadeUpEmailCode,
@@ -75,6 +77,8 @@ async function peopleOf(fields: TypedFields) {
   const { adminPeople, publicSchedule, testCopy } = await webPorts();
   return {
     context,
+    /** The league's state: an archived one takes only a change that shows less (R-26). */
+    leagueStatus: league.status,
     /** The test copy takes only a made-up contact email (step 2.205): from the ports. */
     testCopy,
     deps: adminPeople.deps,
@@ -292,6 +296,32 @@ export async function savePersonAction(_state: FormState, form: FormData): Promi
   if (!uuidShape.test(personId)) return redirect(list);
   leaveNotice(context, 'person', personId, result.firstChild ? 'saved.firstChild' : 'saved');
   await showSaved(`${record(personId)}#${detailsAnchor}`);
+  return untouched;
+}
+
+/**
+ * "Save Show as" on a person's page (R-23): the person's request about their name on
+ * public pages, with the reason from the fixed list. The command checks people.manage and
+ * the league's state again; a refusal in an archived league says why (R-26). Saved, the
+ * page says so beside the form.
+ */
+export async function setNameRequestAction(_state: FormState, form: FormData): Promise<FormState> {
+  const fields = typedOf(form);
+  const { context, deps, list, record, leagueStatus } = await peopleOf(fields);
+  const input = nameRequestInputOf(fields);
+  if (input === undefined || !uuidShape.test(input.personId)) {
+    return refused('set_name_request', 'invalid-input', fields, []);
+  }
+  const result = await requests().once(requestKeyOf(context, fields), async () => {
+    const saved = await setNameRequest(context, input, deps);
+    return saved.ok
+      ? { ok: true, personId: input.personId }
+      : { ok: false, code: nameRequestRefusalCode(saved.error.code, leagueStatus) };
+  });
+  if (!result.ok) return refused('set_name_request', result.code, fields, []);
+  if (!uuidShape.test(result.personId)) return redirect(list);
+  leaveNotice(context, 'person', result.personId, 'showAsSaved');
+  await showSaved(`${record(result.personId)}#${showAsAnchor}`);
   return untouched;
 }
 

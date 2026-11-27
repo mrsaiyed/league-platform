@@ -20,7 +20,12 @@ import { commandTransaction } from '../db/command-transaction.ts';
 import { createDatabase } from '../db/create-database.ts';
 import type { DatabaseHandle } from '../db/database-handle.ts';
 import { withTransaction } from '../db/with-transaction.ts';
-import { findPerson, listPeople as listPeopleQuery } from '../queries/index.ts';
+import {
+  findPerson,
+  listBinned,
+  listPeople as listPeopleQuery,
+  listRoster,
+} from '../queries/index.ts';
 import {
   allPersonColumns,
   publicPersonColumns,
@@ -31,6 +36,10 @@ import {
   newAccount,
   newLeague,
   newPerson,
+  newProgram,
+  newRosterEntry,
+  newSeason,
+  newTeam,
   one,
   type MadeLeague,
 } from '../schema/schema.test-helper.ts';
@@ -520,5 +529,35 @@ describe('the people commands on the database', () => {
         deps,
       ),
     ).toMatchObject({ error: { code: 'not-allowed' } });
+  });
+
+  it('gives Admin → Teams and the bin the request beside the recorded name (R-33)', async () => {
+    const l = await league();
+    const onTeam = await newPerson(pglite, l.leagueId);
+    const binned = await newPerson(pglite, l.leagueId);
+    const plain = await newPerson(pglite, l.leagueId);
+    const seasonId = await newSeason(pglite, l.leagueId, await newProgram(pglite, l.leagueId));
+    const teamId = await newTeam(pglite, l.leagueId, seasonId);
+    await newRosterEntry(pglite, l.leagueId, teamId, onTeam);
+    await newRosterEntry(pglite, l.leagueId, teamId, plain);
+    const ask = (personId: string, showAs: 'initials' | 'removed') =>
+      setNameRequest(
+        l.as(l.ownerId),
+        { personId, version: 1, showAs, reason: 'personAsked' },
+        deps,
+      );
+    expect(await ask(onTeam, 'removed')).toMatchObject({ ok: true });
+    expect(await ask(binned, 'removed')).toMatchObject({ ok: true });
+    expect(await removePerson(l.as(l.ownerId), { personId: binned }, deps)).toMatchObject({
+      ok: true,
+    });
+    const scope = { leagueId: l.leagueId, accountId: l.ownerId };
+    const roster = await withTransaction(db, scope, (tx) => listRoster(tx, teamId));
+    const requestOf = (personId: string) =>
+      roster.find((r) => r.personId === personId)?.nameRequest;
+    expect(requestOf(onTeam)).toBe('removed');
+    expect(requestOf(plain)).toBe('none');
+    const bin = await withTransaction(db, scope, (tx) => listBinned(tx));
+    expect(bin.find((item) => item.id === binned)?.details).toEqual({ nameRequest: 'removed' });
   });
 });

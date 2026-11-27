@@ -11,7 +11,7 @@ import {
   type PeopleTx,
   type PersonRecord,
 } from '@srleagues/core';
-import { rosterName } from '../teams-area/index.ts';
+import { rosterName, showAsOf } from '../teams-area/index.ts';
 
 /** How many people one page of the list shows. */
 export const peoplePageSize = 50;
@@ -48,10 +48,16 @@ export function peopleAskOf(query: Query): PeopleAsk {
  * One line of the list: who, and nothing else. The list holds names only, for every role:
  * a person's private details are on their own record, for a role that may see them.
  */
-export type PeopleRow = { readonly id: string; readonly name: string };
+export type PeopleRow = {
+  readonly id: string;
+  readonly name: string;
+  /** "Show as: initials" or "Show as: removed" beside the recorded name (R-33); else absent. */
+  readonly showAs?: string;
+};
 
 export function peopleRowOf(person: PersonRecord): PeopleRow {
-  return { id: person.id, name: rosterName(person) };
+  const showAs = showAsOf({ nameRequest: person.visibility });
+  return { id: person.id, name: rosterName(person), ...(showAs === undefined ? {} : { showAs }) };
 }
 
 export type PeopleList =

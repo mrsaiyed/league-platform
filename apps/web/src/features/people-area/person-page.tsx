@@ -9,6 +9,7 @@
 // other role they are not read, so they are neither drawn nor in the page's data.
 import {
   leagueUrl,
+  nameRequestReasons,
   nameRequests,
   publicViewer,
   showName,
@@ -25,12 +26,14 @@ import { t } from '../../server/messages.ts';
 import { requestTokenField } from '../../server/same-request.ts';
 import { noticeHolderOf, savedNoticesHere } from '../../server/saved-notice.ts';
 import { StaffTrail } from '../staff/index.ts';
-import { removePersonAction, savePersonAction } from './actions.ts';
+import { removePersonAction, savePersonAction, setNameRequestAction } from './actions.ts';
 import { treatedAsChild, treatmentOf, type Treatment } from './age-on-record.ts';
-import { addPersonAnchor, detailsAnchor, removeAnchor } from './anchors.ts';
+import { addPersonAnchor, detailsAnchor, removeAnchor, showAsAnchor } from './anchors.ts';
 import { personFormWords } from './form-words.ts';
 import { readPerson, type PersonView } from './people-view.ts';
 import { PersonForm } from './person-form.tsx';
+import { NameRequestForm } from './name-request-form.tsx';
+import { showAsChoices } from './name-request.ts';
 import { RemoveForm } from './remove-form.tsx';
 import { addToRosterAction } from '../teams-area/index.ts';
 import { currentTeams, currentTeamsByPerson } from './teams-of-people.ts';
@@ -127,6 +130,41 @@ export async function PersonPage({
             </a>
           </p>
         ) : null}
+      </section>
+
+      <section id={showAsAnchor} className="staff-panel admin-team-part" data-show-as="true">
+        <h2>{t('adminPeople.showAs.title')}</h2>
+        <p className="staff-quiet">{t('adminPeople.showAs.body')}</p>
+        <NameRequestForm
+          action={setNameRequestAction}
+          permalink={`${pageUrl}#${showAsAnchor}`}
+          hidden={{
+            league: here.slug,
+            personId: person.id,
+            version: String(person.version),
+            [requestTokenField]: crypto.randomUUID(),
+          }}
+          current={requestOf(person.visibility)}
+          saved={
+            notice?.said === 'showAsSaved' && notice.thing === person.id
+              ? t('adminPeople.showAs.saved', { name: person.name })
+              : undefined
+          }
+          words={{
+            showAs: t('adminPeople.showAs.label'),
+            choices: showAsChoices.map((value) => ({
+              value,
+              label: t(`adminPeople.showAs.choice.${value}`),
+            })),
+            reason: t('adminPeople.showAs.reason.label'),
+            chooseReason: t('adminPeople.showAs.reason.choose'),
+            reasons: nameRequestReasons.map((value) => ({
+              value,
+              label: t(`adminPeople.showAs.reason.${value}`),
+            })),
+            submit: t('adminPeople.showAs.submit'),
+          }}
+        />
       </section>
 
       <section className="staff-panel admin-team-part" data-person-teams="true">

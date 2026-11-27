@@ -41,6 +41,8 @@ export type BinnedItem = {
 };
 
 export type BinDetails = {
+  /** A person: what they asked for on public pages (R-23), initials or removed; absent for none. */
+  readonly nameRequest?: string;
   /** A team: its games outside the bin with a result (final or forfeited). */
   readonly gamesPlayed?: number;
   /** A team: its games outside the bin still to play (scheduled, postponed or live). */

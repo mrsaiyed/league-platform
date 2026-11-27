@@ -40,6 +40,8 @@ type Row = {
   division_name: string | null;
   venue_name: string | null;
   teams_in_bin: { id: string; name: string }[] | null;
+  /** A person: what they asked for on public pages (R-23), said beside the name (R-33). */
+  name_request: string | null;
 };
 
 /** A person's name on an admin's screen: in full, as recorded (T-81). */
@@ -86,7 +88,7 @@ export async function listBinned(scope: LeagueScope): Promise<readonly BinnedIte
           and s.id = t.season_id) as season_name,
       (select d.name from divisions d where d.league_id = t.league_id
           and d.id = t.division_id) as division_name,
-      null::text as venue_name, null::jsonb as teams_in_bin
+      null::text as venue_name, null::jsonb as teams_in_bin, null::text as name_request
       from teams t where t.league_id = ${league} and t.deleted_at is not null
     union all
     select 'division', d.id, d.name, null, d.season_id, d.deleted_at, null, null,
@@ -100,20 +102,21 @@ export async function listBinned(scope: LeagueScope): Promise<readonly BinnedIte
           and s.division_id = d.id),
       null, null, null, null, null,
       (select s.name from seasons s where s.league_id = d.league_id and s.id = d.season_id),
-      null, null, null
+      null, null, null, null
       from divisions d where d.league_id = ${league} and d.deleted_at is not null
     union all
     select 'venue', v.id, v.name, null, null, v.deleted_at, null, null,
       exists (select 1 from courts c where c.league_id = v.league_id
           and c.venue_id = v.id and c.deleted_at is null)
         or exists (select 1 from games g where g.league_id = v.league_id and g.venue_id = v.id),
-      null, null, null, null, null, null, null, null, null
+      null, null, null, null, null, null, null, null, null, null
       from venues v where v.league_id = ${league} and v.deleted_at is not null
     union all
     select 'court', c.id, c.name, null, null, c.deleted_at, null, null,
       exists (select 1 from games g where g.league_id = c.league_id and g.court_id = c.id),
       null, null, null, null, null, null, null,
-      (select v.name from venues v where v.league_id = c.league_id and v.id = c.venue_id), null
+      (select v.name from venues v where v.league_id = c.league_id and v.id = c.venue_id), null,
+      null
       from courts c where c.league_id = ${league} and c.deleted_at is not null
     union all
     select 'person', p.id, '', null, null, p.deleted_at, p.first_name, p.last_name,
@@ -125,7 +128,7 @@ export async function listBinned(scope: LeagueScope): Promise<readonly BinnedIte
           and s.person_id = p.id)
         or exists (select 1 from people m where m.league_id = p.league_id
           and m.merged_into_id = p.id),
-      null, null, null, null, null, null, null, null, null
+      null, null, null, null, null, null, null, null, null, p.visibility
       from people p where p.league_id = ${league} and p.deleted_at is not null
         and p.merged_into_id is null
     union all
@@ -136,7 +139,8 @@ export async function listBinned(scope: LeagueScope): Promise<readonly BinnedIte
       (select coalesce(jsonb_agg(jsonb_build_object('id', x.id, 'name', x.name)
           order by x.name, x.id), '[]'::jsonb)
         from teams x where x.league_id = g.league_id and x.deleted_at is not null
-          and x.id in (g.home_team_id, g.away_team_id))
+          and x.id in (g.home_team_id, g.away_team_id)),
+      null
       from games g
       join teams h on h.league_id = g.league_id and h.id = g.home_team_id
       join teams a on a.league_id = g.league_id and a.id = g.away_team_id
@@ -166,6 +170,11 @@ export async function listBinned(scope: LeagueScope): Promise<readonly BinnedIte
  */
 function detailsOf(row: Row): { details?: BinDetails } {
   const season = row.season_name === null ? {} : { seasonName: row.season_name };
+  if (row.kind === 'person') {
+    // Only a request is told: a person who asked for nothing has no details, as before.
+    const asked = row.name_request;
+    return asked === null || asked === 'none' ? {} : { details: { nameRequest: asked } };
+  }
   if (row.kind === 'team') {
     return {
       details: {

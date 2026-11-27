@@ -78,6 +78,8 @@ export function worldBinStore(s: LeagueWorld, now: () => Date = () => new Date()
           seasonId: null,
           binnedAt: binnedAt(p.id),
           kept: s.roster.some((r) => r.personId === p.id),
+          // As list-binned.ts: what they asked for on public pages, only when they asked.
+          ...(p.visibility === 'none' ? {} : { details: { nameRequest: p.visibility } }),
         }));
       const games: BinnedItem[] = s.games
         .filter((g) => g.binned && neverPlayed.includes(g.status))

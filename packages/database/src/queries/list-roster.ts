@@ -14,6 +14,8 @@ export type RosterLineSummary = RosterEntrySummary & {
   publicName: string | null;
   /** Added at a scorer's table and waiting for review (S-6, record 058). */
   needsReview: boolean;
+  /** What the person asked for on public pages (R-23), said beside the name (R-33). */
+  nameRequest: string;
 };
 
 export async function listRoster(scope: LeagueScope, teamId: string): Promise<RosterLineSummary[]> {
@@ -30,6 +32,7 @@ export async function listRoster(scope: LeagueScope, teamId: string): Promise<Ro
       'people.last_name',
       'people.public_name',
       'roster_entries.needs_review',
+      'people.visibility',
     ])
     .where('roster_entries.league_id', '=', scope.leagueId)
     .where('roster_entries.team_id', '=', teamId)
@@ -43,5 +46,6 @@ export async function listRoster(scope: LeagueScope, teamId: string): Promise<Ro
     lastName: row.last_name,
     publicName: row.public_name,
     needsReview: row.needs_review,
+    nameRequest: row.visibility,
   }));
 }
