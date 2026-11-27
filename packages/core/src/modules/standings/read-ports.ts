@@ -78,7 +78,16 @@ export type PlayerTotalsRecord = {
 };
 
 /** A team a person has numbers or a roster place with in the season. */
-export type PlayerTeamLink = { readonly personId: string; readonly teamId: string };
+export type PlayerTeamLink = {
+  readonly personId: string;
+  readonly teamId: string;
+  /**
+   * The number on the person's roster place with the team: what a line shows in place of
+   * a name the league hides (R-24) or never recorded (S-34). Null or absent when there is
+   * none, as for a team the person has only box score lines with.
+   */
+  readonly jerseyNumber?: string | null;
+};
 
 /** A decided game with the box score lines of some players: what a mixed-team player's totals are recomputed from. */
 export type DecidedGameLines = {

@@ -266,9 +266,17 @@ function standingsReadOver(s: ReadWorld | undefined, moment: Date): StandingsRea
           .filter((r) => teams.has(r.teamId))
           .map((r) => `${r.personId}|${r.teamId}`),
       ];
+      // The roster place's number, a current place's first, as the query takes it.
+      const numbers = new Map<string, string>();
+      for (const r of [...(at()?.roster ?? [])].sort(
+        (a, b) => (a.leftOn === null ? 1 : 0) - (b.leftOn === null ? 1 : 0),
+      )) {
+        const number = (r.jerseyNumber ?? '').trim();
+        if (teams.has(r.teamId) && number !== '') numbers.set(`${r.personId}|${r.teamId}`, number);
+      }
       return [...new Set(links)].sort().map((link) => {
         const [personId = '', teamId = ''] = link.split('|');
-        return { personId, teamId };
+        return { personId, teamId, jerseyNumber: numbers.get(link) ?? null };
       });
     },
     decidedGamesOf: async (seasonId, personIds) => {

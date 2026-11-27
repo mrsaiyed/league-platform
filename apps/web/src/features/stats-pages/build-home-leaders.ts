@@ -7,7 +7,7 @@ import { publicViewer, readStatLeaders, readStatisticsTable } from '@srleagues/c
 import type { StandingsReadStore } from '@srleagues/core';
 import { t } from '../../server/messages.ts';
 import type { PublicStatsPorts, PublicStatsSettings } from '../../server/public-stats.ts';
-import { leaderValues, noLeaderCard, statLabel } from './build-stats.ts';
+import { leaderValues, noLeaderCard, playerNameText, statLabel } from './build-stats.ts';
 
 /**
  * How many places the home page asks for. Players level with the last of them come too
@@ -140,7 +140,7 @@ async function readHomeLeaders(
           // are not level get the decimals that tell them apart (step 2.199).
           value: leaderValues(shown, 'average')[index] ?? '',
           unit: t('home.leaders.perGame'),
-          name: leader.name.text ?? t('stats.unnamedPlayer'),
+          name: playerNameText(leader.name),
           detail: t('stats.leaderDetail', {
             team: theirs.map((team) => team.name).join(t('stats.teamsJoin')),
             // The games the statistic was recorded in: what the average is over (S-63).

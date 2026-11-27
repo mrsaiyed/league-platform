@@ -7,7 +7,7 @@ import {
   type NamePolicy,
   type NameRequest,
 } from './name-policy.ts';
-import { showName, type PersonForDisplay, type ShownName } from './show-name.ts';
+import { numberInPlace, showName, type PersonForDisplay, type ShownName } from './show-name.ts';
 import { statsVisibilities, type TeamStatsSetting } from './stats-shown.ts';
 import { publicViewer, type Viewer } from './viewer.ts';
 
@@ -344,5 +344,17 @@ describe('showName: fails closed on values it does not know', () => {
       shown: false,
       why: 'restricted',
     });
+  });
+});
+
+describe('numberInPlace: the number a line shows for a name not shown (R-24, S-34)', () => {
+  it('gives the number only for a hidden name or none recorded', () => {
+    expect(numberInPlace({ shown: false, why: 'hidden' }, '12')).toBe('12');
+    expect(numberInPlace({ shown: false, why: 'no_name' }, ' 7 ')).toBe('7');
+    expect(numberInPlace({ shown: false, why: 'removed' }, '12')).toBeNull();
+    expect(numberInPlace({ shown: false, why: 'restricted' }, '12')).toBeNull();
+    expect(numberInPlace({ shown: true, text: 'Noor H.' }, '12')).toBeNull();
+    expect(numberInPlace({ shown: false, why: 'hidden' }, null)).toBeNull();
+    expect(numberInPlace({ shown: false, why: 'hidden' }, ' ')).toBeNull();
   });
 });

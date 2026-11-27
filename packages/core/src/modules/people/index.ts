@@ -17,6 +17,7 @@ export {
   type PrivatePersonFields,
 } from './rules/private-field-scan.ts';
 export {
+  numberInPlace,
   showName,
   type PersonForDisplay,
   type ShownName,

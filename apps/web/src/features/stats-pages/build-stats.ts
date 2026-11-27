@@ -42,6 +42,21 @@ function isKnown(key: string): key is keyof typeof known {
 export const hasStatLabel = (key: string): boolean => isKnown(key);
 
 /** A statistic's name and short name; a statistic we have no words for shows its own key. */
+/**
+ * A statistics line's name as the page writes it: the name, else the player's number with
+ * the team beside it ("#12", R-24, S-34), else a nameless line (R-17). Which applies is
+ * core's to say (`numberInPlace`): the page only words it.
+ */
+export function playerNameText(name: {
+  readonly text: string | null;
+  readonly number: string | null;
+}): string {
+  if (name.text !== null) return name.text;
+  return name.number === null
+    ? t('stats.unnamedPlayer')
+    : t('stats.byNumber', { number: name.number });
+}
+
 export function statLabel(key: string): { readonly full: string; readonly short: string } {
   return isKnown(key)
     ? { full: t(known[key][0]), short: t(known[key][1]) }
@@ -227,8 +242,7 @@ function pageData(
       .map((id) => teamName.get(id) ?? '')
       .filter((name) => name !== '')
       .join(', ');
-  const playerName = (name: { readonly text: string | null }) =>
-    name.text ?? t('stats.unnamedPlayer');
+  const playerName = playerNameText;
   const valueOf = (entry: { total: number; average: number } | undefined): string | null =>
     entry === undefined ? null : shown(by === 'average' ? entry.average : entry.total, by);
   // The numbers behind the written ones: a column is sorted by these, never by its words.

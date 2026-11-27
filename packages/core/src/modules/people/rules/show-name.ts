@@ -101,3 +101,18 @@ export function showName(person: PersonForDisplay, where: WhereShown): ShownName
       return { shown: false, why: 'hidden' };
   }
 }
+
+/**
+ * The jersey number a line shows in place of the name `showName` withheld, as "#12" with
+ * the team (R-24, S-34): only for a name the league hides or one never recorded. A person
+ * who asked to be taken off (R-17) stays a nameless line, and a team whose numbers this
+ * viewer may not see shows nothing at all. Null when there is no number to show.
+ */
+export function numberInPlace(
+  shown: ShownName,
+  jerseyNumber: string | null | undefined,
+): string | null {
+  if (shown.shown || (shown.why !== 'hidden' && shown.why !== 'no_name')) return null;
+  const number = (jerseyNumber ?? '').trim();
+  return number === '' ? null : number;
+}
