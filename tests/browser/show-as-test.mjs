@@ -10,8 +10,17 @@
 // parents' confirmation is not offered there. Back on full names the confirmation is
 // offered again and the team page changes; ticked, the others are in full and the removed
 // child still is not. In the adult league (north-valley) the child playing there is
-// removed the same way and her team's roster keeps her line, nameless. A scorekeeper never
-// reaches the panel.
+// removed the same way and her team's roster keeps her line, nameless; then (the fix
+// round) the scorekeeper scores a basket by her, #9, in the live game while a visitor
+// watches its page: the page as served and as the live message redraws it, and the game's
+// snapshot, never name her. A scorekeeper never reaches the panel.
+import {
+  court,
+  leagueId as adultLeagueId,
+  liveGame,
+  starters,
+  trackerPath,
+} from './tracker-driver.mjs';
 import {
   accessibilityProblems,
   answered,
@@ -258,6 +267,76 @@ if (browser) {
       'adult removed: the statistics show no Pia',
       !(await textOf('/north-valley/stats')).includes('Pia'),
     );
+  });
+
+  // Plan row 29's last part (the review's Medium 3): the game page, its snapshot and the
+  // live message, with a play by the removed child. This server's world only: no seed and
+  // no other test changes.
+  await step('the adult league: a live play by the removed child', async () => {
+    const gamePath = `/north-valley/games/${liveGame}`;
+    const snapshotOf = async () => {
+      const answer = await fetch(
+        `${origin}/api/v1/leagues/${adultLeagueId}/games/${liveGame}/snapshot`,
+      );
+      return { status: answer.status, text: await answer.text() };
+    };
+    const before = await snapshotOf();
+    const homeBefore = JSON.parse(before.text).score?.home;
+    note(
+      'live game: the snapshot answers, without Pia',
+      before.status === 200 && typeof homeBefore === 'number' && !before.text.includes('Pia'),
+      `${before.status} ${before.text.slice(0, 200)}`,
+    );
+    await page.goto(`${origin}${gamePath}`);
+    const pageBefore = await page.locator('main').innerText();
+    note(
+      'live game: the page as served has no Pia',
+      !pageBefore.includes('Pia') && !(await page.content()).includes('Pia'),
+    );
+    const scorer = await (
+      await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true })
+    ).newPage();
+    scorer.setDefaultTimeout(60_000);
+    await scorer
+      .context()
+      .addCookies([{ name: 'srl_session', value: 'local-scorekeeper-token', url: origin }]);
+    const c = court(scorer);
+    await scorer.goto(`${origin}${trackerPath()}`);
+    await c.open();
+    const playing = scorer.locator('[data-scoring][data-stage="play"]');
+    if (!(await playing.isVisible())) {
+      for (const jersey of starters) await c.tile('home', jersey).tap();
+      for (const jersey of starters) await c.tile('away', jersey).tap();
+      await playing.waitFor();
+    }
+    // Her tile is her number alone (R-33); a basket by #9 is hers.
+    const options = c.pad.locator(
+      `[data-options="${await c.tile('home', 9).getAttribute('data-player')}"]`,
+    );
+    if (!(await options.isVisible())) await c.tile('home', 9).tap();
+    await c.recorded(() => options.locator('[data-act="p2"]').tap());
+    await c.saved();
+    // The visitor's page is redrawn by the live message, not loaded again: wait (at most a
+    // minute) for the new score in it, then read it.
+    await page.waitForFunction(
+      (old) => document.querySelector('main')?.innerText !== old,
+      pageBefore,
+      { timeout: 60_000 },
+    );
+    const pageAfter = await page.locator('main').innerText();
+    note('live game: the redrawn page has no Pia', !pageAfter.includes('Pia'), pageAfter);
+    const after = await snapshotOf();
+    note(
+      'live game: the snapshot after her basket counts it and has no Pia',
+      JSON.parse(after.text).score?.home === homeBefore + 2 && !after.text.includes('Pia'),
+      after.text.slice(0, 300),
+    );
+    await page.reload();
+    note(
+      'live game: the page served again after her basket has no Pia',
+      !(await page.content()).includes('Pia'),
+    );
+    await scorer.context().close();
   });
 
   await step('a scorekeeper', async () => {
