@@ -20,11 +20,14 @@ export const listPeople = defineCommand({
     // Only those ticked as children who are 18 or over by birth date (step 2.146). Ages
     // are private (R-16): for a role that may not see them the list is empty.
     tickedButGrown: z.boolean().default(false),
+    // Only those added at a scorer's table with no age recorded (S-136, amended in step
+    // 2.146's fix round), guarded the same way: whether someone counts as a child is private.
+    walkUps: z.boolean().default(false),
   }),
   allowed: (context, _input, tx: PeopleTx) => mayReadPeople(context, tx, 'people.read'),
   run: async ({ context, input, tx }): Promise<Result<readonly PersonRecord[], never>> => {
     const sensitive = input.privateFields && (await maySeeSensitive(context, tx));
-    if (input.tickedButGrown && !sensitive) return ok([]);
+    if ((input.tickedButGrown || input.walkUps) && !sensitive) return ok([]);
     return ok(
       await tx.people.list({
         // Names only; a curly apostrophe (as a phone types "o’neill") is a plain one.
@@ -35,6 +38,7 @@ export const listPeople = defineCommand({
         offset: input.offset,
         sensitive,
         ...(input.tickedButGrown ? { tickedButGrown: true } : {}),
+        ...(input.walkUps ? { walkUps: true } : {}),
       }),
     );
   },

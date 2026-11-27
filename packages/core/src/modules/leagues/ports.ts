@@ -147,6 +147,13 @@ export type LeaguesStore = {
    */
   readonly hasRecordedChild: () => Promise<boolean>;
   /**
+   * Whether anyone in the league, not in the bin, counts as a child only because they were
+   * added at a scorer's table with no age (S-136 as amended in step 2.146's fix round): an
+   * adult league's Privacy settings then offer the confirmation too, and say how to mark
+   * them. Never the S-109 put-back's question, which stays with what an admin recorded.
+   */
+  readonly hasWalkUpOfUnknownAge: () => Promise<boolean>;
+  /**
    * T-403: holds the league's own row until the transaction ends, so the saves S-109 and
    * T-402 guard run one after another for one league. The first thing such a save does.
    */

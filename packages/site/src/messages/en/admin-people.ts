@@ -145,6 +145,13 @@ export const enAdminPeople = {
   'adminPeople.treated.childByChoice': 'Treated as a child, because they are marked as a child.',
   'adminPeople.treated.childNotRecorded':
     'Treated as a child: nothing records their age, and in this league anyone whose age is not recorded is shown as a child.',
+  // S-136 as amended in step 2.146's fix round: why a walk-up is shown as a child.
+  'adminPeople.treated.childWalkUp':
+    'Treated as a child: they were added at the scorer’s table and nothing records their age. Choose “An adult” or “A child”, or give a date of birth, and this no longer applies.',
+  'adminPeople.walkUps.link': 'Added at the scorer’s table, age not recorded',
+  'adminPeople.walkUps.none': 'No one added at the scorer’s table is without a recorded age.',
+  'adminPeople.walkUps.on':
+    'Showing only people added at the scorer’s table with no date of birth and no child-or-adult choice. They are shown as children until you open a record and mark them.',
   'adminPeople.wholeName.check':
     '“{first}” in the first-name box looks like a whole name. Put the last name in its own box; if this is the first name as it is, tick the box and save again.',
   'adminPeople.wholeName.checked': 'Yes, this is the first name',

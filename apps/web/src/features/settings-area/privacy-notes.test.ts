@@ -22,21 +22,29 @@ const confirmationRow = (value: boolean, savedAt: string | null = null): LeagueS
   savedAt,
 });
 
+const walkUpsUrl = '/league/admin/people?added=table';
+
 function notes(
   audience: Audience,
   options: {
     readonly hasRecordedChild?: boolean;
+    readonly hasWalkUpOfUnknownAge?: boolean;
     readonly policy?: Partial<NamePolicy>;
     readonly given?: boolean;
     readonly savedAt?: string;
   } = {},
 ): SettingNotes {
   return privacyNotes({
-    facts: { audience, hasRecordedChild: options.hasRecordedChild ?? false },
+    facts: {
+      audience,
+      hasRecordedChild: options.hasRecordedChild ?? false,
+      hasWalkUpOfUnknownAge: options.hasWalkUpOfUnknownAge ?? false,
+    },
     policy: { ...defaultNamePolicy, ...options.policy },
     rows: [confirmationRow(options.given ?? false, options.savedAt ?? null)],
     timeZone: 'America/Chicago',
     locale: 'en',
+    walkUpsUrl: walkUpsUrl,
   });
 }
 const keys = (n: SettingNotes) => (n.area?.['privacy'] ?? []).map((line) => line.key);
@@ -80,12 +88,13 @@ describe('privacyNotes', () => {
 
   it('says who gave the confirmation where the activity log tells it (2.146)', () => {
     const given = privacyNotes({
-      facts: { audience: 'youth', hasRecordedChild: false },
+      facts: { audience: 'youth', hasRecordedChild: false, hasWalkUpOfUnknownAge: false },
       policy: { ...defaultNamePolicy, childrenInFull: true },
       rows: [confirmationRow(true, '2026-11-16T03:00:00.000Z')],
       timeZone: 'America/Chicago',
       locale: 'en',
       confirmedBy: 'Riley Owner',
+      walkUpsUrl,
     });
     expect(given.area?.['privacy']?.at(-1)).toEqual({
       key: 'adminSettings.privacy.confirmedOnBy',
@@ -151,6 +160,34 @@ describe('privacyNotes', () => {
     expect(row(notes('adult', { given: true }))?.offered).toBe(true);
   });
 
+  // S-136 as amended in step 2.146's fix round (Medium 1 of the review): an adult league
+  // whose only children are walk-ups with no age is offered the confirmation, told why, and
+  // given the list of them; a league with none hears nothing of it.
+  it('offers the confirmation where the only children are walk-ups, and links to them', () => {
+    const row = (n: SettingNotes) => n.rows?.[confirmationKey];
+    const walkUps = notes('adult', { hasWalkUpOfUnknownAge: true });
+    expect(row(walkUps)).toEqual({
+      before: [{ key: 'adminSettings.privacy.confirm.adultWithWalkUps' }],
+      offered: true,
+    });
+    expect(walkUps.area?.['privacy']).toContainEqual({
+      key: 'adminSettings.privacy.walkUps',
+      link: { href: walkUpsUrl, key: 'adminSettings.privacy.walkUps.link' },
+    });
+    expect(keys(walkUps)).toContain('adminSettings.privacy.adultWithChildren');
+    expect(keys(notes('youth', { hasWalkUpOfUnknownAge: true }))).toContain(
+      'adminSettings.privacy.walkUps',
+    );
+    for (const audience of ['adult', 'youth', 'mixed'] as const) {
+      expect(keys(notes(audience))).not.toContain('adminSettings.privacy.walkUps');
+    }
+    // A recorded child too: the words for recorded children.
+    expect(row(notes('adult', { hasRecordedChild: true, hasWalkUpOfUnknownAge: true }))).toEqual({
+      before: [{ key: 'adminSettings.privacy.confirm.adultWithChildren' }],
+      offered: true,
+    });
+  });
+
   it('offers the confirmation only while names are on full names, unless one is stored (2.146)', () => {
     const offered = (n: SettingNotes) => n.rows?.[confirmationKey]?.offered;
     for (const names of ['hidden', 'first_name_last_initial'] as const) {
@@ -166,13 +203,15 @@ describe('privacyNotes', () => {
       [false, true].flatMap((hasRecordedChild) => {
         const n = notes(audience, {
           hasRecordedChild,
+          hasWalkUpOfUnknownAge: !hasRecordedChild,
           given: true,
           policy: { names: 'hidden' },
           savedAt: '2026-11-15T12:00:00.000Z',
         });
-        return [...(n.area?.['privacy'] ?? []), ...(n.rows?.[confirmationKey]?.before ?? [])].map(
-          (line) => line.key,
-        );
+        return [
+          ...(n.area?.['privacy'] ?? []),
+          ...(n.rows?.[confirmationKey]?.before ?? []),
+        ].flatMap((line) => [line.key, ...(line.link === undefined ? [] : [line.link.key])]);
       }),
     );
     for (const key of all) expect(Object.hasOwn(en, key), key).toBe(true);

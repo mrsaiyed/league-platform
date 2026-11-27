@@ -13,6 +13,7 @@ import {
   findPublishedDesign,
   findProgramId,
   hasRecordedChild,
+  hasWalkUpOfUnknownAge,
   lockLeagueRow,
   findSeasonProgramId,
   insertLeague,
@@ -49,6 +50,7 @@ export function leaguesStore(
     setName: (name, version) => updateLeagueName(scope, name, version),
     leagueAudience: () => findLeagueAudience(scope),
     hasRecordedChild: () => hasRecordedChild(scope),
+    hasWalkUpOfUnknownAge: () => hasWalkUpOfUnknownAge(scope),
     // T-403: a save that could not hold its league's row must not go on unguarded.
     lockLeague: async () => {
       if ((await lockLeagueRow(scope)) === undefined) {

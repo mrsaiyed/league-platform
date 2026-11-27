@@ -196,7 +196,17 @@ export function SettingForms({
   readonly notes?: SettingNotes;
 }) {
   const lines = (said: readonly Line[] | undefined) =>
-    (said ?? []).map((line) => <p key={line.key}>{say(line.key, line.params)}</p>);
+    (said ?? []).map((line) => (
+      <p key={line.key}>
+        {say(line.key, line.params)}
+        {line.link === undefined ? null : (
+          <>
+            {' '}
+            <a href={line.link.href}>{say(line.link.key)}</a>
+          </>
+        )}
+      </p>
+    ));
   return (
     <>
       {byArea(rows).map((group) => (

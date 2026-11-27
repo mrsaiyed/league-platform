@@ -25,7 +25,7 @@ import {
   standInNamesOf,
   standInStatusVersion,
 } from './stand-in-league-states.ts';
-import { minorAt, recordedOnly } from './stand-in-world-clock.ts';
+import { minorAt, recordedOnly, walkUpIn } from './stand-in-world-clock.ts';
 import { newId } from './stand-in-world-ids.ts';
 import {
   copyWorldSeasonSetup,
@@ -474,6 +474,7 @@ export function worldLeaguesStores(
     lockLeague: async () => undefined,
     hasRecordedChild: async () =>
       s.people.some((p) => !p.binned && minorAt(p, s.timeZone, now(), recordedOnly) === true),
+    hasWalkUpOfUnknownAge: async () => s.people.some((p) => !p.binned && walkUpIn(p, s.roster)),
     // The permission check asks who the league is and whether it may be changed.
     currentLeague: async () => {
       const status = await access.leagueStatus();

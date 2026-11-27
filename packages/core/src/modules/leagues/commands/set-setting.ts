@@ -102,7 +102,9 @@ export function setSettingFor(registry: SettingRegistry) {
       if (
         givingYes &&
         (await tx.leagues.leagueAudience()) === 'adult' &&
-        !(await tx.leagues.hasRecordedChild())
+        !(await tx.leagues.hasRecordedChild()) &&
+        // A walk-up shown as a child for want of an age is someone it covers (S-136).
+        !(await tx.leagues.hasWalkUpOfUnknownAge())
       ) {
         return fail({ code: 'no-child-recorded' });
       }

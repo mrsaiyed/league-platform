@@ -18,6 +18,7 @@ import {
   findPerson,
   findPersonIsMinor,
   hasRecordedChild,
+  hasWalkUpOfUnknownAge,
   lockLeagueRow,
   insertPerson,
   isPersonOnRoster,
@@ -148,6 +149,12 @@ registerIsolationCase({
     await noChildInOwnLeague(scope, target);
     return hasRecordedChild(scope);
   },
+});
+
+registerIsolationCase({
+  subject: hasWalkUpOfUnknownAge,
+  name: "ask whether anyone in the scope's league is a walk-up with no age (S-136)",
+  run: (scope) => hasWalkUpOfUnknownAge(scope),
 });
 
 registerIsolationCase({

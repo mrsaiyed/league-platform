@@ -95,6 +95,10 @@ export async function SettingsPage({
           timeZone: clock.timeZone,
           locale,
           confirmedBy: confirmer,
+          walkUpsUrl: leagueUrl(view.context.league, 'admin-area', {
+            area: 'people',
+            query: { added: 'table' },
+          }),
         });
   // A Profile form's or a setting's "Saved" (step 2.155 parts 3 and 4): taken once, so a
   // reload says nothing old.

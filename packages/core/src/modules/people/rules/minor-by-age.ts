@@ -46,6 +46,17 @@ export function tickedButGrownOn(person: MinorFacts, today: string): boolean {
   );
 }
 
+/**
+ * Whether the person counts as a child only because they were added at a scorer's table
+ * with no age (S-136 as amended in the fix round of step 2.146): no birth date, the tick
+ * neither on nor off, and a roster place added at a table. These are the people an admin
+ * may want to mark, by the tick either way or a date, after which the rule no longer
+ * applies to them. The database answers it in SQL (walkUpOfUnknownAgeSql).
+ */
+export function walkUpOfUnknownAgeOn(person: MinorFacts, origin: MinorOrigin): boolean {
+  return origin.addedAtTable && person.birthDate === null && person.isMinor === null;
+}
+
 /** The age at which a person stops counting as a child (R-28: "under 18 today"). */
 export const adultAge = 18;
 

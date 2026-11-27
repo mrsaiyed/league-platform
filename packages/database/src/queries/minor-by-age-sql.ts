@@ -47,6 +47,15 @@ const addedAtTableOfPerson: RawBuilder<boolean> = sql<boolean>`exists (
 )`;
 
 /**
+ * Whether the `people` row counts as a child only because a roster place of theirs was
+ * added at a scorer's table with no age: no birth date and the tick neither on nor off
+ * (core's walkUpOfUnknownAgeOn, S-136 as amended in step 2.146's fix round). A yes or a no.
+ */
+export function walkUpOfUnknownAgeSql(): RawBuilder<boolean> {
+  return sql<boolean>`(people.birth_date is null and people.is_minor is null and ${addedAtTableOfPerson})`;
+}
+
+/**
  * What only what is recorded says (the date or the tick), with nobody counted a child for
  * having been added at a scorer's table: whether the league has a recorded child (S-109).
  */

@@ -7,11 +7,21 @@
 import type { Audience } from '../league-values.ts';
 import type { LeaguesTx } from '../ports.ts';
 
-export type PrivacyFacts = { readonly audience: Audience; readonly hasRecordedChild: boolean };
+export type PrivacyFacts = {
+  readonly audience: Audience;
+  readonly hasRecordedChild: boolean;
+  /**
+   * Whether someone counts as a child only because they were added at a scorer's table
+   * with no age (S-136 as amended in step 2.146's fix round): the screen then offers the
+   * confirmation in an adult league too, and says how to mark them.
+   */
+  readonly hasWalkUpOfUnknownAge: boolean;
+};
 
 export async function readPrivacyFacts(tx: Pick<LeaguesTx, 'leagues'>): Promise<PrivacyFacts> {
   return {
     audience: await tx.leagues.leagueAudience(),
     hasRecordedChild: await tx.leagues.hasRecordedChild(),
+    hasWalkUpOfUnknownAge: await tx.leagues.hasWalkUpOfUnknownAge(),
   };
 }

@@ -3,6 +3,7 @@
 // adds only when it is asked for them, which the command does only for a role holding
 // `people.read_sensitive` (R-16, T-76): for anyone else the database is never asked
 // for them, so they are not merely hidden afterwards.
+import { walkUpOfUnknownAgeSql } from './minor-by-age-sql.ts';
 
 export type PersonSummary = {
   id: string;
@@ -17,6 +18,8 @@ export type PersonSummary = {
     contactEmail: string | null;
     birthDate: string | null;
     isMinor: boolean | null;
+    /** Present, and true, only for a walk-up with no age (walkUpOfUnknownAgeSql, S-136). */
+    walkUp?: true;
   };
 };
 
@@ -64,13 +67,22 @@ export function personSummary(row: PersonRow): PersonSummary {
   };
 }
 
-export function personSummaryWithSensitive(row: PersonRow & SensitiveRow): PersonSummary {
+/**
+ * The walk-up question a query asks beside the sensitive columns (S-136): whether the
+ * person counts as a child only for being added at a scorer's table with no age.
+ */
+export const walkUpColumn = walkUpOfUnknownAgeSql().as('walk_up');
+
+export function personSummaryWithSensitive(
+  row: PersonRow & SensitiveRow & { readonly walk_up?: boolean | null },
+): PersonSummary {
   return {
     ...personSummary(row),
     sensitive: {
       contactEmail: row.contact_email,
       birthDate: row.birth_date,
       isMinor: row.is_minor,
+      ...(row.walk_up === true ? { walkUp: true as const } : {}),
     },
   };
 }

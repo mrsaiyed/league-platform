@@ -49,6 +49,8 @@ export const enAdminSettings = {
     'A player recorded as a child is shown by first name and last initial.',
   'adminSettings.privacy.confirm.adultWithChildren':
     'This league has players recorded as children. Tick to show their full names too, while names are on full names.',
+  'adminSettings.privacy.confirm.adultWithWalkUps':
+    'No one here is recorded as a child, but players added at the scorer’s table with no age are shown as children. Tick to show their full names too, while names are on full names.',
   'adminSettings.privacy.confirm.youthOrMixed':
     "Tick to show the young players' full names too, while names are on full names.",
   'adminSettings.privacy.confirmedOn': 'Confirmed on {date}.',
@@ -74,6 +76,10 @@ export const enAdminSettings = {
     'To show less of one person, open their record in People and choose "Show as".',
   'adminSettings.privacy.unknownAge':
     'In this league, anyone whose record does not say whether they are a child or an adult is shown as a child, coaches too.',
+  // S-136 as amended in step 2.146's fix round, with a link to Admin → People's list.
+  'adminSettings.privacy.walkUps':
+    'Players added at the scorer’s table with no date of birth count as children until someone marks them as a child or an adult on their record.',
+  'adminSettings.privacy.walkUps.link': 'See who they are',
   'adminSettings.profile.audience.adult': 'Adults',
   'adminSettings.profile.audience.mixed': 'Both adults and under-18s',
   'adminSettings.profile.audience.youth': 'Under-18s',

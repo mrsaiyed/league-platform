@@ -9,13 +9,18 @@ import {
 import type { ActivityEntry, Grant } from '../access/index.ts';
 import type { Audience } from '../leagues/index.ts';
 import type { PeopleTx, PersonRecord, PersonSensitiveFields } from './ports.ts';
-import { isMinorOn, tickedButGrownOn } from './rules/minor-by-age.ts';
+import { isMinorOn, tickedButGrownOn, walkUpOfUnknownAgeOn } from './rules/minor-by-age.ts';
 
 /** A stored person: the record, and the sensitive fields kept beside it. */
 export type StoredPerson = Omit<PersonRecord, 'sensitive'> & {
   sensitiveFields: PersonSensitiveFields;
   onRoster: boolean;
+  /** Whether a roster place of theirs was added at a scorer's table (S-136); false if absent. */
+  addedAtTable?: boolean;
 };
+
+const walkUpOf = (p: StoredPerson): boolean =>
+  walkUpOfUnknownAgeOn(p.sensitiveFields, { addedAtTable: p.addedAtTable === true });
 
 export type MemoryPeople = {
   status: string;
@@ -87,7 +92,9 @@ export function memoryPeople(state: Partial<MemoryPeople> = {}) {
       visibility: p.visibility,
       binned: p.binned,
       version: p.version,
-      ...(sensitive ? { sensitive: { ...p.sensitiveFields } } : {}),
+      ...(sensitive
+        ? { sensitive: { ...p.sensitiveFields, ...(walkUpOf(p) ? { walkUp: true as const } : {}) } }
+        : {}),
     });
     return {
       jobs,
@@ -107,12 +114,13 @@ export function memoryPeople(state: Partial<MemoryPeople> = {}) {
           const found = s.people.find((p) => p.id === id);
           return found === undefined ? undefined : view(found, sensitive);
         },
-        list: async ({ search, limit, offset, sensitive, tickedButGrown }) => {
+        list: async ({ search, limit, offset, sensitive, tickedButGrown, walkUps }) => {
           if (sensitive) s.sensitiveReads += 1;
           const needle = search?.toLowerCase();
           return s.people
             .filter((p) => !p.binned)
             .filter((p) => tickedButGrown !== true || tickedButGrownOn(p.sensitiveFields, s.today))
+            .filter((p) => walkUps !== true || walkUpOf(p))
             .filter(
               (p) =>
                 needle === undefined ||

@@ -28,7 +28,9 @@ import {
   newTeam,
   type MadeLeague,
 } from '../schema/schema.test-helper.ts';
+import { findPerson } from './find-person.ts';
 import { hasRecordedChild } from './has-recorded-child.ts';
+import { hasWalkUpOfUnknownAge } from './has-walk-up-of-unknown-age.ts';
 import { listPeopleForDisplay } from './list-people-for-display.ts';
 import { listPublicRoster } from './list-public-roster.ts';
 import { listPeople } from './list-people.ts';
@@ -332,6 +334,15 @@ describe('the queries that say whether someone is a child read it through isMino
         minor: rows.find((row) => row.id === walkUp)?.isMinor,
         names: roster.lines.map((line) => (line.name.shown ? line.name.text : line.name.why)),
         recorded: await inB((scope) => hasRecordedChild(scope)),
+        // S-136 as amended (the fix round): the Privacy screen's fact, Admin → People's
+        // list of walk-ups with no age, and the walk-up's own record.
+        walkUpFact: await inB((scope) => hasWalkUpOfUnknownAge(scope)),
+        walkUpList: (
+          await inB((scope) =>
+            listPeople(scope, { limit: 10, offset: 0, sensitive: true, walkUps: true }),
+          )
+        ).map((row) => row.id),
+        onRecord: (await inB((scope) => findPerson(scope, walkUp, true)))?.sensitive?.walkUp,
       };
     };
     // No date and no tick: the walk-up is a child in this adult league; the person put on
@@ -341,23 +352,36 @@ describe('the queries that say whether someone is a child read it through isMino
       minor: true,
       names: expect.arrayContaining(['Wal K.', 'Lis Ted']),
       recorded: false,
+      walkUpFact: true,
+      walkUpList: [walkUp],
+      onRecord: true,
     });
-    // The admin says otherwise: the tick off, or a date that says adult.
+    // The admin says otherwise: the tick off ("an adult"), or a date that says adult. The
+    // walk-up rule then no longer applies: off the list, off the record, off Privacy.
     await pglite.query('update people set is_minor = false where id = $1', [walkUp]);
     expect(await seen()).toMatchObject({
       minor: false,
       names: expect.arrayContaining(['Wal Kup']),
+      walkUpFact: false,
+      walkUpList: [],
+      onRecord: undefined,
     });
     await pglite.query('update people set is_minor = null, birth_date = $2 where id = $1', [
       walkUp,
       '1990-04-12',
     ]);
-    expect((await seen()).minor).toBe(false);
+    expect(await seen()).toMatchObject({ minor: false, walkUpFact: false, walkUpList: [] });
     // Or the tick on: a recorded child now.
     await pglite.query('update people set is_minor = true, birth_date = null where id = $1', [
       walkUp,
     ]);
-    expect(await seen()).toMatchObject({ minor: true, recorded: true });
+    expect(await seen()).toMatchObject({
+      minor: true,
+      recorded: true,
+      walkUpFact: false,
+      walkUpList: [],
+      onRecord: undefined,
+    });
   });
 
   it('lists only those ticked as children who are 18 or over by birth date (step 2.146)', async () => {

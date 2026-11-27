@@ -269,6 +269,7 @@ const treatedText: Readonly<Record<Treatment, () => string>> = {
   'child-by-choice': () => t('adminPeople.treated.childByChoice'),
   'child-by-choice-over-date': () => t('adminPeople.field.childByTick'),
   'child-not-recorded': () => t('adminPeople.treated.childNotRecorded'),
+  'child-walk-up': () => t('adminPeople.treated.childWalkUp'),
   'adult-by-both': () => t('adminPeople.treated.adultByBoth'),
   'adult-by-date': () => t('adminPeople.treated.adultByDate'),
   'adult-by-choice': () => t('adminPeople.treated.adultByChoice'),

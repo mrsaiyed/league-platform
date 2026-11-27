@@ -36,6 +36,11 @@ export type PeopleAsk = {
    * 2.146): the database works it out, so no date reaches the page.
    */
   readonly tickedButGrown: boolean;
+  /**
+   * Only people added at a scorer's table with no age recorded (`?added=table`, S-136 as
+   * amended in step 2.146's fix round), shown as children until an admin marks them.
+   */
+  readonly walkUps: boolean;
 };
 
 export function peopleAskOf(query: Query): PeopleAsk {
@@ -47,6 +52,7 @@ export function peopleAskOf(query: Query): PeopleAsk {
     emailRefused,
     page: Number.isInteger(page) && page >= 1 && page <= 10_000 ? page : 1,
     tickedButGrown: only(query['ticked']) === 'grown',
+    walkUps: only(query['added']) === 'table',
   };
 }
 
@@ -83,6 +89,7 @@ export async function readPeopleList(
       limit: peoplePageSize + 1,
       offset: (ask.page - 1) * peoplePageSize,
       tickedButGrown: ask.tickedButGrown,
+      walkUps: ask.walkUps,
     },
     deps,
   );
@@ -102,6 +109,11 @@ export type PrivateDetails = {
   readonly contactEmail: string;
   readonly birthDate: string;
   readonly child: ChildChoice;
+  /**
+   * Present only for someone shown as a child because they were added at a scorer's table
+   * with no age (S-136): the record says so, and marking them in either way ends it.
+   */
+  readonly walkUp?: true;
 };
 
 /** One person's record as their page draws it. */
@@ -135,6 +147,7 @@ export function personViewOf(person: PersonRecord): PersonView {
       contactEmail: sensitive.contactEmail ?? '',
       birthDate: sensitive.birthDate ?? '',
       child: sensitive.isMinor === null ? '' : sensitive.isMinor ? 'child' : 'adult',
+      ...(sensitive.walkUp === true ? { walkUp: true as const } : {}),
     },
   };
 }

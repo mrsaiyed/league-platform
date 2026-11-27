@@ -3,6 +3,7 @@ export {
   adultAge,
   isMinorOn,
   tickedButGrownOn,
+  walkUpOfUnknownAgeOn,
   type MinorFacts,
   type MinorOrigin,
 } from './rules/minor-by-age.ts';

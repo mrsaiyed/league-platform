@@ -2,7 +2,12 @@
 // and back from a day and time there to a moment. What the database works out with
 // `at time zone`, for the stand-in's one world (stand-in-world.ts). Local work only.
 // "Today" is always the league's own day, by core's own rule (dayIn of the leagues module).
-import { isMinorOn, dayIn as leagueDayIn, type MinorFacts } from '@srleagues/core';
+import {
+  isMinorOn,
+  dayIn as leagueDayIn,
+  walkUpOfUnknownAgeOn,
+  type MinorFacts,
+} from '@srleagues/core';
 
 /** yyyy-mm-dd, `days` days on from `day` (or back, when negative). */
 export function addDays(day: string, days: number): string {
@@ -63,11 +68,26 @@ export function minorAt(
   moment: Date,
   roster: TablePlaces,
 ): boolean | null {
-  const addedAtTable = roster.some(
+  return isMinorOn(person.sensitive, dayIn(moment, timeZone), {
+    addedAtTable: addedAtTable(person, roster),
+  });
+}
+
+const addedAtTable = (person: { readonly id: string }, roster: TablePlaces): boolean =>
+  roster.some(
     (place) =>
       place.personId.toLowerCase() === person.id.toLowerCase() && place.addedAtGameId !== null,
   );
-  return isMinorOn(person.sensitive, dayIn(moment, timeZone), { addedAtTable });
+
+/**
+ * Whether a person of the world counts as a child only because a place of theirs in
+ * `roster` was added at a scorer's table with no age (core's walkUpOfUnknownAgeOn, S-136).
+ */
+export function walkUpIn(
+  person: { readonly id: string; readonly sensitive: MinorFacts },
+  roster: TablePlaces,
+): boolean {
+  return walkUpOfUnknownAgeOn(person.sensitive, { addedAtTable: addedAtTable(person, roster) });
 }
 
 /** One reader of the wall clock for each zone: making one is the slow part. */
