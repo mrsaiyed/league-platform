@@ -1264,8 +1264,9 @@ const gameCommandRows: readonly Row[] = [
     needs: 'games.score',
     // Anyone who scores somewhere may ask; the answer holds only what they may score.
     scope: 'program',
+    // A game of today that has started, so it is offered (offeredOnItsDay).
     prepare: async (league) => ({
-      input: { gameIds: [(await gameIn(league, true)).gameId] },
+      input: { gameIds: [(await gameIn(league, true, { starts_at: inDays(-1 / 24) })).gameId] },
     }),
     run: (c, i) => listScoringOffers(c, i, gamesDeps),
   },
@@ -1981,6 +1982,36 @@ const divisionAndVenueRows: readonly Row[] = [
  * One row per declared setting and level it allows: the permission is the setting's
  * own (T-98), checked at the league, or at the program of a program or a season (P4 §4).
  */
+/**
+ * M2, by hand from the spec: the permission each setting needs (T-98: every setting
+ * names one). The league's settings (P4 §3, "Settings": the owner and admins; T5 §4's
+ * `league.settings`): who may score, the start page, reopening, formats, stats levels,
+ * privacy, ranking and the site's notice. The matrix's own banner is the site's (an editor).
+ */
+const settingNeeds: Readonly<Record<string, Permission>> = {
+  'games.scorekeeperReopenMinutes': 'league.settings',
+  'games.scorekeepersMayChangeFormat': 'league.settings',
+  'games.whoMayScore': 'league.settings',
+  'members.startPage': 'league.settings',
+  'privacy.childrenInFullConfirmed': 'league.settings',
+  'privacy.playersMayAskForInitials': 'league.settings',
+  'privacy.publicNames': 'league.settings',
+  'privacy.scorekeepersSeeFullNames': 'league.settings',
+  'site.banner': 'site.edit',
+  'site.doNotIndex': 'league.settings',
+  'site.notice': 'league.settings',
+  'statistics.minimumGamesToRank': 'league.settings',
+  'teams.mayChooseStatsLevel': 'league.settings',
+  'teams.startingStatsLevel': 'league.settings',
+};
+
+/** The permission written above for a setting; one not written fails the file. */
+function needsOfSetting(key: string): Permission {
+  const needs = settingNeeds[key];
+  if (needs === undefined) throw new Error(`no permission written by hand for ${key} (M2)`);
+  return needs;
+}
+
 function settingRows(registry: SettingRegistry): Row[] {
   const set = setSettingFor(registry);
   const clear = clearSettingFor(registry);
@@ -2001,7 +2032,7 @@ function settingRows(registry: SettingRegistry): Row[] {
         {
           command: 'leagues.set_setting',
           name: `set ${setting.key} at ${at}`,
-          needs: setting.permission,
+          needs: needsOfSetting(setting.key),
           declared: true,
           scope,
           prepare: async (league) => ({
@@ -2017,7 +2048,7 @@ function settingRows(registry: SettingRegistry): Row[] {
         {
           command: 'leagues.clear_setting',
           name: `clear ${setting.key} at ${at}`,
-          needs: setting.permission,
+          needs: needsOfSetting(setting.key),
           declared: true,
           scope,
           prepare: async (league) => {
@@ -2857,7 +2888,7 @@ describe('every role against every command (T4 §12)', () => {
       for (const level of setting.levels) {
         for (const command of ['leagues.set_setting', 'leagues.clear_setting']) {
           const found = rows.filter(
-            (r) => r.command === command && r.needs === setting.permission && r.declared,
+            (r) => r.command === command && r.needs === needsOfSetting(setting.key) && r.declared,
           );
           expect(
             found.some((r) => r.name.includes(setting.key)),
@@ -2867,6 +2898,14 @@ describe('every role against every command (T4 §12)', () => {
       }
     }
     expect(rows.filter((r) => r.name.includes(bannerSetting.key))).toHaveLength(6);
+  });
+
+  it("writes each setting's permission by hand, and core declares the same (M2, T-98)", () => {
+    const declared = [...declaredSettings.all(), bannerSetting];
+    expect(Object.keys(settingNeeds).sort()).toEqual(declared.map((s) => s.key).sort());
+    for (const setting of declared) {
+      expect(setting.permission, setting.key).toBe(settingNeeds[setting.key]);
+    }
   });
 
   it('cannot yet give anyone a club admin role: a club scope is refused until clubs exist (0008)', async () => {
@@ -2885,11 +2924,17 @@ describe('every role against every command (T4 §12)', () => {
     it(`${row.command}: ${row.name} (${row.needs})`, async () => {
       const outcomes: Partial<Record<Actor, string>> = {};
       const given: Partial<Record<Actor, readonly string[]>> = {};
+      const shown: Partial<Record<Actor, readonly string[]>> = {};
+      let ownersValue: unknown = undefined;
       for (const actor of actors) {
         const reads = readsGiven.has(row.command);
-        const run = await runRowFor(row, actor, reads ? withPrivatePerson : undefined);
+        const run = await runRowFor(row, actor, reads ? withOneOfEach : undefined);
         outcomes[actor] = run.code;
+        if (actor === 'owner') ownersValue = run.value;
         if (run.code === 'ok' && readsGiven.has(row.command)) given[actor] = fieldsOf(run.value);
+        if (run.code === 'ok' && gameListsShow[row.command] !== undefined) {
+          shown[actor] = labelsIn(run.value, run.leagueId);
+        }
       }
       const allowed = expectedActors(row.needs, row.scope ?? 'league');
       const expected = Object.fromEntries(
@@ -2903,12 +2948,30 @@ describe('every role against every command (T4 §12)', () => {
         ]),
       );
       expect(outcomes).toEqual(expected);
+      // H2: the owner is given every list withOneOfEach fills with something in it.
+      const stillEmpty = filledLists[row.command];
+      if (stillEmpty !== undefined) {
+        expect(emptyListsIn(ownersValue), 'the lists left empty (H2)').toEqual(stillEmpty);
+      }
       // T-76: what each one who may read it is given, field by field.
       if (readsGiven.has(row.command)) {
         const fields = Object.fromEntries(
           Object.keys(given).map((actor) => [actor, fieldsFor(row, actor as Actor)]),
         );
         expect(given, 'the fields each person is given (T-76)').toEqual(fields);
+      }
+      // M1: which games, not only which fields: one limited to a program sees its games only.
+      if (gameListsShow[row.command] !== undefined) {
+        const games = Object.fromEntries(
+          Object.keys(shown).map((actor) => [
+            actor,
+            gamesShown(
+              row.command,
+              otherProgramOnly.includes(actor as Actor) ? ['other'] : ['default', 'other'],
+            ),
+          ]),
+        );
+        expect(shown, 'the games each person is given (M1)').toEqual(games);
       }
     });
   }
@@ -3004,6 +3067,250 @@ async function withPrivatePerson(league: League, input: unknown) {
   const team = await teamOfInput(input);
   if (team !== null) await newRosterEntry(pglite, league.leagueId, team, person.id);
 }
+
+/** What withOneOfEach made, by league: each game's and team's id with a label (M1). */
+const madeIn = new Map<string, ReadonlyMap<string, string>>();
+
+/** A time `days` from now (a fraction of a day is fine), as the games table holds it. */
+const inDays = (days: number) => new Date(Date.now() + days * 86_400_000).toISOString();
+
+/** A season's stage: its own if it has one (one regular stage a season), else a new one. */
+async function stageOf(seasonId: string, leagueId: string) {
+  const found = await pglite.query<{ id: string }>(
+    'select id from stages where season_id = $1 order by id limit 1',
+    [seasonId],
+  );
+  return found.rows[0]?.id ?? newStage(pglite, leagueId, seasonId);
+}
+
+/** The id of the first row a query finds. */
+async function idOf(sql: string, params: unknown[]) {
+  return (await one<{ id: string }>(pglite, sql, params)).id;
+}
+
+/**
+ * For a read (T-76, T-503, the step 2.228 review's H2): one of each thing a read lists,
+ * so the fields of every list's items are checked, never only an empty list. Besides
+ * withPrivatePerson's person: in each program a season whose two teams have a game
+ * tomorrow, one a month ahead, one past with no result, one decided in a round and one
+ * postponed, all at one court; an invitation to the league and one to the program; an
+ * activity entry about the program; a binned venue and division; and for the season,
+ * team or game the read is about, a division, an adjustment, a coin flip no level set
+ * uses, two teams level with each other, a decided game, a game to play and a line of a
+ * saved box score. The games and teams are labelled `default:` or `other:` (M1).
+ */
+async function withOneOfEach(league: League, input: unknown) {
+  await withPrivatePerson(league, input);
+  const leagueId = league.leagueId;
+  const labels = new Map<string, string>();
+  const venueId = await newVenue(pglite, leagueId);
+  const courtId = await newCourt(pglite, leagueId, venueId);
+  const decided = (days: number) => ({
+    starts_at: inDays(days),
+    status: 'final',
+    home_score: 50,
+    away_score: 40,
+    finalized_at: inDays(days),
+  });
+  for (const program of [false, true]) {
+    const side = program ? 'other' : 'default';
+    const seasonId = await seasonIn(league, program);
+    const stageId = await newStage(pglite, leagueId, seasonId);
+    const homeTeamId = await newTeam(pglite, leagueId, seasonId);
+    const awayTeamId = await newTeam(pglite, leagueId, seasonId);
+    labels.set(homeTeamId, `${side}:team`).set(awayTeamId, `${side}:team`);
+    const roundId = await newRound(pglite, leagueId, seasonId, 1);
+    labels.set(roundId, `${side}:round`);
+    const kinds: Record<string, Record<string, unknown>> = {
+      tomorrow: { starts_at: inDays(1) },
+      later: { starts_at: inDays(30) },
+      unrecorded: { starts_at: inDays(-2) },
+      decided: { ...decided(-10), round_id: roundId },
+      postponed: { starts_at: inDays(-3), status: 'postponed' },
+    };
+    for (const [kind, columns] of Object.entries(kinds)) {
+      const gameId = await newGame(pglite, {
+        leagueId,
+        seasonId,
+        stageId,
+        homeTeamId,
+        awayTeamId,
+        columns: { venue_id: venueId, court_id: courtId, ...columns },
+      });
+      labels.set(gameId, `${side}:${kind}`);
+    }
+  }
+  await invitationIn(league);
+  await invitationIn(league, { program: true });
+  await pglite.query(
+    `insert into activity_log (league_id, actor_account_id, action, summary, details)
+     values ($1, $2, 'teams.create_team', 'Added a team', $3::jsonb)`,
+    [leagueId, league.ownerId, JSON.stringify({ scopeType: 'program', scopeId: league.programId })],
+  );
+  await binned('venues', await newVenue(pglite, leagueId));
+  await binned('divisions', await divisionIn(league, false));
+  const about =
+    typeof input === 'object' && input !== null ? (input as Record<string, unknown>) : {};
+  const season = about['seasonId'];
+  if (typeof season === 'string') {
+    await newDivision(pglite, leagueId, season);
+    const stageId = await stageOf(season, leagueId);
+    const [won, lost] = [
+      await newTeam(pglite, leagueId, season),
+      await newTeam(pglite, leagueId, season),
+    ];
+    const [one, two] = [
+      await newTeam(pglite, leagueId, season),
+      await newTeam(pglite, leagueId, season),
+    ];
+    const game = { leagueId, seasonId: season, stageId };
+    await newGame(pglite, { ...game, homeTeamId: won, awayTeamId: lost, columns: decided(-5) });
+    const toPlay = await newGame(pglite, {
+      ...game,
+      homeTeamId: one,
+      awayTeamId: two,
+      columns: { starts_at: inDays(2) },
+    });
+    await pglite.query(
+      'insert into game_assignments (league_id, game_id, account_id) values ($1, $2, $3)',
+      [leagueId, toPlay, league.accountOf('scorekeeper')],
+    );
+    await pglite.query(
+      `insert into standings_adjustments (league_id, season_id, team_id, wins, reason, account_id)
+       values ($1, $2, $3, 1, 'Won by ruling', $4)`,
+      [leagueId, season, won, league.ownerId],
+    );
+    await pglite.query(
+      `insert into standings_coin_flips (league_id, season_id, team_ids, method, account_id)
+       values ($1, $2, array[$3::uuid, $4::uuid], 'by-hand', $5)`,
+      [leagueId, season, won, lost, league.ownerId],
+    );
+  }
+  const team = about['teamId'];
+  if (typeof team === 'string') {
+    const seasonId = await idOf('select season_id as id from teams where id = $1', [team]);
+    const stageId = await stageOf(seasonId, leagueId);
+    const game = { leagueId, seasonId, stageId, homeTeamId: team };
+    await newGame(pglite, {
+      ...game,
+      awayTeamId: await newTeam(pglite, leagueId, seasonId),
+      columns: { starts_at: inDays(2) },
+    });
+    await newGame(pglite, {
+      ...game,
+      awayTeamId: await newTeam(pglite, leagueId, seasonId),
+      columns: decided(-5),
+    });
+  }
+  const gameId = about['gameId'];
+  if (typeof gameId === 'string') {
+    const home = await idOf('select home_team_id as id from games where id = $1', [gameId]);
+    const personId = await newPerson(pglite, leagueId);
+    await newRosterEntry(pglite, leagueId, home, personId);
+    await pglite.query(
+      `insert into player_game_stats (league_id, game_id, team_id, person_id, played, stats)
+       values ($1, $2, $3, $4, true, '{"points": 2}')`,
+      [leagueId, gameId, home, personId],
+    );
+  }
+  madeIn.set(leagueId, labels);
+}
+
+/** H2: the paths of the empty lists in a value (`games[].assigned[]`), ids as `*`. */
+function emptyListsIn(value: unknown, path = ''): string[] {
+  if (Array.isArray(value)) {
+    if (value.length === 0) return [`${path}[]`];
+    return [...new Set(value.flatMap((item) => emptyListsIn(item, `${path}[]`)))].sort();
+  }
+  if (typeof value !== 'object' || value === null || value instanceof Date) return [];
+  const idKey = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+  return [
+    ...new Set(
+      Object.entries(value).flatMap(([key, item]) =>
+        emptyListsIn(item, `${path === '' ? '' : `${path}.`}${idKey.test(key) ? '*' : key}`),
+      ),
+    ),
+  ].sort();
+}
+
+/**
+ * H2, by hand: the reads whose lists were empty in the matrix until withOneOfEach (the
+ * step 2.228 review), and the lists of each that the owner is still given empty, each
+ * with its reason. Any other empty list fails, so its items' fields are checked again.
+ */
+const filledLists: Readonly<Record<string, readonly string[]>> = {
+  'access.list_access': [],
+  'access.list_activity': [],
+  'access.search_activity': [],
+  'games.get_box_score_sheet': [],
+  'games.list_earlier_games': [],
+  'games.list_games_needing_result': [],
+  'games.list_later_games': [],
+  'games.list_my_games': [],
+  'games.list_postponed_games': [],
+  'games.list_scorekeepers': [],
+  'games.list_scoring_offers': [],
+  'leagues.list_bin': [],
+  'leagues.list_bin_part': [],
+  'leagues.list_divisions': [],
+  'scheduling.count_place_games': [],
+  'scheduling.list_venues': [],
+  'standings.list_adjustments': [],
+  'teams.count_team_games': [],
+};
+
+/** M1: the labels of what withOneOfEach made that a value names, as a sorted list. */
+function labelsIn(value: unknown, leagueId: string): string[] {
+  const labels = madeIn.get(leagueId) ?? new Map<string, string>();
+  const found = new Set<string>();
+  const walk = (item: unknown): void => {
+    if (typeof item === 'string') {
+      const label = labels.get(item);
+      if (label !== undefined) found.add(label);
+    } else if (Array.isArray(item)) {
+      item.forEach(walk);
+    } else if (typeof item === 'object' && item !== null) {
+      for (const [key, inner] of Object.entries(item)) {
+        walk(key);
+        walk(inner);
+      }
+    }
+  };
+  walk(value);
+  return [...found].sort();
+}
+
+/**
+ * M1, by hand from the spec: which of withOneOfEach's games each list shows to someone
+ * who scores (or, for postponed games, reads the schedule) in the whole league. Its teams
+ * come with them. Someone limited to the other program is given only that program's
+ * (P4 §4); in a league that scores assigned games only, a scorekeeper only the games
+ * assigned to them (P4 §4, A-13).
+ */
+const gameListsShow: Readonly<Record<string, readonly string[]>> = {
+  // "Today and the week ahead" (P4 §4), with each game's teams.
+  'games.list_my_games': ['team', 'tomorrow'],
+  // Past its start, with no result.
+  'games.list_games_needing_result': ['team', 'unrecorded'],
+  // Scheduled after this week, and the teams offered to choose from.
+  'games.list_later_games': ['later', 'team'],
+  // Before today, decided or called off: by round, a round's games shown when asked for.
+  'games.list_earlier_games': ['round'],
+  // Waiting to be rescheduled.
+  'games.list_postponed_games': ['postponed', 'team'],
+};
+
+/** The labels a list should name for one who sees `sides` of the league (M1). */
+function gamesShown(command: string, sides: readonly ('default' | 'other')[]): string[] {
+  const kinds = gameListsShow[command] ?? [];
+  return sides.flatMap((side) => kinds.map((kind) => `${side}:${kind}`)).sort();
+}
+
+/** M1: the people limited to the league's other program. */
+const otherProgramOnly: readonly Actor[] = [
+  'program_admin',
+  ...programLimited.map(([actor]) => actor),
+];
 
 /**
  * Every field a value carries, as paths: `games[].homeTeam.name`. An empty list is
@@ -3188,6 +3495,7 @@ describe('every command in an archived or suspended league (U-9, R-26)', () => {
   }
 
   it('names only commands that have rows among its findings and its lists', () => {
+    expect(Object.keys(filledLists).filter((command) => !readsGiven.has(command))).toEqual([]);
     const named = [...Object.keys(stateFindings), ...readCommands, ...changeToolReads];
     expect(named.filter((command) => !rows.some((row) => row.command === command))).toEqual([]);
   });
@@ -3217,8 +3525,22 @@ describe('every scoring command where the league scores assigned games only (P4 
   for (const row of scoringRows) {
     it(`${row.command}: ${row.name}`, async () => {
       const outcomes: Record<string, string> = {};
+      const shown: Record<string, readonly string[]> = {};
+      const lists = gameListsShow[row.command] !== undefined;
       let aboutOneGame = false;
       const assignedOnly = async (league: League, input: unknown) => {
+        // M1: a list is tried with games in both programs, the scorekeeper assigned to the
+        // default program's (by withOneOfEach's labels).
+        if (lists) {
+          await withOneOfEach(league, input);
+          for (const [id, label] of madeIn.get(league.leagueId) ?? []) {
+            if (!label.startsWith('default:') || /:(team|round)$/.test(label)) continue;
+            await pglite.query(
+              'insert into game_assignments (league_id, game_id, account_id) values ($1, $2, $3)',
+              [league.leagueId, id, league.accountOf('scorekeeper')],
+            );
+          }
+        }
         await pglite.query(
           `insert into setting_values (league_id, level, key, value)
            values ($1, 'league', 'games.whoMayScore', $2::jsonb)`,
@@ -3237,11 +3559,13 @@ describe('every scoring command where the league scores assigned games only (P4 
         }
       };
       for (const actor of ['owner', 'scheduler', 'scorekeeper'] as const) {
-        outcomes[actor] = await runRow(row, actor, assignedOnly);
+        const run = await runRowFor(row, actor, assignedOnly);
+        outcomes[actor] = run.code;
+        shown[actor] = labelsIn(run.value, run.leagueId);
       }
       // A second scorekeeper of the whole league, with no assignment.
       let unassigned: string | null = null;
-      outcomes['unassigned_scorekeeper'] = await runRow(
+      const second = await runRowFor(
         row,
         'scorekeeper',
         async (league, input) => {
@@ -3250,6 +3574,16 @@ describe('every scoring command where the league scores assigned games only (P4 
         },
         () => unassigned,
       );
+      outcomes['unassigned_scorekeeper'] = second.code;
+      shown['unassigned_scorekeeper'] = labelsIn(second.value, second.leagueId);
+      if (lists) {
+        expect(shown, 'the games each one is given (M1)').toEqual({
+          owner: gamesShown(row.command, ['default', 'other']),
+          scheduler: gamesShown(row.command, ['default', 'other']),
+          scorekeeper: gamesShown(row.command, ['default']),
+          unassigned_scorekeeper: [],
+        });
+      }
       expect(outcomes).toEqual({
         owner: 'ok',
         scheduler: 'ok',
