@@ -30,6 +30,9 @@
 // with R-26's and T-226's exceptions, written out here by hand), and each scoring
 // row in a league that scores assigned games only (P4 §4), by a scorekeeper assigned
 // to the game and one who is not (T-500, T-501, T-502).
+//
+// Every read is checked for what it gives each of them, field by field (T-76), against
+// role-matrix-fields.test-helper.ts: a field a person's permission does not cover fails.
 import { defaultSeasonRules, formatOfRules, startingDesign } from '@srleagues/contracts';
 import { basketball } from '@srleagues/sports';
 import { createHash, randomUUID } from 'node:crypto';
@@ -233,6 +236,7 @@ import { liveGamesStore } from './live-games-store.ts';
 import { peopleStore } from './people-store.ts';
 import { schedulingStore } from './scheduling-store.ts';
 import { scoringSessionsStore } from './scoring-sessions-store.ts';
+import { readFields } from './role-matrix-fields.test-helper.ts';
 import { standingsStore } from './standings-store.ts';
 import { teamsStore } from './teams-store.ts';
 
@@ -259,7 +263,11 @@ type Actor = (typeof actors)[number];
 const signedIn = actors.filter((a) => a !== 'visitor');
 
 type League = MadeLeague & { programId: string; accountOf: (actor: Actor) => string | null };
-type Outcome = { readonly ok: boolean; readonly error?: { readonly code: string } };
+type Outcome = {
+  readonly ok: boolean;
+  readonly value?: unknown;
+  readonly error?: { readonly code: string };
+};
 type Row = {
   readonly command: string;
   readonly name: string;
@@ -2876,8 +2884,12 @@ describe('every role against every command (T4 §12)', () => {
   for (const row of rows) {
     it(`${row.command}: ${row.name} (${row.needs})`, async () => {
       const outcomes: Partial<Record<Actor, string>> = {};
+      const given: Partial<Record<Actor, readonly string[]>> = {};
       for (const actor of actors) {
-        outcomes[actor] = await runRow(row, actor);
+        const reads = readsGiven.has(row.command);
+        const run = await runRowFor(row, actor, reads ? withPrivatePerson : undefined);
+        outcomes[actor] = run.code;
+        if (run.code === 'ok' && readsGiven.has(row.command)) given[actor] = fieldsOf(run.value);
       }
       const allowed = expectedActors(row.needs, row.scope ?? 'league');
       const expected = Object.fromEntries(
@@ -2891,9 +2903,37 @@ describe('every role against every command (T4 §12)', () => {
         ]),
       );
       expect(outcomes).toEqual(expected);
+      // T-76: what each one who may read it is given, field by field.
+      if (readsGiven.has(row.command)) {
+        const fields = Object.fromEntries(
+          Object.keys(given).map((actor) => [actor, fieldsFor(row, actor as Actor)]),
+        );
+        expect(given, 'the fields each person is given (T-76)').toEqual(fields);
+      }
     });
   }
+
+  it('writes the fields of every read, and of reads only (T-76)', () => {
+    expect([...readsGiven].filter((command) => readFields[command] === undefined)).toEqual([]);
+    expect(Object.keys(readFields).filter((command) => !readsGiven.has(command))).toEqual([]);
+    const named = Object.values(readFields).flatMap((read) => Object.keys(read.byActor ?? {}));
+    expect(named.filter((actor) => !(actors as readonly string[]).includes(actor))).toEqual([]);
+  });
 });
+
+/**
+ * T-76: the fields `actor` should be given by a read, from role-matrix-fields: its own
+ * list, and each private field whose permission it holds where the row applies.
+ */
+function fieldsFor(row: Row, actor: Actor): string[] {
+  const read = readFields[row.command];
+  if (read === undefined) return ['(no fields written for this read)'];
+  const own = read.byActor?.[actor] ?? read.all;
+  const guarded = (read.guarded ?? []).flatMap((guard) =>
+    expectedActors(guard.permission, row.scope ?? 'league').includes(actor) ? guard.fields : [],
+  );
+  return [...new Set([...own, ...guarded])].sort();
+}
 
 /**
  * Reopening one's own result (S-38, step 2.177): the result these rows reopen was
@@ -2912,6 +2952,16 @@ async function runRow(
   before: (league: League, input: unknown) => Promise<void> = async () => {},
   accountOf: (league: League) => string | null = (league) => league.accountOf(actor),
 ): Promise<string> {
+  return (await runRowFor(row, actor, before, accountOf)).code;
+}
+
+/** As `runRow`, with what a call that worked handed back (T-76). */
+async function runRowFor(
+  row: Row,
+  actor: Actor,
+  before: (league: League, input: unknown) => Promise<void> = async () => {},
+  accountOf: (league: League) => string | null = (league) => league.accountOf(actor),
+): Promise<{ readonly code: string; readonly value: unknown }> {
   const league = await leagueWithActors();
   const { input, leagueId } = await row.prepare(league);
   const team = await teamOfInput(input);
@@ -2923,7 +2973,57 @@ async function runRow(
     requestId: 'matrix',
   };
   const result = await row.run(context, input);
-  return result.ok ? 'ok' : (result.error?.code ?? 'failed');
+  return result.ok
+    ? { code: 'ok', value: result.value }
+    : { code: result.error?.code ?? 'failed', value: undefined };
+}
+
+/**
+ * For a read (T-76): a person with every private field R-16 names that the league holds
+ * (a contact email, a birth date, under 18), on the roster of the team the call is about,
+ * and the person a call reads made the same; so a read that hands one out is seen to.
+ */
+async function withPrivatePerson(league: League, input: unknown) {
+  const privateFields = `contact_email = 'private@example.test', birth_date = '2012-04-01', is_minor = true`;
+  const person = await one<{ id: string }>(
+    pglite,
+    `insert into people (league_id, first_name, last_name) values ($1, 'Made-up', 'Private')
+     returning id`,
+    [league.leagueId],
+  );
+  const fields =
+    typeof input === 'object' && input !== null ? (input as Record<string, unknown>) : {};
+  const read = typeof fields['personId'] === 'string' ? fields['personId'] : null;
+  await pglite.query(`update people set ${privateFields} where id = $1 or id = $2`, [
+    person.id,
+    read,
+  ]);
+  const team = await teamOfInput(input);
+  if (team !== null) await newRosterEntry(pglite, league.leagueId, team, person.id);
+}
+
+/**
+ * Every field a value carries, as paths: `games[].homeTeam.name`. An empty list is
+ * `name[]`; a key that is an id (a map by id) is `*`, so the paths never depend on ids.
+ */
+function fieldsOf(value: unknown, path = ''): string[] {
+  if (Array.isArray(value)) {
+    if (value.length === 0) return [`${path}[]`];
+    return [...new Set(value.flatMap((item) => fieldsOf(item, `${path}[]`)))].sort();
+  }
+  if (typeof value === 'object' && value !== null && !(value instanceof Date)) {
+    const entries = Object.entries(value);
+    if (entries.length === 0) return [path === '' ? '{}' : `${path}{}`];
+    const idKey = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+    return [
+      ...new Set(
+        entries.flatMap(([key, item]) =>
+          fieldsOf(item, `${path === '' ? '' : `${path}.`}${idKey.test(key) ? '*' : key}`),
+        ),
+      ),
+    ].sort();
+  }
+  return [path === '' ? '.' : path];
 }
 
 /**
@@ -2989,17 +3089,19 @@ const changeToolReads: ReadonlySet<string> = new Set([
   'standings.list_adjustments',
 ]);
 
+/** Every read: what each one gives each kind of person is checked (T-76). */
+const readsGiven: ReadonlySet<string> = new Set([
+  ...readCommands,
+  ...changeToolReads,
+  'access.read_invitation',
+]);
+
 /**
  * FINDING (for the lead, step 2.228): rows the sweep below cannot settle from the spec,
  * each named with what was seen; they show as "todo" until the lead decides.
  */
 const stateFindings: Readonly<Record<string, string>> = {
-  // U-9 makes an archived or suspended league read-only, and the spec does not say our
-  // staff may still remove a draft league made by mistake once it is suspended (or
-  // archived without ever being published). The command refuses only a league that was
-  // published or used, so staff removed it in both states.
-  'leagues.remove_draft':
-    'staff removed a never-published league in an archived and a suspended state',
+  // None open: `leagues.remove_draft` was one, settled by S-132 (see stillWorksIn).
 };
 
 type LeagueState = 'archived' | 'suspended';
@@ -3026,6 +3128,10 @@ function stillWorksIn(row: Row, state: LeagueState): boolean | string {
       return true;
     // Making a league changes no league that exists.
     case 'leagues.create':
+      return true;
+    // S-132: a league never published and never used is nobody's history; our staff
+    // may still remove it, archived or suspended (the command refuses one that was).
+    case 'leagues.remove_draft':
       return true;
     // U-9: the owner or an admin un-archives ("publish" from archived goes back to
     // live); only our staff lift a suspension, and that returns the league to draft,
