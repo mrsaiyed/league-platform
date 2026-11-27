@@ -367,13 +367,13 @@ async function lockOutWalk(email, getsIn) {
       note(
         'from the fifth wrong try, the wait is said in whole minutes with the way in that does not wait',
         slowed ===
-          'Too many tries. Please wait 1 minute, or tap "Forgot your password?" to choose a new one now.',
+          'For safety, signing in with a password is paused for 1 minute. To get in now, choose a new password:\nReset your password',
         slowed,
       );
       note(
         'ten wrong passwords show "15 minutes" and the hint (M28)',
         alert ===
-          'Too many tries. Please wait 15 minutes, or tap "Forgot your password?" to choose a new one now.',
+          'For safety, signing in with a password is paused for 15 minutes. To get in now, choose a new password:\nReset your password',
         alert,
       );
       await screenChecks(page, 'locked out');

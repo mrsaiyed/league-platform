@@ -217,30 +217,39 @@ describe('sign-up with an emailed code', () => {
     expect(env.capture.messages()).toHaveLength(7);
   });
 
-  it('sends at most 30 codes an hour to one network, whatever the addresses (T-225)', async () => {
+  it('sends at most 200 reset codes and 60 sign-ups an hour to one network, whatever the addresses (T-225, T-507, T-509)', async () => {
     const env = setup();
-    for (let i = 0; i < 30; i++) {
-      const result = await env.sign.startSignUp({
+    for (let i = 0; i < 200; i++) {
+      const result = await env.sign.startReset({
         email: `p${i}@example.test`,
         networkAddress: here,
       });
       expect(result.ok).toBe(true);
     }
-    expect(await env.sign.startSignUp({ email: 'p30@example.test', networkAddress: here })).toEqual(
-      {
-        ok: false,
-        error: { code: 'too-many-attempts', retryAfterSeconds: 60 * 60 },
-      },
+    const refused = { ok: false, error: { code: 'too-many-attempts', retryAfterSeconds: 60 * 60 } };
+    expect(await env.sign.startReset({ email: 'p200@example.test', networkAddress: here })).toEqual(
+      refused,
     );
+    // Sign-ups are counted apart, on their own 60 an hour.
+    for (let i = 0; i < 60; i++) {
+      const result = await env.sign.startSignUp({
+        email: `new${i}@example.test`,
+        networkAddress: here,
+      });
+      expect(result.ok).toBe(true);
+    }
+    expect(
+      await env.sign.startSignUp({ email: 'new60@example.test', networkAddress: here }),
+    ).toEqual(refused);
     const otherNetwork = await env.sign.startSignUp({
-      email: 'p30@example.test',
+      email: 'new60@example.test',
       networkAddress: elsewhere,
     });
     expect(otherNetwork.ok).toBe(true);
   });
 
   it('counts a whole IPv6 /64 as one network', async () => {
-    const env = setup({ settings: { codesPerHourPerNetwork: 2 } });
+    const env = setup({ settings: { signUpsPerHourPerNetwork: 2 } });
     const ask = (email: string, networkAddress: string) =>
       env.sign.startSignUp({ email, networkAddress });
     expect((await ask('a@example.test', '2001:db8:1:2::1')).ok).toBe(true);

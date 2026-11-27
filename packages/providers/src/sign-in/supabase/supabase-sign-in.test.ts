@@ -220,7 +220,7 @@ describe('sign-up with an emailed code', () => {
     ).toEqual(fail({ code: 'code-expired' }));
   });
 
-  it('sends 5 codes an hour per address and 30 per network (T-225)', async () => {
+  it('sends 5 codes an hour per address, 60 sign-ups and 200 other codes per network (T-225, T-507, T-509)', async () => {
     const env = setup();
     const results = [];
     for (let i = 0; i < 6; i++) {
@@ -230,15 +230,24 @@ describe('sign-up with an emailed code', () => {
     }
     expect(results).toEqual(['ok', 'ok', 'ok', 'ok', 'ok', 'too-many-attempts']);
     const network = [];
-    for (let i = 0; i < 26; i++) {
+    for (let i = 0; i < 56; i++) {
       network.push(
         errorCode(
           await env.sign.startSignUp({ email: `p${i}@example.test`, networkAddress: here }),
         ),
       );
     }
-    expect(network.filter((r) => r === 'ok')).toHaveLength(25);
+    expect(network.filter((r) => r === 'ok')).toHaveLength(55);
     expect(network.at(-1)).toBe('too-many-attempts');
+    // Codes for resetting are counted apart, on their own 200 an hour.
+    const resets = [];
+    for (let i = 0; i < 201; i++) {
+      resets.push(
+        errorCode(await env.sign.startReset({ email: `r${i}@example.test`, networkAddress: here })),
+      );
+    }
+    expect(resets.filter((r) => r === 'ok')).toHaveLength(200);
+    expect(resets.at(-1)).toBe('too-many-attempts');
   });
 
   it('limits wrong codes per network across addresses (T-225)', async () => {

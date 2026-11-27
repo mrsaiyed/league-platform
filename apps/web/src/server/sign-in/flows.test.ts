@@ -2,7 +2,7 @@
 // the same answers whether or not an account exists (T-68), attempt limits (T-85,
 // T-225), the session cookie (T-69), new-device and password-changed emails (T-70,
 // T-85), and "sign out everywhere" (T-71).
-import type { EmailSender } from '@srleagues/core';
+import { platformUrl, type EmailSender } from '@srleagues/core';
 import {
   captureEmail,
   createLocalBotCheck,
@@ -16,12 +16,14 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import {
   cookieNames,
+  cookieOptions,
   readFlow,
   readTypedEmail,
   type CookieJar,
   type CookieOptions,
 } from './cookies.ts';
 import { networkAddressOf, type Visit } from './device.ts';
+import { knownDevicesUnder } from './known-device.ts';
 import {
   askForCode as askForCodeWith,
   choosePassword,
@@ -88,6 +90,7 @@ function setup(sender?: (outbox: EmailSender) => EmailSender) {
     siteOrigin: origin,
     testCopy: false,
     now,
+    knownDevices: knownDevicesUnder('made-up secret for tests'),
   };
   const advanceSeconds = (seconds: number) => {
     at += seconds * 1000;
@@ -145,7 +148,12 @@ describe('signing up (T-67)', () => {
       to: '/signup/password',
     });
     expect(await choosePassword({ password }, b.visit, env.deps)).toEqual({ to: '/account' });
-    expect(b.names()).toEqual([cookieNames.device, cookieNames.renew, cookieNames.session]);
+    expect(b.names()).toEqual([
+      cookieNames.device,
+      cookieNames.knownDevice,
+      cookieNames.renew,
+      cookieNames.session,
+    ]);
     for (const { options } of b.cookies.values()) {
       expect(options).toMatchObject({ httpOnly: true, sameSite: 'lax', path: '/' });
     }
@@ -735,7 +743,7 @@ describe('devices and sessions (T-70, T-71)', () => {
     expect(await signOutEverywhere(laptop.visit, env.deps)).toEqual({
       to: '/?notice=signedOutEverywhere',
     });
-    expect(laptop.names()).toEqual([cookieNames.device]);
+    expect(laptop.names()).toEqual([cookieNames.device, cookieNames.knownDevice]);
     for (const accessToken of [laptopToken, phoneToken]) {
       expect((await env.deps.signIn.identify({ accessToken })).ok).toBe(false);
     }
@@ -824,7 +832,7 @@ describe('staying signed in (T-69, T-70)', () => {
     });
     const renew = sharedRenewal((refreshToken) => env.deps.signIn.renew({ refreshToken }));
     expect(await renewIfDue(b.jar, renew, false, env.deps.now)).toBe(true);
-    expect(b.names()).toEqual([cookieNames.device]);
+    expect(b.names()).toEqual([cookieNames.device, cookieNames.knownDevice]);
   });
 });
 
@@ -956,7 +964,7 @@ describe('after review', () => {
       to: '/signin?problem=signInAgain',
     });
     expect(signOutCalls).toHaveBeenCalledTimes(1);
-    expect(b.names()).toEqual([cookieNames.device]);
+    expect(b.names()).toEqual([cookieNames.device, cookieNames.knownDevice]);
     expect((await service.identify({ accessToken })).ok).toBe(false);
   });
 
@@ -1461,5 +1469,132 @@ describe('the test copy takes only made-up addresses for a code (step 2.205, T-1
         await askForCode(purpose, { email: 'someone@gmail.com' }, browser().visit, env.deps),
       ).toEqual({ to: '/signup/code' });
     }
+  });
+});
+
+describe('wrong tries do not lock the wrong person out (T-504, T-505)', () => {
+  const member = 'ana@example.test';
+  const wrong = 'not the password';
+  const options = cookieOptions(false, 60);
+
+  /** Ten wrong passwords for `email` from `b`, waiting out each slow-down. */
+  async function tenWrong(env: Env, b: ReturnType<typeof browser>, email: string) {
+    const answers = [];
+    for (let i = 0; i < 10; i++) {
+      answers.push(await signInWithPassword({ email, password: wrong }, b.visit, env.deps));
+      env.advanceSeconds(30);
+    }
+    return answers;
+  }
+
+  it("a stranger's ten wrong passwords do not stop the person on a device they used before", async () => {
+    const env = setup();
+    const ownPhone = browser('192.0.2.10', safariOnIphone);
+    await signUp(env, ownPhone, member);
+    await signOut({}, ownPhone.visit, env.deps);
+    expect(ownPhone.jar.get(cookieNames.knownDevice)).toBeDefined();
+    await tenWrong(env, browser('198.51.100.7'), member);
+    // A new phone meets the lock, as before (the screen's words are step 2.234's second part).
+    const newPhone = browser('192.0.2.10', safariOnIphone);
+    const refused = await signInWithPassword({ email: member, password }, newPhone.visit, env.deps);
+    expect(refused.to).toMatch(/^\/signin\?problem=tooManyAttempts&wait=870/);
+    expect(newPhone.jar.get(cookieNames.session)).toBeUndefined();
+    // The phone that signed in before gets in.
+    expect(await signInWithPassword({ email: member, password }, ownPhone.visit, env.deps)).toEqual(
+      { to: platformUrl('account') },
+    );
+    expect(ownPhone.jar.get(cookieNames.session)).toBeDefined();
+  });
+
+  it('vouches only for the address and the device the cookie was made for', async () => {
+    const env = setup();
+    const ownPhone = browser();
+    await signUp(env, ownPhone, member);
+    await signOut({}, ownPhone.visit, env.deps);
+    await tenWrong(env, browser('198.51.100.7'), member);
+    // The known cookie copied to another device (its own device cookie) vouches for nothing.
+    const copied = browser();
+    copied.jar.set(
+      cookieNames.knownDevice,
+      ownPhone.jar.get(cookieNames.knownDevice) ?? '',
+      options,
+    );
+    const byCopy = await signInWithPassword({ email: member, password }, copied.visit, env.deps);
+    expect(byCopy.to).toMatch(/problem=tooManyAttempts/);
+  });
+
+  it("a known device's reset code outlives a stranger's ask and wrong codes (T-509, T-510, T-511)", async () => {
+    const env = setup();
+    const ownPhone = browser();
+    await signUp(env, ownPhone, member);
+    await signOut({}, ownPhone.visit, env.deps);
+    env.advanceSeconds(2 * 60 * 60);
+    expect(await askForCode('reset', { email: member }, ownPhone.visit, env.deps)).toEqual({
+      to: '/signup/code',
+    });
+    const owners = env.codeFor(member);
+    // The review's attack: a stranger on another network asks, then types 5 wrong codes.
+    const intruder = browser('198.51.100.7');
+    expect(await askForCode('reset', { email: member }, intruder.visit, env.deps)).toEqual({
+      to: '/signup/code',
+    });
+    expect(env.codeFor(member)).toBe(owners);
+    const wrong = owners === '000000' ? '111111' : '000000';
+    // Its own entry, as for an address with no account (T-511): 5 attempts, then no more.
+    for (let i = 0; i < 5; i++) {
+      const typed = await enterCode({ code: wrong }, intruder.visit, env.deps);
+      expect(typed.to).toMatch(i < 4 ? /problem=codeWrong/ : /problem=codeUsedUp/);
+    }
+    // The known device's ask was counted on the address with the stranger's (T-509).
+    for (let i = 0; i < 3; i++) {
+      await askForCode('reset', { email: member }, intruder.visit, env.deps);
+    }
+    const refused = await askForCode('reset', { email: member }, ownPhone.visit, env.deps);
+    expect(refused.to).toMatch(/problem=tooManyAttempts/);
+    // The owner's code still works on the device that asked for it.
+    expect(await enterCode({ code: owners }, ownPhone.visit, env.deps)).toEqual({
+      to: '/signup/password',
+    });
+    const chosen = await choosePassword(
+      { password: 'another good password' },
+      ownPhone.visit,
+      env.deps,
+    );
+    expect(chosen).toEqual({ to: platformUrl('account') });
+  });
+
+  it('signed in to its own account, a browser is no known device for another address', async () => {
+    const env = setup();
+    const other = 'other-member@example.test';
+    await signUp(env, browser(), other);
+    const ownPhone = browser();
+    await signUp(env, ownPhone, member);
+    await tenWrong(env, browser('198.51.100.7'), other);
+    // The same browser, vouched for its own address, meets the other address's lock.
+    const tried = await signInWithPassword({ email: other, password }, ownPhone.visit, env.deps);
+    expect(tried.to).toMatch(/problem=tooManyAttempts/);
+    // Its own address it still gets into.
+    await signOut({}, ownPhone.visit, env.deps);
+    expect(await signInWithPassword({ email: member, password }, ownPhone.visit, env.deps)).toEqual(
+      { to: platformUrl('account') },
+    );
+  });
+
+  it('an address with an account and one without answer alike through the limits (T-68)', async () => {
+    const seen = [];
+    for (const email of [member, 'nobody@example.test']) {
+      const env = setup();
+      await signUp(env, browser(), member);
+      env.advanceSeconds(2 * 60 * 60);
+      const stranger = browser('198.51.100.7');
+      const answers = await tenWrong(env, stranger, email);
+      answers.push(await signInWithPassword({ email, password }, stranger.visit, env.deps));
+      for (let i = 0; i < 6; i++) {
+        answers.push(await askForCode('reset', { email }, stranger.visit, env.deps));
+      }
+      seen.push({ answers, cookies: stranger.names() });
+    }
+    expect(seen[0]?.answers.at(-1)?.to).toMatch(/problem=tooManyAttempts/);
+    expect(seen[1]).toEqual(seen[0]);
   });
 });

@@ -25,10 +25,11 @@ async function hourlyWait(
 ): Promise<number | null> {
   const trx = signInTransactionOf(scope);
   const hourAgo = new Date(at.getTime() - hour);
+  // Every subject's asks older than the hour go, not only this one's, so a row naming
+  // an address never outlives its hour (T-504): one that is not asked again expires too.
   await trx
     .deleteFrom('sign_in.code_requests')
     .where('scope', '=', subjectScope)
-    .where('subject', '=', subject)
     .where('asked_at', '<=', hourAgo)
     .execute();
   const recent = await trx

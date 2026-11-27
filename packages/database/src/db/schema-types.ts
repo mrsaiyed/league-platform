@@ -634,6 +634,7 @@ export interface SignInCodesTable {
   verify_type: string | null;
   expires_at: ColumnType<Date, Date | string, Date | string>;
   attempts_left: number;
+  known_device: string | null;
 }
 
 export interface SignInDevicesTable {

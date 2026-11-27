@@ -46,7 +46,7 @@ export async function guessWait(
   return null;
 }
 
-/** The times of the subject's guesses in the window before `at`, oldest first; older ones are removed. */
+/** The times of the subject's guesses in the window before `at`, oldest first; old rows are swept (T-512). */
 async function recentGuesses(
   scope: SignInScope,
   guessScope: GuessScope,
@@ -56,17 +56,30 @@ async function recentGuesses(
 ): Promise<Date[]> {
   const trx = signInTransactionOf(scope);
   const windowStart = new Date(at.getTime() - limits.windowMinutes * minute);
+  // Every subject's guesses older than the longer of the window and the lock go, not
+  // only this one's, and every lock that ran out that long ago (its guesses are older
+  // still), so a row naming an address never outlives them (T-504). The longer of the
+  // two, whatever the caller passes (T-512): a lock longer than the window keeps the
+  // guesses behind it while it holds, so taking its guess back still lifts it.
+  const sweepBefore = new Date(
+    at.getTime() - Math.max(limits.windowMinutes, limits.lockMinutes) * minute,
+  );
+  await trx
+    .deleteFrom('sign_in.guess_locks')
+    .where('scope', '=', guessScope)
+    .where('locked_until', '<=', sweepBefore)
+    .execute();
   await trx
     .deleteFrom('sign_in.guesses')
     .where('scope', '=', guessScope)
-    .where('subject', '=', subject)
-    .where('counted_at', '<=', windowStart)
+    .where('counted_at', '<=', sweepBefore)
     .execute();
   const rows = await trx
     .selectFrom('sign_in.guesses')
     .select('counted_at')
     .where('scope', '=', guessScope)
     .where('subject', '=', subject)
+    .where('counted_at', '>', windowStart)
     .orderBy('counted_at')
     .orderBy('id')
     .execute();

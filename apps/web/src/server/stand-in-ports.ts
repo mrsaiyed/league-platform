@@ -320,8 +320,9 @@ export type StandInSignIn = Pick<
   /** The newest kept emails in the folder, newest first (the kept emails' page). */
   readonly keptEmails: () => Promise<readonly KeptEmail[]>;
   /**
-   * Waits for the next email captured in memory for `email` and the code in it, from now on
-   * ("be this made-up person" on the made-up database, and the made-up people's sign-ups).
+   * Waits for the next email to `email`, captured in memory and kept, and the code in it,
+   * from now on ("be this made-up person" on the made-up database, and the made-up people's
+   * sign-ups).
    */
   readonly watchForCode: (email: string) => CodeWatch;
   /** From now on emails to made-up addresses are written to the folder (after startup). */
@@ -353,24 +354,25 @@ export function standInSignIn(options: StandInOptions): StandInSignIn {
   }
   const now = () => new Date();
   const outbox = captureEmail({ now });
-  // Who waits for the next email to an address (watchForCode): told as each one is captured.
+  // A copy of each email to a made-up address in the working folder, once started (step 2.96).
+  const folder = options.keptEmailsFolder ?? null;
+  const keeping = keepingSender(outbox, folder, {
+    now,
+    onNotKept: () => options.warn?.('email not kept', { kind: 'kept-email' }),
+  });
+  // Who waits for the next email to an address (watchForCode): told as each one is captured
+  // and kept, so a code given is already on the kept emails page (step 2.234, GitHub).
   const waiting = new Set<{ readonly address: string; readonly arrived: (text: string) => void }>();
   const telling: EmailSender = {
     send: async (message) => {
-      const sent = await outbox.send(message);
+      const sent = await keeping.sender.send(message);
       const address = message.to.trim().toLowerCase();
       for (const waiter of waiting) if (waiter.address === address) waiter.arrived(message.text);
       return sent;
     },
   };
-  // A copy of each email to a made-up address in the working folder, once started (step 2.96).
-  const folder = options.keptEmailsFolder ?? null;
-  const keeping = keepingSender(telling, folder, {
-    now,
-    onNotKept: () => options.warn?.('email not kept', { kind: 'kept-email' }),
-  });
   const signInMail = createSignInMail({
-    sender: keeping.sender,
+    sender: telling,
     fromAddress: options.emailFrom,
     siteOrigin: options.publicBaseUrl,
     onNoticeFailed: (kind) => options.warn?.('sign-in email not sent', { kind }),
@@ -443,7 +445,7 @@ export function standInSignIn(options: StandInOptions): StandInSignIn {
     keptEmails: async () => (folder === null ? [] : readKeptEmails(folder, options.publicBaseUrl)),
     watchForCode,
     startKeeping: keeping.startKeeping,
-    mail: keeping.sender,
+    mail: telling,
   };
 }
 

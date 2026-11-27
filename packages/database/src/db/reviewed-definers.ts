@@ -50,7 +50,7 @@ export const reviewedDefiners: ReadonlyMap<string, string> = new Map([
   ],
   [
     'public.erase_account()',
-    'erases the account the transaction set (T-52): refuses while it owns a league or its profile is in one; ends that account’s grants, removes its game assignments and scoring sessions, empties its accepted invitations’ email, in every league, and nothing of anyone else’s (0012)',
+    'erases the account the transaction set (T-52): refuses while it owns a league or its profile is in one; ends that account’s grants, removes its game assignments and scoring sessions, empties its accepted invitations’ email, in every league; removes its sign-in user, sessions, devices and proofs and the address’s codes, proofs, code requests, guesses and locks, a known device’s under the address too (T-504); and nothing of anyone else’s (0033)',
   ],
   [
     'public.find_league_by_slug(wanted text)',

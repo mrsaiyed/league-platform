@@ -42,7 +42,7 @@ export const problems = {
   signOutEverywhereFailed: 'problem.signOutEverywhereFailed',
 } as const satisfies Record<string, TextKey>;
 
-/** "Too many tries", with the wait in seconds: a plural message of its own. */
+/** A pause for safety, with the wait in seconds (said in minutes): a plural message of its own. */
 export type Problem = keyof typeof problems | 'tooManyAttempts';
 
 /**
