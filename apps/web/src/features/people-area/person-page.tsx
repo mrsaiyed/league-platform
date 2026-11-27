@@ -300,6 +300,7 @@ function treatmentLineOf(
       lastName: person.lastName,
       isMinor: treatedAsChild(treatment),
       nameRequest: requestOf(person.visibility),
+      ...(details.walkUp === true ? { walkUp: true as const } : {}),
     },
     {
       audience: league.audience,

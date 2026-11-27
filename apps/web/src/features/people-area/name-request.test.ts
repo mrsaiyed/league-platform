@@ -55,6 +55,20 @@ describe('a refused "Show as" says why (R-26)', () => {
     );
   });
 
+  // Step 2.146's closing round (Low 11): the details' save says why in the same way.
+  it('names the archive or the suspension when the details are refused', () => {
+    expect(
+      peopleRefusalText('update_person', nameRequestRefusalCode('not-allowed', 'archived')),
+    ).toBe(
+      'Not saved. This league is archived, so a person’s details, "An adult" or "A child" included, cannot be changed.',
+    );
+    expect(
+      peopleRefusalText('update_person', nameRequestRefusalCode('not-allowed', 'suspended')),
+    ).toBe(
+      'Not saved. This league is suspended, so a person’s details, "An adult" or "A child" included, cannot be changed.',
+    );
+  });
+
   it('keeps every other refusal as it is', () => {
     expect(nameRequestRefusalCode('not-allowed', 'live')).toBe('not-allowed');
     expect(nameRequestRefusalCode('initials-not-offered', 'archived')).toBe('initials-not-offered');

@@ -334,6 +334,27 @@ describe('setNameRequest in a read-only league (R-26)', () => {
     },
   );
 
+  // Step 2.146's closing round (Low 11): "An adult" shows more, so it is refused as a
+  // request that shows more is; so is every other change of a person's details (U-9).
+  it.each(['archived', 'suspended'])(
+    'refuses "An adult" and every change of details in a league that is %s',
+    async (status) => {
+      const { db, deps, as } = league({ status });
+      for (const change of [
+        { personId: unknownAge, version: 1, isMinor: false },
+        { personId: child, version: 1, isMinor: false },
+        { personId: child, version: 1, birthDate: '1990-04-12' },
+        { personId: adult, version: 1, firstName: 'Renamed' },
+      ]) {
+        expect(await updatePerson(as(ownerId), change, deps)).toMatchObject({
+          error: { code: 'not-allowed' },
+        });
+      }
+      expect(db.state.people.map((p) => p.sensitiveFields.isMinor)).toEqual([true, false, null]);
+      expect(db.state.activity).toEqual([]);
+    },
+  );
+
   it.each(['archived', 'suspended'])(
     'still refuses a scorekeeper in a league that is %s',
     async (status) => {

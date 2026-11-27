@@ -5,7 +5,10 @@
 //
 // The children's rule (U-18): a league that holds a child is never indexed, whatever its
 // setting says: a youth or mixed league, and an adult league with a child recorded in it
-// (the same test as publish-checks.ts, record 065). It is a safety rule, not the admin's
+// (the same test as publish-checks.ts, record 065), and, since step 2.146's closing round
+// (S-136), an adult league with a player added at a scorer's table whose age nobody has
+// marked: they are shown as a child, so the site stays out of search until an admin marks
+// them. The publish check still reads recorded children alone. It is a safety rule, not the admin's
 // choice: a child's name must not reach a search engine because of the kind of league
 // picked. Every public page can show a child's name (team, statistics, home and game
 // pages, not only player pages), so the whole league's public site is marked, and no page
@@ -26,7 +29,7 @@ export type SiteFacts = {
 /** What reading the facts needs: the league's settings and who plays in it. */
 export type SiteFactsStore = Pick<
   LeaguesStore,
-  'settingRows' | 'leagueAudience' | 'hasRecordedChild'
+  'settingRows' | 'leagueAudience' | 'hasRecordedChild' | 'hasWalkUpOfUnknownAge'
 >;
 
 /** U-18: whether a league's public pages are kept out of search engines whatever it chose. */
@@ -44,7 +47,8 @@ export async function readSiteFacts(store: SiteFactsStore): Promise<SiteFacts> {
   };
   const notice = (await leagueValue(siteNotice, '')).trim();
   const asked = await leagueValue(siteDoNotIndex, true);
+  const shownAsChildren = (await store.hasRecordedChild()) || (await store.hasWalkUpOfUnknownAge());
   const doNotIndex =
-    asked || childrenKeepOutOfSearch(await store.leagueAudience(), await store.hasRecordedChild());
+    asked || childrenKeepOutOfSearch(await store.leagueAudience(), shownAsChildren);
   return { notice, doNotIndex };
 }

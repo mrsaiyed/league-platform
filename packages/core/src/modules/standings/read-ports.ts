@@ -145,6 +145,8 @@ export type PersonDisplayRecord = {
   readonly firstName: string;
   readonly lastName: string;
   readonly isMinor: boolean | null;
+  /** Present, and true, only for a walk-up of unknown age (S-136): showName's `walkUp`. */
+  readonly walkUp?: true;
   /** The person's own request (R-15, R-17), as stored. */
   readonly visibility: string;
 };

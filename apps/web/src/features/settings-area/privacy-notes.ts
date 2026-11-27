@@ -64,16 +64,18 @@ export function privacyNotes(input: PrivacyInput): SettingNotes {
   const area: Line[] = [{ key: `adminSettings.privacy.intro.${facts.audience}` }, nowLine(policy)];
   // Right under "Now", so an owner who sees a coach by initial learns why (R-15).
   if (facts.audience !== 'adult') area.push({ key: 'adminSettings.privacy.unknownAge' });
-  // S-136 as amended in step 2.146's fix round: walk-ups with no age count as children
-  // until an admin marks them, in every league, and the list of them is one tap away.
+  // S-136 as amended in step 2.146's fix and closing rounds: walk-ups with no age are shown
+  // as children whatever the confirmation says, and keep the site out of search, until an
+  // admin marks them, in every league; the list of them is one tap away.
   if (facts.hasWalkUpOfUnknownAge) {
     area.push({
       key: 'adminSettings.privacy.walkUps',
       link: { href: input.walkUpsUrl, key: 'adminSettings.privacy.walkUps.link' },
     });
   }
-  // Someone the confirmation would cover: a recorded child, or a walk-up with no age.
-  const hasChild = facts.hasRecordedChild || facts.hasWalkUpOfUnknownAge;
+  // Someone the confirmation would cover: a recorded child. Never a walk-up with no age
+  // (S-136, step 2.146's closing round): the line above speaks for them.
+  const hasChild = facts.hasRecordedChild;
   // Where adults show in full and children do not (step 2.146): in an adult league with
   // children, that the difference itself tells who is a child, and that "first name and
   // last initial" for everyone avoids it; wherever children are about, that the day a name
@@ -112,9 +114,7 @@ export function privacyNotes(input: PrivacyInput): SettingNotes {
       ? [{ key: 'adminSettings.privacy.confirm.youthOrMixed' }]
       : adultWithoutChildren
         ? [{ key: 'adminSettings.privacy.confirm.adultNoChildren' }]
-        : facts.hasRecordedChild
-          ? [{ key: 'adminSettings.privacy.confirm.adultWithChildren' }]
-          : [{ key: 'adminSettings.privacy.confirm.adultWithWalkUps' }];
+        : [{ key: 'adminSettings.privacy.confirm.adultWithChildren' }];
   return {
     area: { privacy: area },
     rows: { [confirmationKey]: { before, offered } },

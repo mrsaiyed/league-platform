@@ -27,6 +27,8 @@ export type GamePersonRecord = {
   readonly firstName: string;
   readonly lastName: string;
   readonly isMinor: boolean | null;
+  /** Present, and true, only for a walk-up of unknown age (S-136): showName's `walkUp`. */
+  readonly walkUp?: true;
   readonly visibility: string;
 };
 

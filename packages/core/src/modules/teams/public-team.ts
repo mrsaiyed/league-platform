@@ -64,6 +64,8 @@ export type RosterLineSource = {
   readonly firstName: string;
   readonly lastName: string;
   readonly isMinor: boolean | null;
+  /** Present, and true, only for a walk-up of unknown age (S-136): showName's `walkUp`. */
+  readonly walkUp?: true;
   readonly nameRequest: string;
   /** A person in the bin has no name on a public page. */
   readonly personBinned: boolean;
@@ -122,6 +124,7 @@ export function publicRosterLine(
           lastName: source.lastName,
           isMinor: source.isMinor,
           nameRequest: nameRequestOf(source.nameRequest),
+          ...(source.walkUp === true ? { walkUp: true as const } : {}),
         },
         { audience, policy: display.policy, viewer: display.viewer, statsOf: null },
       );

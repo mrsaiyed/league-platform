@@ -291,7 +291,8 @@ export async function addPersonAction(_state: FormState, form: FormData): Promis
 /** "Save details" on a person's page: saved, the page says so beside the details. */
 export async function savePersonAction(_state: FormState, form: FormData): Promise<FormState> {
   const fields = typedOf(form);
-  const { context, deps, list, record, leagueToday, testCopy } = await peopleOf(fields);
+  const { context, deps, list, record, leagueToday, testCopy, leagueStatus } =
+    await peopleOf(fields);
   const personId = (fields['personId'] ?? '').trim().toLowerCase();
   const today = await leagueToday();
   const wrong = wrongBoxes(fields, today);
@@ -314,7 +315,8 @@ export async function savePersonAction(_state: FormState, form: FormData): Promi
     const saved = await updatePerson(context, personChangeInput(fields), deps);
     return saved.ok
       ? { ok: true, personId, firstChild: saved.value.clearedChildrenInFull === true }
-      : { ok: false, code: saved.error.code };
+      : // An archived or suspended league says so, as "Show as" does (step 2.146, Low 11).
+        { ok: false, code: nameRequestRefusalCode(saved.error.code, leagueStatus) };
   });
   if (!result.ok) return refused('update_person', result.code, fields, []);
   if (!uuidShape.test(personId)) return redirect(list);

@@ -192,6 +192,10 @@ export const enError = {
   'error.people.set_name_request.person-not-found': 'That person is not in the league list.',
   'error.people.update_person.changed-since-read':
     'Someone else changed this person’s details while you were looking. What you typed is still here; check it against theirs and save again.',
+  'error.people.update_person.league-archived':
+    'This league is archived, so a person’s details, "An adult" or "A child" included, cannot be changed.',
+  'error.people.update_person.league-suspended':
+    'This league is suspended, so a person’s details, "An adult" or "A child" included, cannot be changed.',
   'error.people.update_person.person-not-found': 'That person is not in the league list.',
   'error.people.update_person.sensitive-fields-not-allowed':
     'You are not allowed to change those details.',

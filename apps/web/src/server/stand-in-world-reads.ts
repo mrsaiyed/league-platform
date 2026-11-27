@@ -23,7 +23,7 @@ import {
 import type { LeagueClock, PublicGameFacts } from './public-schedule.ts';
 import type { PublicSeason } from './public-stats.ts';
 import type { StartPage } from './public-teams.ts';
-import { dayIn, minorAt } from './stand-in-world-clock.ts';
+import { dayIn, minorAt, walkUpIn } from './stand-in-world-clock.ts';
 import { gameRecordOf } from './stand-in-world-games.ts';
 import type {
   WorldGame as StoredGame,
@@ -249,6 +249,7 @@ export function worldGameSnapshot(
           lastName: p.lastName,
           // R-28: the birth date or the tick (list-people-for-display.ts).
           isMinor: minorAt(p, s?.timeZone ?? 'UTC', moment, s?.roster ?? []),
+          ...(walkUpIn(p, s?.roster ?? []) ? { walkUp: true as const } : {}),
           visibility: p.visibility,
         }));
     },
@@ -312,6 +313,7 @@ export function worldPublicRoster(
             lastName: p?.lastName ?? '',
             // R-28: the birth date or the tick (list-public-roster.ts).
             isMinor: p === undefined ? null : minorAt(p, s.timeZone, now, s.roster),
+            ...(p !== undefined && walkUpIn(p, s.roster) ? { walkUp: true as const } : {}),
             nameRequest: p?.visibility ?? 'none',
             personBinned: p === undefined || p.binned,
           },

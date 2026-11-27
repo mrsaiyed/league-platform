@@ -397,6 +397,7 @@ function standingsReadOver(s: ReadWorld | undefined, moment: Date): StandingsRea
           lastName: p.lastName,
           // R-28: the birth date or the tick (list-people-for-display.ts).
           isMinor: minorAt(p, s?.timeZone ?? 'UTC', moment, s?.roster ?? []),
+          ...(walkUpIn(p, s?.roster ?? []) ? { walkUp: true as const } : {}),
           visibility: p.visibility,
         })),
   };

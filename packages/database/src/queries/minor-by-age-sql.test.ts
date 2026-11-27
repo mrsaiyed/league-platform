@@ -330,9 +330,20 @@ describe('the queries that say whether someone is a child read it through isMino
           policy: defaultNamePolicy,
         }),
       );
+      // S-136, the closing round: the parents' confirmation never covers a walk-up.
+      const confirmed = await inB((scope) =>
+        listPublicRoster(scope, home, {
+          viewer: publicViewer(b.leagueId),
+          policy: { ...defaultNamePolicy, childrenInFull: true },
+        }),
+      );
       return {
         minor: rows.find((row) => row.id === walkUp)?.isMinor,
+        walkUpForName: rows.find((row) => row.id === walkUp)?.walkUp,
         names: roster.lines.map((line) => (line.name.shown ? line.name.text : line.name.why)),
+        confirmedNames: confirmed.lines.map((line) =>
+          line.name.shown ? line.name.text : line.name.why,
+        ),
         recorded: await inB((scope) => hasRecordedChild(scope)),
         // S-136 as amended (the fix round): the Privacy screen's fact, Admin → People's
         // list of walk-ups with no age, and the walk-up's own record.
@@ -350,7 +361,9 @@ describe('the queries that say whether someone is a child read it through isMino
     // a recorded child (S-109 reads what an admin recorded).
     expect(await seen()).toEqual({
       minor: true,
+      walkUpForName: true,
       names: expect.arrayContaining(['Wal K.', 'Lis Ted']),
+      confirmedNames: expect.arrayContaining(['Wal K.', 'Lis Ted']),
       recorded: false,
       walkUpFact: true,
       walkUpList: [walkUp],
@@ -361,6 +374,7 @@ describe('the queries that say whether someone is a child read it through isMino
     await pglite.query('update people set is_minor = false where id = $1', [walkUp]);
     expect(await seen()).toMatchObject({
       minor: false,
+      walkUpForName: undefined,
       names: expect.arrayContaining(['Wal Kup']),
       walkUpFact: false,
       walkUpList: [],
@@ -377,6 +391,9 @@ describe('the queries that say whether someone is a child read it through isMino
     ]);
     expect(await seen()).toMatchObject({
       minor: true,
+      walkUpForName: undefined,
+      // A recorded child now: the confirmation covers them.
+      confirmedNames: expect.arrayContaining(['Wal Kup']),
       recorded: true,
       walkUpFact: false,
       walkUpList: [],

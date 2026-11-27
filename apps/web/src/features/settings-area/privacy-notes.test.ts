@@ -160,21 +160,24 @@ describe('privacyNotes', () => {
     expect(row(notes('adult', { given: true }))?.offered).toBe(true);
   });
 
-  // S-136 as amended in step 2.146's fix round (Medium 1 of the review): an adult league
-  // whose only children are walk-ups with no age is offered the confirmation, told why, and
-  // given the list of them; a league with none hears nothing of it.
-  it('offers the confirmation where the only children are walk-ups, and links to them', () => {
+  // S-136 as amended in step 2.146's closing round: the confirmation never covers a walk-up
+  // with no age, so an adult league whose only children are walk-ups is not offered it; it
+  // is told they show as children and keep the site out of search until marked, and given
+  // the list of them; a league with none hears nothing of it.
+  it('does not offer the confirmation where the only children are walk-ups, and links to them', () => {
     const row = (n: SettingNotes) => n.rows?.[confirmationKey];
     const walkUps = notes('adult', { hasWalkUpOfUnknownAge: true });
     expect(row(walkUps)).toEqual({
-      before: [{ key: 'adminSettings.privacy.confirm.adultWithWalkUps' }],
-      offered: true,
+      before: [{ key: 'adminSettings.privacy.confirm.adultNoChildren' }],
+      offered: false,
     });
     expect(walkUps.area?.['privacy']).toContainEqual({
       key: 'adminSettings.privacy.walkUps',
       link: { href: walkUpsUrl, key: 'adminSettings.privacy.walkUps.link' },
     });
-    expect(keys(walkUps)).toContain('adminSettings.privacy.adultWithChildren');
+    expect(en['adminSettings.privacy.walkUps']).toMatch(/whatever the parents’ confirmation/);
+    expect(en['adminSettings.privacy.walkUps']).toMatch(/out of search engines/);
+    expect(keys(walkUps)).not.toContain('adminSettings.privacy.adultWithChildren');
     expect(keys(notes('youth', { hasWalkUpOfUnknownAge: true }))).toContain(
       'adminSettings.privacy.walkUps',
     );
